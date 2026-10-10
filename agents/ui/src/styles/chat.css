@@ -123,3 +123,17 @@
 .editor__count { flex: none; font-variant-numeric: tabular-nums; }
 
 @media (prefers-reduced-motion: reduce) { .tool__dot { animation: none; opacity: 1; } }
+
+/* Notification SentinelL1 : un acteur distinct de l'agent, révélé après la voiture. */
+.sentinel { margin-top: 12px; padding: 12px 14px; border: 1px solid var(--line, #e6e8ee); border-left: 3px solid var(--ink-3, #8590a8);
+  border-radius: 10px; background: rgba(0,0,0,.015); }
+.sentinel--bad { border-left-color: #d03b3b; }
+.sentinel--warn { border-left-color: #e0a019; }
+.sentinel--ok { border-left-color: #0ca30c; }
+.sentinel__head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.sentinel__tag { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; color: var(--ink-3, #8590a8); }
+.sentinel__trust { font-size: 12.5px; color: var(--ink-2, #5b6272); }
+.sentinel__reasons { margin: 6px 0 4px; padding-left: 18px; font-size: 13px; color: var(--ink-2, #5b6272); overflow-wrap: anywhere; }
+.sentinel__reasons li { margin: 0 0 3px; }
+.sentinel__proof { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 13px; }
+.sentinel__proof a { color: inherit; text-underline-offset: 3px; }

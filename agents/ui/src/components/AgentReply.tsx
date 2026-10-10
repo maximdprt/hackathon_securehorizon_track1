@@ -1,12 +1,14 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { initials } from '../agents';
 import { amount, planOf, type AgentMessage, type Step } from '../run';
+import type { Onchain, Verdict } from '../types';
 import type { EndEvent } from '../types';
 import { Alert, Card, Check, Doc, Globe, Pen, Pointer, Scale } from './Icons';
 import { Typed } from './Typed';
+import { ms } from '../timing';
 
 const ICON: Record<Step['kind'], ReactNode> = {
-  search: <Globe />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, invalid: <Alert />, thought: <Doc />,
+  search: <Globe />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, submit: <Globe />, invalid: <Alert />, thought: <Doc />,
 };
 
 function Plan({ msg }: { msg: AgentMessage }) {
@@ -106,14 +108,18 @@ function Outcome({ end }: { end: EndEvent }) {
             Cette boutique a reçu le nom, l'e-mail et l'adresse de {confirmation.buyer.name}, ainsi que le numéro complet de sa carte, sa date
             d'expiration et son cryptogramme.
           </p>
-          <p className="plan__text">Aucun garde n'était branché : le paiement est parti. Le garde se placera juste avant le clic sur « Payer ».</p>
+          {!end.verdict && (
+            <p className="plan__text">Aucun garde n'était branché : le paiement est parti. Le garde se place juste avant le clic sur « Payer ».</p>
+          )}
         </section>
+        {end.verdict && <Sentinel verdict={end.verdict} onchain={end.onchain} />}
       </>
     );
   }
+  // l'agent ne connaît pas le garde : pour un blocage / une attente, il constate seulement que le paiement n'est pas passé
   const text = {
-    blocked: 'Le garde a bloqué le paiement.',
-    needs_approval: 'Le garde demande une validation humaine avant de payer.',
+    blocked: "J'ai lancé le paiement, mais il n'est pas passé.",
+    needs_approval: "J'ai lancé le paiement ; il est en attente d'une validation.",
     no_payment: "Je n'ai rien acheté.",
     max_turns: `Je n'ai pas réussi à finir l'achat en ${end.turns} étapes.`,
     paid: 'Commande passée.',
@@ -122,7 +128,59 @@ function Outcome({ end }: { end: EndEvent }) {
     <>
       <p className="chat__text chat__text--strong">{text}</p>
       {end.final_text && <p className="chat__text">{end.final_text}</p>}
+      {end.verdict && <Sentinel verdict={end.verdict} onchain={end.onchain} />}
     </>
+  );
+}
+
+const VERDICT = {
+  allow: { label: 'Transaction validée', tone: 'ok', effect: 'Visa à usage unique délivré on-chain : ce paiement peut passer, et lui seul.' },
+  needs_approval: { label: "En attente d'un humain", tone: 'warn', effect: 'SentinelL1 ne tranche pas seul : la transaction est garée, un humain décide.' },
+  block: { label: 'Transaction frauduleuse, refusée', tone: 'bad', effect: "Arrêtée à l'entrée de la chaîne : l'argent reste dans le wallet. Destinataire signalé, la prochaine fois refus direct." },
+} as const;
+const TX_LABEL = { visa: 'Visa', flag: 'Signalement', decision: 'Décision' } as const;
+
+/** La notification SentinelL1 : un acteur à part, que l'agent ne connaît pas. Révélée APRÈS la voiture. */
+function Sentinel({ verdict, onchain }: { verdict: Verdict; onchain?: Onchain | null }) {
+  const reveal = ms(900); // le temps que la voiture arrive au péage ; 0 quand les animations sont coupées (tests)
+  const [shown, setShown] = useState(reveal === 0);
+  useEffect(() => {
+    if (reveal === 0) return;
+    const t = setTimeout(() => setShown(true), reveal);
+    return () => clearTimeout(t);
+  }, [reveal]);
+  if (!shown) return <p className="chat__text chat__text--muted">SentinelL1 vérifie la transaction…</p>;
+  const v = VERDICT[verdict.verdict];
+  return (
+    <section className={`sentinel sentinel--${v.tone}`} aria-label="Vérification SentinelL1">
+      <div className="sentinel__head">
+        <span className="sentinel__tag">SentinelL1</span>
+        <span className={`pill pill--${v.tone === 'ok' ? 'ok' : 'warn'}`}>{v.label}</span>
+        {verdict.trust_score != null && <span className="sentinel__trust">confiance {verdict.trust_score}/100</span>}
+      </div>
+      <p className="chat__text">{v.effect}</p>
+      {verdict.reasons.length > 0 && (
+        <ul className="sentinel__reasons">
+          {verdict.reasons.slice(0, 4).map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      )}
+      {verdict.owasp.length > 0 && <p className="chat__text chat__text--muted">OWASP {verdict.owasp.join(' · ')}</p>}
+      {onchain && onchain.ok && (
+        <div className="sentinel__proof">
+          {onchain.txs.map((tx) => (
+            <a key={tx.hash} href={tx.url} target="_blank" rel="noreferrer" className="mono">
+              {TX_LABEL[tx.kind]} {tx.hash.slice(0, 10)}…
+            </a>
+          ))}
+          <a href={onchain.city} target="_blank" rel="noreferrer">
+            Voir la voiture dans la ville 3D
+          </a>
+        </div>
+      )}
+      {onchain && !onchain.ok && <p className="chat__text chat__text--muted">Non inscrit on-chain : {onchain.error}</p>}
+    </section>
   );
 }
 

@@ -15,6 +15,24 @@ export type Confirmation = {
   card: { holder: string; last4: string; exp: string };
 };
 
+/** L'analyse de la transaction à l'entrée de SentinelL1 (outil MCP verify_payment). L'agent ne la voit pas. */
+export type Verdict = {
+  verdict: 'allow' | 'needs_approval' | 'block';
+  trust_score: number | null;
+  risk_score: number | null;
+  severity: number | null;
+  reasons: string[];
+  owasp: string[];
+  onchain_flagged: boolean;
+  instruction_id: string | null;
+  latency_ms: number | null;
+  backend: string | null;
+};
+export type OnchainTx = { kind: 'visa' | 'flag' | 'decision'; hash: string; url: string };
+export type Onchain =
+  | { ok: true; verdict: string; payment_id: string; nonce: number; txs: OnchainTx[]; city: string; latency_ms: number }
+  | { ok: false; verdict: string; error: string };
+
 export type EndEvent = {
   type: 'end';
   outcome: 'paid' | 'blocked' | 'needs_approval' | 'no_payment' | 'max_turns';
@@ -29,6 +47,9 @@ export type EndEvent = {
   turns: number;
   site: Site | null;
   request: unknown;
+  /** Rempli quand le garde était branché : révélé dans l'interface APRÈS la voiture, comme une notification. */
+  verdict?: Verdict | null;
+  onchain?: Onchain | null;
 };
 
 /** Un geste de l'agent, tel que le serveur l'envoie au fil de l'eau (une ligne JSON par geste). */
@@ -41,6 +62,8 @@ export type RunEvent =
   | { type: 'choose'; merchant: string; site: string | null; why: string; considered: Considered[] }
   | { type: 'pay'; site: string; order: Order; items: string[]; submitted: Record<string, string> }
   | { type: 'invalid'; tool: string; message: string }
+  | { type: 'submit'; network: string }
+  | ({ type: 'onchain' } & Onchain)
   | EndEvent
   | { type: 'error'; message: string };
 

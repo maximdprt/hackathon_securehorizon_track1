@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import secrets
 import sys
@@ -33,7 +34,10 @@ sys.path.insert(0, str(ROOT))
 
 from agents import shops, world  # noqa: E402
 from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
+from agents.guard_client import GuardClient  # noqa: E402
 from agents.llm import MODEL_ID, BedrockLLM  # noqa: E402
+from agents.sentinel_chain import API as CHAIN_API, SentinelChain  # noqa: E402
+from agents.sentinel_gateway import verdict_summary  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
 DIST = ROOT / "agents" / "ui" / "dist"  # l'interface React construite par `npm run build`
@@ -57,6 +61,8 @@ SHOP_PATH = re.compile(r"/shop/([a-z0-9]+)(/.*)?")
 SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
 PACE = 0  # le serveur n'attend pas entre deux gestes : c'est l'interface qui les joue à vitesse humaine
 _llms: dict[str, BedrockLLM] = {}
+_guard: GuardClient | None = None   # le garde à l'entrée de la chaîne, réglé au lancement (--guard)
+_chain: SentinelChain | None = None  # l'API authorize de SentinelL1, réglée au lancement (--chain)
 _visitors: dict[str, shops.Session] = {}  # paniers et commandes des humains qui visitent /shop, par cookie
 
 
@@ -112,7 +118,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/world":
             buyer = masked(PROFILE)
             return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID,
-                                    "profile": {"name": buyer["name"], "city": buyer["city"], "card": buyer["card_number"]}})
+                                    "profile": {"name": buyer["name"], "city": buyer["city"], "card": buyer["card_number"]},
+                                    "guard": _guard.backend if _guard else None, "chain": _chain.base if _chain else None})
         if path == "/search":
             query = parse_qs(url.query).get("q", [""])[0]
             page = shops.search_page(query, "/search", lambda key: f"/shop/{key}/").replace('action="/search/"', 'action="/search"')
@@ -152,14 +159,22 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
-            run = run_browser(prompt, llm, instructions=instructions, emit=emit, pace=PACE)  # pas de garde : le paiement part
-            run.update(agent=agent, model=model, backend=None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+            # l'agent ne connaît pas le garde ; run_browser appelle guard.verify au clic "Payer" et ne paie que si allow
+            run = run_browser(prompt, llm, guard=_guard, instructions=instructions, emit=emit, pace=PACE)
+            if run["verdict"] and _chain:  # la transaction entre dans SentinelL1 : le garde a jugé, on inscrit la décision
+                emit({"type": "submit", "network": "SentinelL1"})
+                run["onchain"] = _chain.authorize(run["verdict"], public_site(run["site"]) if run["site"] else None,
+                                                   item=", ".join(world.PRODUCTS[p]["name"] for p in run.get("items", {})) or run.get("chosen", ""))
+                emit({"type": "onchain", **run["onchain"]})
+            run.update(agent=agent, model=model, backend=_guard.backend if _guard else None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
             OUT.mkdir(exist_ok=True)
             with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps(run, ensure_ascii=False) + "\n")
             request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères de HTML lus par l'agent>"}
             keys = ("outcome", "order", "chosen", "why", "considered", "submitted", "confirmation", "expected", "final_text", "turns")
-            emit({"type": "end", **{k: run[k] for k in keys}, "site": public_site(run["site"]) if run["site"] else None, "request": request})
+            emit({"type": "end", **{k: run[k] for k in keys}, "site": public_site(run["site"]) if run["site"] else None, "request": request,
+                  **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], _guard.backend if _guard else None),
+                      "onchain": run.get("onchain")} if run["verdict"] else {})})
         except ConnectionError:
             pass  # l'onglet a été fermé pendant le run
         except Exception as exc:  # identifiants AWS expirés, modèle indisponible...
@@ -176,10 +191,16 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--open", action="store_true", help="ouvre l'interface dans le navigateur")
+    p.add_argument("--guard", choices=["engine", "stub", "off"], default="engine", help="le garde à l'entrée de SentinelL1 (défaut engine)")
+    p.add_argument("--chain", default=CHAIN_API, help="API authorize de SentinelL1, ou off")
     a = p.parse_args()
+    if a.guard != "off":
+        _guard = GuardClient(a.guard)
+        _chain = SentinelChain(a.chain) if a.chain != "off" else None
     url = f"http://127.0.0.1:{a.port}/"
     server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     print(f"Sandbox -> {url}   boutiques : {url}search   (Ctrl+C pour arrêter)")
+    print(f"  garde : {_guard.backend if _guard else 'off'}   chaîne : {_chain.base if _chain else 'off'}   Claude : {os.environ.get('GUARD_LLM','off')}")
     if a.open:
         webbrowser.open(url)
     try:

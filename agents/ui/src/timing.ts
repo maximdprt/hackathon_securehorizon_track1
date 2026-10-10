@@ -46,6 +46,8 @@ function gesture(ev: RunEvent): number {
       return 600;
     case 'pay':
       return 500;
+    case 'submit':
+      return 1300; // la voiture roule jusqu'au péage avant que le verdict se révèle
     default:
       return 0;
   }

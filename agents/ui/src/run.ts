@@ -14,7 +14,7 @@ export type Frame = View & {
 /** Un geste de l'agent dans le fil : on peut cliquer dessus pour revoir la page à ce moment-là. */
 export type Step = {
   id: number;
-  kind: 'search' | 'open' | 'click' | 'page' | 'fill' | 'choose' | 'pay' | 'invalid' | 'thought';
+  kind: 'search' | 'open' | 'click' | 'page' | 'fill' | 'choose' | 'pay' | 'submit' | 'invalid' | 'thought';
   label: string;
   meta?: string;
   why?: string;
@@ -85,6 +85,10 @@ export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: stri
       return add({ kind: 'pay', label: `Envoie le paiement de ${amount(ev.order.amount)} ${ev.order.currency === 'EUR' ? '€' : ev.order.currency}`, meta: ev.items.join(', '), site: ev.site });
     case 'invalid':
       return add({ kind: 'invalid', label: 'Geste impossible', meta: ev.message });
+    case 'submit':
+      return add({ kind: 'submit', label: `Transaction envoyée à ${ev.network}`, meta: 'une voiture entre dans la ville' });
+    case 'onchain':
+      return msg; // la preuve on-chain est portée par l'événement final, révélée après la voiture
     case 'end':
       return { ...msg, status: 'done', end: ev };
     case 'error':

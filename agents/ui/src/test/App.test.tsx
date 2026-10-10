@@ -339,3 +339,35 @@ test('a reason repeated on consecutive steps is written once, and a step waits f
   }
   expect(durationOf(run()[5], true)).toBe(0);
 });
+
+test('with the guard on, the verdict is a SentinelL1 notification, not the agent speaking', async () => {
+  const VERDICT = { verdict: 'block' as const, trust_score: 8, risk_score: 0.92, severity: 3, onchain_flagged: true,
+    instruction_id: '0xab', reasons: ['new_merchant_first_payment: domaine de 9 jours'], owasp: ['ASI07'], latency_ms: 1.2, backend: 'engine' };
+  const ONCHAIN = { ok: true as const, verdict: 'block', payment_id: '0x11', nonce: 1, city: 'https://city.test/?live=1', latency_ms: 900,
+    txs: [{ kind: 'flag' as const, hash: '0xf1f1f1f1f1', url: 'https://explorer.test/tx/0xf1' }, { kind: 'decision' as const, hash: '0xd1d1d1d1d1', url: 'https://explorer.test/tx/0xd1' }] };
+  const events: RunEvent[] = [
+    ...run(MERIDIAN).slice(0, -2), // jusqu'au clic « Payer » inclus
+    { type: 'submit', network: 'SentinelL1' },
+    { type: 'onchain', ...ONCHAIN },
+    { type: 'end', outcome: 'blocked', order: ORDER, chosen: 'Meridian Watch Co.', why: 'prix le plus bas', considered: CONSIDERED,
+      submitted: { card_number: '•••• •••• •••• 4242' }, confirmation: null, expected: 'block', final_text: '', turns: 9,
+      site: MERIDIAN, request: { order: ORDER, task: 'x' }, verdict: VERDICT, onchain: ONCHAIN },
+  ];
+  server(events);
+  render(<App />);
+  await ready();
+  await ask('Achète une Apple Watch Series 10 46 mm');
+
+  // la voix de l'agent : il constate que le paiement n'est pas passé, sans parler du garde
+  expect(await screen.findByText("J'ai lancé le paiement, mais il n'est pas passé.")).toBeInTheDocument();
+  expect(screen.queryByText(/garde a bloqué/)).not.toBeInTheDocument();
+  // la décision vient d'un acteur distinct : SentinelL1
+  const sentinel = screen.getByRole('region', { name: 'Vérification SentinelL1' });
+  expect(within(sentinel).getByText('Transaction frauduleuse, refusée')).toBeInTheDocument();
+  expect(within(sentinel).getByText(/confiance 8\/100/)).toBeInTheDocument();
+  expect(within(sentinel).getByText(/l'argent reste dans le wallet/)).toBeInTheDocument();
+  expect(within(sentinel).getByRole('link', { name: /Signalement 0xf1/ })).toHaveAttribute('href', 'https://explorer.test/tx/0xf1');
+  expect(within(sentinel).getByRole('link', { name: 'Voir la voiture dans la ville 3D' })).toHaveAttribute('href', 'https://city.test/?live=1');
+  // le fil montre bien l'envoi de la transaction
+  expect(screen.getByText('Transaction envoyée à SentinelL1')).toBeInTheDocument();
+});
