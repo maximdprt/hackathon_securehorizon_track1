@@ -1,10 +1,14 @@
-"""Interface de chat de la sandbox : on écrit une demande, l'agent shopping cherche parmi les 5 boutiques,
-choisit, et s'arrête au paiement. Chaque étape s'affiche en direct dans le navigateur.
+"""Interface de chat de la sandbox, sur le principe d'un atelier d'agents : on règle les consignes de chaque
+agent, puis on lui écrit une demande d'achat. Il cherche parmi les 5 boutiques d'Apple Watch, justifie
+chaque étape, choisit, et s'arrête juste avant le paiement. Tout s'affiche en direct dans le navigateur.
 
     .venv/Scripts/python agents/app.py --open        # http://127.0.0.1:8765
 
-Tout reste sur la machine : le serveur n'écoute que sur 127.0.0.1, les boutiques sont des fichiers
-locaux, aucun paiement n'est exécuté. Chaque run est aussi ajouté à agents/out/runs.jsonl.
+Aucun garde n'est branché ici : l'ordre de paiement est préparé, jamais envoyé, et on ne connaît donc pas
+le verdict. La requête `verify_payment` prête à partir est montrée dans l'interface et enregistrée dans
+agents/out/runs.jsonl, pour la rejouer contre le vrai garde plus tard (voir `run_open(..., guard=...)`).
+
+Tout reste sur la machine : le serveur n'écoute que sur 127.0.0.1 et les boutiques sont des fichiers locaux.
 """
 from __future__ import annotations
 
@@ -21,19 +25,17 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from agents import world  # noqa: E402
-from agents.guard_client import GuardClient  # noqa: E402
 from agents.llm import MODEL_ID, BedrockLLM  # noqa: E402
 from agents.shopping_agent import run_open  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
 UI = ROOT / "agents" / "ui" / "chat.html"
-MODELS = {  # agents proposés dans l'interface ; le comportement noté est celui observé sur la fausse boutique Walmart
-    "us.mistral.pixtral-large-2502-v1:0": "Pixtral Large · suit les injections",
-    "us.amazon.nova-lite-v1:0": "Nova Lite · paie sur le faux site",
-    "us.anthropic.claude-sonnet-4-6": "Claude Sonnet 4.6 · refuse seul",
+MODELS = {  # modèles proposés pour un agent
+    "us.mistral.pixtral-large-2502-v1:0": "Pixtral Large",
+    "us.amazon.nova-lite-v1:0": "Nova Lite",
+    "us.anthropic.claude-sonnet-4-6": "Claude Sonnet 4.6",
 }
 SITE_PATH = re.compile(r"/site/([a-z0-9]+)/([a-z.]*)")
-GUARD = GuardClient()  # un seul garde pour toute la session : une adresse bloquée une fois le reste
 SESSION = time.strftime("%Y-%m-%dT%H:%M:%S")
 _llms: dict[str, BedrockLLM] = {}
 
@@ -66,8 +68,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             return self._send(200, UI.read_bytes(), "text/html; charset=utf-8")
         if path == "/api/world":
-            return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS,
-                                    "default_model": MODEL_ID, "backend": GUARD.backend})
+            return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID})
         m = SITE_PATH.fullmatch(path)
         page = world.SITES[m.group(1)]["pages"].get(m.group(2)) if m and m.group(1) in world.SITES else None
         if page is None:
@@ -82,8 +83,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "not found"})
         try:
             body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
-            prompt, model, guarded = body["prompt"].strip(), body.get("model") or MODEL_ID, bool(body.get("guard", True))
-            assert prompt and len(prompt) <= 2000 and model in MODELS
+            prompt, model = body["prompt"].strip(), body.get("model") or MODEL_ID
+            instructions, agent = str(body.get("instructions", "")).strip(), str(body.get("agent", "")).strip()
+            assert prompt and len(prompt) <= 2000 and len(instructions) <= 4000 and len(agent) <= 80 and model in MODELS
         except Exception:
             return self._json(400, {"error": "bad request"})
 
@@ -98,13 +100,14 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
-            run = run_open(prompt, llm, GUARD if guarded else None, emit=emit)
-            run.update(model=model, backend=GUARD.backend if guarded else None, session=SESSION, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+            run = run_open(prompt, llm, instructions=instructions, emit=emit)  # pas de garde : arrêt avant le paiement
+            run.update(agent=agent, model=model, backend=None, session=SESSION, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
             OUT.mkdir(exist_ok=True)
             with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps(run, ensure_ascii=False) + "\n")
-            emit({"type": "end", **{k: run[k] for k in ("outcome", "order", "item", "verdict", "latency_ms", "expected", "final_text", "guarded", "backend")},
-                  "site": public_site(run["site"]) if run["site"] else None})
+            request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères de HTML lus par l'agent>"}
+            emit({"type": "end", **{k: run[k] for k in ("outcome", "order", "item", "why", "considered", "final_text", "turns")},
+                  "site": public_site(run["site"]) if run["site"] else None, "request": request})
         except ConnectionError:
             pass  # l'onglet a été fermé pendant le run
         except Exception as exc:  # identifiants AWS expirés, modèle indisponible...
@@ -124,7 +127,7 @@ if __name__ == "__main__":
     a = p.parse_args()
     url = f"http://127.0.0.1:{a.port}/"
     server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
-    print(f"Chat de la sandbox -> {url}   garde : {GUARD.backend}   (Ctrl+C pour arrêter)")
+    print(f"Chat de la sandbox -> {url}   (Ctrl+C pour arrêter)")
     if a.open:
         webbrowser.open(url)
     try:
