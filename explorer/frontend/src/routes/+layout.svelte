@@ -4,6 +4,7 @@
 	import Footer from '$lib/components/layout/Footer.svelte';
 	import FirstVisitBanner from '$lib/components/layout/FirstVisitBanner.svelte';
 	import PagePreloader from '$lib/components/PagePreloader.svelte';
+	import SimPanel from '$lib/components/SimPanel.svelte';
 	import { _ } from 'svelte-i18n';
 
 	let { children } = $props();
@@ -32,30 +33,6 @@
 		name="keywords"
 		content={$_('meta.keywords')}
 	/>
-	<script async src="https://www.googletagmanager.com/gtag/js?id=AW-403783252"></script>
-	<script>
-		window.dataLayer = window.dataLayer || [];
-		function gtag() {
-			dataLayer.push(arguments);
-		}
-		gtag('js', new Date());
-		gtag('config', 'AW-403783252');
-	</script>
-	<script>
-		!function (e, t, n, s, u, a) {
-			e.twq || ((s = e.twq = function () {
-				s.exe ? s.exe.apply(s, arguments) : s.queue.push(arguments);
-			}),
-			(s.version = '1.1'),
-			(s.queue = []),
-			(u = t.createElement(n)),
-			(u.async = !0),
-			(u.src = 'https://static.ads-twitter.com/uwt.js'),
-			(a = t.getElementsByTagName(n)[0]),
-			a.parentNode.insertBefore(u, a));
-		}(window, document, 'script');
-		twq('config', 'pdzkg');
-	</script>
 </svelte:head>
 
 <div class="flex min-h-screen w-screen flex-col">
@@ -68,6 +45,7 @@
 </div>
 
 <PagePreloader />
+<SimPanel />
 
 <style lang="postcss">
 	@reference "$lib/../app.css";
