@@ -204,7 +204,9 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
     const bySubnet = catalogBySubnet(network);
     // AVAGUARD: our L1 joins the chain feed before the plan, and its street to the C-Chain joins the flows; a network
     // whose feed has no ICM at all (Fuji today) gets plausible flows between the C-Chain and its most validated chains
-    const fed = chains ? [...chains.filter((c) => String(c.chainId) !== AVAGUARD_ID), AVAGUARD_CHAIN] : null;
+    // SENTINEL: the demo city is ONLY our L1 (Sentinel) + the C-Chain hub it reports to. Every other chain and its
+    // ICM traffic is removed, so the main road, the toll and the car's journey read clearly (not a 231-chain map).
+    const fed = chains ? [...chains.filter((c) => String(c.chainId) === hubId), AVAGUARD_CHAIN] : null;
     const icmSimulated = !!fed && !flows.some((f) => f.messageCount > 0);
     const allFlows = [
       ...(icmSimulated ? simulatedFlows(fed!, hubId) : flows),
@@ -312,7 +314,11 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
         blockchainId: r.blockchainId,
       });
     }
-    const base = [...listed.map((c) => (freshAt.has(c.id) ? { ...c, newAt: freshAt.get(c.id)! } : c)), ...guests];
+    // SENTINEL: the demo keeps ONLY our L1 + the C-Chain hub. Every other listed chain and every P-Chain resident
+    // (the Frontier guests) is dropped, so the city is just Sentinel's ward and the blockchain it reports to.
+    const base = [...listed.map((c) => (freshAt.has(c.id) ? { ...c, newAt: freshAt.get(c.id)! } : c)), ...guests].filter(
+      (c) => c.id === hubId || c.id === AVAGUARD_ID,
+    );
 
     const metric = (c: (typeof base)[number]) => (byMessages ? c.out + c.in : c.validators);
     const top = Math.max(byMessages ? 1 : H_TOP_MIN, ...base.map(metric));

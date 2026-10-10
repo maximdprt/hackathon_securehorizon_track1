@@ -4,7 +4,7 @@ import type { MapChain } from "@/components/explorer-v2/network/city-data";
 
 /** demo id until Walid's L1 has its chain ID; set NEXT_PUBLIC_AVAGUARD_CHAIN_ID to the real one */
 export const AVAGUARD_ID = process.env.NEXT_PUBLIC_AVAGUARD_CHAIN_ID || "avaguard-l1";
-export const AVAGUARD_NAME = "AvaGuard L1";
+export const AVAGUARD_NAME = "Sentinel L1";
 /** a hackathon L1's validator set */
 export const AVAGUARD_VALIDATORS = 5;
 /** our HQ is a skyline landmark whatever its validator count, so it reads from the home view */

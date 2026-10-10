@@ -68,7 +68,7 @@ const CARD = "absolute inset-0 -z-10 rounded-2xl border border-zinc-200/90 bg-wh
 const SEG_ON = "flex items-center rounded-xl bg-zinc-100 px-3 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50";
 const SEG_OFF = "flex items-center rounded-xl px-3 text-zinc-400 dark:text-zinc-600";
 
-/** the site's navbar replaced by ours: the shield and AvaGuard+, our tabs, the search, the theme, the badge */
+/** the site's navbar replaced by ours: the shield and Sentinel, our tabs, the search, the theme, the badge */
 function TopBar({ panel, onTab, onSearch }: { panel: Panel; onTab: (p: Panel) => void; onSearch: () => void }) {
   const [dark, setDark] = useState(true);
   useEffect(() => setDark(document.documentElement.classList.contains("dark")), []);
@@ -85,7 +85,7 @@ function TopBar({ panel, onTab, onSearch }: { panel: Panel; onTab: (p: Panel) =>
           <path d="M13 2 L23 6 V13 C23 18.5 18.8 22.6 13 24 C7.2 22.6 3 18.5 3 13 V6 Z" fill="none" stroke="#3FD08F" strokeWidth="2.2" strokeLinejoin="round" />
           <path d="M8.5 13.2 L11.8 16.4 L17.6 10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-50">AvaGuard+</span>
+        <span className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-50">Sentinel</span>
       </div>
       <nav aria-label="Sections" className="absolute left-1/2 flex -translate-x-1/2 items-center gap-6">
         {tabs.map((t) => {
@@ -115,7 +115,7 @@ function TopBar({ panel, onTab, onSearch }: { panel: Panel; onTab: (p: Panel) =>
         >
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
-        <span className="rounded-md border border-[#F2B33D]/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[#F2B33D]">Concept AvaGuard+ · simulation</span>
+        <span className="rounded-md border border-[#F2B33D]/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[#F2B33D]">Concept Sentinel · simulation</span>
       </div>
     </header>
   );
@@ -358,7 +358,7 @@ export default function CityShell() {
         {/* the key in the bottom left corner (city-key.tsx), and ours above it */}
         <div data-city-hud className="absolute bottom-[calc(var(--frame)+1.4rem)] left-(--frame) z-30 hidden flex-col gap-2 xl:flex" style={{ width: KEY_W }}>
           <div className={cn("rounded-2xl px-4 py-3", GLASS)}>
-            <div className="mb-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">AvaGuard</div>
+            <div className="mb-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">Sentinel</div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               {(["verify", "allow", "block", "human"] as const).map((t) => (
                 <span key={t} className="flex items-center gap-1.5 text-[11.5px] text-zinc-700 dark:text-zinc-300">
@@ -422,7 +422,7 @@ export default function CityShell() {
         </button>}
 
         {/* the licence's mention, as the prompt asks */}
-        <p className="pointer-events-none absolute inset-x-0 bottom-1 z-10 text-center font-mono text-[9.5px] text-zinc-500 dark:text-zinc-500">City 3D d&apos;après le code open source Avalanche Builder Hub (BSD-3) · Concept AvaGuard+ · simulation</p>
+        <p className="pointer-events-none absolute inset-x-0 bottom-1 z-10 text-center font-mono text-[9.5px] text-zinc-500 dark:text-zinc-500">City 3D d&apos;après le code open source Avalanche Builder Hub (BSD-3) · Concept Sentinel · simulation</p>
       </div>
     </div>
   );

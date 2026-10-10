@@ -24,7 +24,7 @@ import type { Shot } from "./Rig";
 import { TIME } from "./shaders";
 import { CANOPY_H, EQUATOR, PODS, ROOF, podGeometry } from "./Traffic";
 import { guardGeoOf, poseAt, type GuardGeo } from "./guardGeo";
-import { Crown, HumanLot, ProofStack, Scrapyard, Toll } from "./Parcel";
+import { Crown, HumanLot, ProofStack, Road, Scrapyard, Toll } from "./Parcel";
 
 type Props = { model: CityModel; city: City; routes: Route[]; streets: RouteStreets[]; theme: Theme; still: boolean; onShot: (s: Shot | null) => void; cameraRef?: RefObject<CameraHandle | null> };
 
@@ -391,7 +391,7 @@ function Verdict({ geo }: { geo: GuardGeo }) {
           <svg width="14" height="14" viewBox="0 0 26 26" aria-hidden>
             <path d="M13 2 L23 6 V13 C23 18.5 18.8 22.6 13 24 C7.2 22.6 3 18.5 3 13 V6 Z" fill="none" stroke="#3FD08F" strokeWidth="2.4" strokeLinejoin="round" />
           </svg>
-          Accepté et protégé par AvaGuard+
+          Accepté et protégé par Sentinel
         </div>
       </Html>
     </group>
@@ -456,6 +456,7 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
   if (!geo) return null;
   return (
     <group>
+      <Road geo={geo} theme={theme} />
       <Crown geo={geo} theme={theme} />
       <Toll geo={geo} theme={theme} />
       <HumanLot geo={geo} theme={theme} />

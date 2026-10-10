@@ -198,7 +198,7 @@ export function AuditPanel() {
   const blocks = useSim((s) => s.blocks);
   return (
     <PanelShell name="audit" title="Audit · preuves on-chain" width={372}>
-      {blocks.length === 0 && <p className="p-4 text-[12.5px] text-zinc-500">Chaque décision écrit un bloc sur AvaGuard L1.</p>}
+      {blocks.length === 0 && <p className="p-4 text-[12.5px] text-zinc-500">Chaque décision écrit un bloc sur Sentinel L1.</p>}
       <ul className="divide-y divide-zinc-100 dark:divide-zinc-900">
         {[...blocks].reverse().map((b) => (
           <li key={b.n} className="flex items-center gap-2 px-4 py-2.5 text-[12.5px]">

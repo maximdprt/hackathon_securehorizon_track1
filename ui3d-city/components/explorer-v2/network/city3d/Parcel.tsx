@@ -11,7 +11,7 @@ import { Color, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial, Vector3 } f
 import { cn } from "@/lib/utils";
 import { motion, useSim } from "@/sim/store";
 import { HALO } from "./Labels";
-import { AVAGUARD3, GROUND, MASS3, ROOF, type Theme } from "./palette";
+import { AVAGUARD3, FLEET, GROUND, MASS3, ROOF, type Theme } from "./palette";
 import type { GuardGeo } from "./guardGeo";
 
 const lambert = (c: string) => new MeshLambertMaterial({ color: c });
@@ -57,8 +57,8 @@ function Block({ w, h, d, x = 0, y0 = 0, z = 0, mat }: { w: number; h: number; d
 export function Toll({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const { p, yaw, span } = geo.toll;
   const S = geo.S;
-  const H = Math.max(S * 0.85, geo.carW * 2.6);
-  const post = Math.max(1, S * 0.07);
+  const H = Math.max(S * 1.25, geo.carW * 3.8);
+  const post = Math.max(1.7, S * 0.11);
   const mats = useMemo(
     () => ({ frame: lambert(AVAGUARD3.gate[theme]), wall: lambert(MASS3.wall[theme]), band: basic(AVAGUARD3.band[theme]), red: lambert(AVAGUARD3.barrier[theme]), white: lambert("#F4F6F9"), scan: new MeshBasicMaterial({ color: AVAGUARD3.verify[theme], transparent: true, opacity: 0.35, depthWrite: false, toneMapped: false }), floor: new MeshBasicMaterial({ color: AVAGUARD3.verify[theme], transparent: true, opacity: 0.25, depthWrite: false, toneMapped: false }) }),
     [theme],
@@ -104,7 +104,7 @@ export function Toll({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
         <planeGeometry args={[span * 0.85, H * 0.9]} />
       </mesh>
       <Word at={[0, H + post * 3.4, 0]} tone={AVAGUARD3.band[theme]} small>
-        Contrôle AvaGuard+
+        Contrôle Sentinel
       </Word>
     </group>
   );
@@ -240,6 +240,59 @@ export function ProofStack({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
       <Word at={[0, 0.3 + size * (blocks.length + 1.2) * 1.08, 0]} tone={AVAGUARD3.proof[theme]} small>
         Preuve on-chain{blocks.length ? ` · #${blocks[blocks.length - 1].n}` : ""}
       </Word>
+    </group>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* the main road: a lit ribbon from the HQ through the toll to the hub */
+/* ------------------------------------------------------------------ */
+
+/** SENTINEL: the avenue the car drives. A dark asphalt ribbon along approach+toCChain with a glowing centre line, so
+    the toll clearly straddles one main road from spawn to the blockchain. */
+export function Road({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
+  const { road, center } = useMemo(() => {
+    const a = geo.legs.approach.pts;
+    const b = geo.legs.toCChain.pts;
+    const pts = [...a, ...b.slice(a.length && b[0].distanceTo(a[a.length - 1]) < 0.5 ? 1 : 0)];
+    const ribbon = (hw: number, y: number) => {
+      const pos: number[] = [];
+      const idx: number[] = [];
+      for (let i = 0; i < pts.length; i++) {
+        const pa = pts[Math.max(0, i - 1)];
+        const pb = pts[Math.min(pts.length - 1, i + 1)];
+        const tx = pb.x - pa.x;
+        const tz = pb.z - pa.z;
+        const len = Math.hypot(tx, tz) || 1;
+        const nx = -tz / len;
+        const nz = tx / len;
+        const p = pts[i];
+        pos.push(p.x + nx * hw, y, p.z + nz * hw, p.x - nx * hw, y, p.z - nz * hw);
+      }
+      for (let i = 0; i < pts.length - 1; i++) {
+        const k = i * 2;
+        idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+      }
+      return { position: new Float32Array(pos), index: new Uint16Array(idx) };
+    };
+    return { road: ribbon(geo.carW * 1.6, 0.03), center: ribbon(Math.max(0.32, geo.carW * 0.13), 0.06) };
+  }, [geo]);
+  const asphalt = useMemo(() => basic(theme === "dark" ? "#3A424E" : "#C3CEDB"), [theme]);
+  const line = useMemo(() => new MeshBasicMaterial({ color: AVAGUARD3.verify[theme], transparent: true, opacity: 0.95, toneMapped: false, depthWrite: false }), [theme]);
+  return (
+    <group>
+      <mesh material={asphalt} renderOrder={-1}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[road.position, 3]} />
+          <bufferAttribute attach="index" args={[road.index, 1]} />
+        </bufferGeometry>
+      </mesh>
+      <mesh material={line}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" args={[center.position, 3]} />
+          <bufferAttribute attach="index" args={[center.index, 1]} />
+        </bufferGeometry>
+      </mesh>
     </group>
   );
 }
