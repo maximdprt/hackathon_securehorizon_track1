@@ -32,7 +32,6 @@ ROOT = Path(__file__).resolve().parent.parent
 SOL = ROOT / "contracts" / "AuthorityRegistry.sol"
 SOLC_VERSION = "0.8.20"
 DECIMALS = 6  # USDC; must equal GUARD_TOKEN_DECIMALS (default 6 in ChainSource)
-ALLOW, NEEDS_APPROVAL, BLOCK = 0, 1, 2
 
 # golden path acts (mirrors redteam/cases/M1_* and M7_*)
 ACT1 = json.loads((ROOT / "redteam" / "cases" / "M1_low_priv_agent_to_treasury.json").read_text())["request"]
@@ -171,8 +170,9 @@ def test_golden_path_on_the_real_contract(engine, registry, chain_source):
 
     # ---- Act 1: the reader relays a poisoned "treasury migration" order of 5000 USDC to 0xBAD
     act1_id = subject_key(VerifyRequest.from_dict(ACT1).order.instruction_id())
-    # before the guard speaks, the contract alone would let it through: maxAmount 0 = no cap, and assess() knows no roles
-    assert registry.functions.assess(reader, act1_id, amt(5000)).call() == ALLOW
+    # before the guard speaks, the contract alone would let it through: maxAmount 0 = no cap, and isAuthorized() knows no roles
+    assert registry.functions.isAuthorized(reader, amt(5000)).call() is True
+    assert list(registry.functions.isFlagged(act1_id).call()) == [False, 0]
 
     v1 = engine.verify(ACT1)
     assert v1["verdict"] == "block" and v1["severity"] == 3
@@ -189,17 +189,17 @@ def test_golden_path_on_the_real_contract(engine, registry, chain_source):
     assert registry.functions.authorities(reader).call()[0] is True
     assert threat(registry, R) == (False, 0, "")
 
-    # DORA trail: one DecisionRecorded, verdict BLOCK, right issuer / amount / instruction id
+    # DORA trail: one DecisionRecorded, verdict "block", right issuer / instruction id (the event carries no amount)
     logs = decisions(registry)
     assert len(logs) == 1
     ev = logs[0]["args"]
-    assert ev["verdict"] == BLOCK and ev["issuer"] == reader and ev["amount"] == amt(5000)
-    assert ev["instructionId"] == subject_key(v1["instruction_id"]) and ev["reason"]
+    assert ev["verdict"] == "block" and ev["issuer"] == reader
+    assert ev["paymentId"] == subject_key(v1["instruction_id"]) and ev["reason"]
     assert logs[0]["transactionHash"].hex().removeprefix("0x") == tx_hex(v1["onchain_tx"])  # the sink's tx is the event's tx
     assert Web3.to_checksum_address(chain_source.w3.eth.get_transaction(logs[0]["transactionHash"])["from"]) == owner
 
-    # the contract's own verdict now agrees with the engine: the flagged instruction hash forces BLOCK (2)
-    assert registry.functions.assess(reader, act1_id, amt(5000)).call() == BLOCK
+    # the contract now remembers the engine's verdict: the instruction hash is flagged at severity 3
+    assert list(registry.functions.isFlagged(act1_id).call()) == [True, 3]
 
     # ---- Act 2: legit treasury invoice, 80 USDC to an allowlisted vendor, ordered by the user
     v2 = engine.verify(ACT2)
@@ -208,8 +208,9 @@ def test_golden_path_on_the_real_contract(engine, registry, chain_source):
     logs = decisions(registry)
     assert len(logs) == 2
     ev = logs[1]["args"]
-    assert ev["verdict"] == ALLOW and ev["issuer"] == treasury and ev["amount"] == amt(80)
-    assert registry.functions.assess(treasury, subject_key(v2["instruction_id"]), amt(80)).call() == ALLOW
+    assert ev["verdict"] == "allow" and ev["issuer"] == treasury
+    assert registry.functions.isAuthorized(treasury, amt(80)).call() is True
+    assert list(registry.functions.isFlagged(subject_key(v2["instruction_id"])).call()) == [False, 0]
     assert threat(registry, VENDOR) == (False, 0, "")
 
     # ---- Act 3: a different, fully authorized agent (treasury) pays 10 USDC to 0xBAD: immune via the registry
@@ -221,13 +222,12 @@ def test_golden_path_on_the_real_contract(engine, registry, chain_source):
     assert "severity 3" in sig["recipient_flagged_onchain"]["evidence"]
     assert "sink_errors" not in v3
     logs = decisions(registry)
-    assert len(logs) == 3 and logs[2]["args"]["verdict"] == BLOCK and logs[2]["args"]["issuer"] == treasury
+    assert len(logs) == 3 and logs[2]["args"]["verdict"] == "block" and logs[2]["args"]["issuer"] == treasury
     # the treasury agent itself is not flagged (it was authorized, the recipient was the problem)
     assert threat(registry, T) == (False, 0, "")
-    # known gap: assess() takes no recipient, so on-chain alone act 3 would still be ALLOW; the engine is the stricter layer
-    assert registry.functions.assess(treasury, subject_key(v3["instruction_id"]), amt(10)).call() == BLOCK  # its own hash got flagged
-    fresh_id = Web3.keccak(text="some-other-order")
-    assert registry.functions.assess(treasury, fresh_id, amt(10)).call() == ALLOW
+    # isAuthorized() takes no recipient, so on-chain alone act 3 would still pass; the engine (or a visa) is the stricter layer
+    assert registry.functions.isAuthorized(treasury, amt(10)).call() is True
+    assert list(registry.functions.isFlagged(subject_key(v3["instruction_id"])).call()) == [True, 3]  # its own hash got flagged
 
     # ---- the in-memory verdicts carry the 3 tx hashes, in the order the events were mined
     assert [tx_hex(v["onchain_tx"]) for v in (v1, v2, v3)] == [l["transactionHash"].hex().removeprefix("0x") for l in logs]

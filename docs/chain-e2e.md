@@ -138,4 +138,8 @@ Les 5 bugs de la section 4 sont corrigés dans `guard/sources.py` et `guard/engi
 3. `Engine.from_env` place `ChainSink` avant `JsonlSink` : `decisions.jsonl` contient `onchain_tx`.
 4. Hash de tx renvoyé via `w3.to_hex` (préfixe 0x).
 5. Montants convertis via `Decimal(str(amount))`, plus de troncature.
-Les écarts contrat / moteur de la section 3 restent à traiter côté Walid (sémantique `maxAmount == 0`, `assess` sans destinataire, `recordDecision` sans `onlyOwner`).
+**Mise à jour 2026-10-10 (merge de main, contrat SentinelL1 déployé `0x7A7e…bcb6`)** :
+- `recordDecision(bytes32 paymentId, address issuer, string verdict, string reason)` : plus de montant ni de code `uint8`. Le verdict est une chaîne (`allow` / `block` / `needs_human`, comme `api/authorize.py`). `ChainSink` traduit `needs_approval` en `needs_human` pour que le feed 3D gare la voiture. ABI de `guard/sources.py` et `tests/test_chain_e2e.py` alignés.
+- Écart C réglé : `recordDecision` et `flagThreat` sont `onlyAuthorizer`.
+- Écart B : `assess()` n'existe plus. Le contrat expose `isAuthorized(issuer, amount)` (toujours sans destinataire) et `isFlagged(subject)`. Le vrai pare-feu on-chain est désormais le visa à usage unique vérifié par `GuardedVault`.
+- Écart A (`maxAmount == 0` = sans plafond) reste ouvert.

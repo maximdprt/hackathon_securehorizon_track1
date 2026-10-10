@@ -84,7 +84,7 @@ ABI = json.loads("""[
  {"inputs":[{"name":"subject","type":"bytes32"}],"name":"isFlagged","outputs":[{"name":"","type":"bool"},{"name":"","type":"uint8"}],"stateMutability":"view","type":"function"},
  {"inputs":[{"name":"","type":"bytes32"}],"name":"threats","outputs":[{"name":"flagged","type":"bool"},{"name":"severity","type":"uint8"},{"name":"reason","type":"string"},{"name":"disputed","type":"bool"},{"name":"flaggedAt","type":"uint256"}],"stateMutability":"view","type":"function"},
  {"inputs":[{"name":"subject","type":"bytes32"},{"name":"severity","type":"uint8"},{"name":"reason","type":"string"}],"name":"flagThreat","outputs":[],"stateMutability":"nonpayable","type":"function"},
- {"inputs":[{"name":"instructionId","type":"bytes32"},{"name":"issuer","type":"address"},{"name":"amount","type":"uint256"},{"name":"verdict","type":"uint8"},{"name":"reason","type":"string"}],"name":"recordDecision","outputs":[],"stateMutability":"nonpayable","type":"function"}
+ {"inputs":[{"name":"paymentId","type":"bytes32"},{"name":"issuer","type":"address"},{"name":"verdict","type":"string"},{"name":"reason","type":"string"}],"name":"recordDecision","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ]""")
 
 
@@ -151,7 +151,7 @@ class ChainSource:
         # nonces stay local: the contract has no nonce store
         return self.fallback.nonce_seen(nonce) if self.fallback else False
 
-    def record_decision(self, instruction_id: str, issuer: str, amount: float, verdict_code: int, reason: str) -> str:
+    def record_decision(self, instruction_id: str, issuer: str, verdict: str, reason: str) -> str:
         from web3 import Web3
         return self._send(self.contract.functions.recordDecision(
-            subject_key(instruction_id), Web3.to_checksum_address(issuer), self.to_units(amount), verdict_code, reason[:200]))
+            subject_key(instruction_id), Web3.to_checksum_address(issuer), verdict, reason[:200]))

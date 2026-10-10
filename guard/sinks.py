@@ -10,7 +10,8 @@ from typing import Protocol
 from guard.models import safe_json
 
 log = logging.getLogger("guard.sinks")
-VERDICT_CODE = {"allow": 0, "needs_approval": 1, "block": 2}
+# on-chain verdict strings, as api/authorize.py writes them (the 3D feed maps needs_human -> park)
+ONCHAIN_VERDICT = {"allow": "allow", "needs_approval": "needs_human", "block": "block"}
 
 
 class DecisionSink(Protocol):
@@ -41,8 +42,7 @@ class ChainSink:
 
     def record(self, verdict: dict) -> None:
         reason = "; ".join(verdict.get("reasons", []))[:200]
-        tx = self.chain.record_decision(verdict["instruction_id"], verdict["issuer"], float(verdict["amount"]),
-                                        VERDICT_CODE[verdict["verdict"]], reason)
+        tx = self.chain.record_decision(verdict["instruction_id"], verdict["issuer"], ONCHAIN_VERDICT[verdict["verdict"]], reason)
         verdict["onchain_tx"] = tx
 
 
