@@ -154,6 +154,8 @@ Chiffres (arXiv "Five Attacks on x402") : métadonnées manipulées = **71,8 %**
 | Gas abuse / service denial | Preuves peu coûteuses à générer mais chères à valider ; création d'ATA inutile sur Solana | Chemin d'exécution anormal | 22,9 k tx suspectes, 5,7 k $ |
 | Fuite de métadonnées | `resource_url`, `description`, `reason` voyagent en clair vers le facilitateur | PII ou instructions dans les métadonnées | arXiv 2604.11430 |
 | Structuring | Plusieurs petits paiements sous le seuil au lieu d'un gros | Somme glissante sur une fenêtre de temps | |
+| Signature replay cross-chain | Signature valide sur une chaîne rejouée sur une autre faute de `chainId` dans le domaine EIP-712 | `chainId` absent ou incorrect dans le domaine signé | EIP-712 §4 |
+| MEV / front-running du visa | Un bot observe la tx visa en mempool et insère sa tx avant (sandwich, drain) | Mempool public, pas de commit-reveal ni private relay | limite PoC, à documenter |
 
 État de l'écosystème (arXiv 2607.19545, 119 M de tx, oct à déc 2025) : **15/15 facilitateurs** étudiés violent au moins une règle de sécurité, 14/15 acceptent des règlements économiquement absurdes, **93 % des serveurs dépendent d'un seul facilitateur**. Pour notre contrat visa : lier le visa à (émetteur, action, montant, destinataire, nonce, facilitateur), encodage canonique type EIP-712, grants à usage unique.
 
@@ -183,6 +185,22 @@ Signal : l'ordre n'a pas de source dans le tour courant, il vient de la mémoire
 - **Auto-approbation** : l'agent est poussé à activer un mode "ne plus demander"
 
 Signal : toute mention d'approbation dans les données, pas dans le canal de contrôle.
+
+### J. Attaques sur le modèle et le runtime
+
+Les sections A à I visent les entrées, les sorties et la contrepartie. Le modèle et son runtime sont une surface distincte : si l'un des deux est compromis, le scoring devient non fiable à la racine.
+
+| Technique | Mécanisme | Signal | Mapping |
+|---|---|---|---|
+| Jailbreak / policy bypass | Role-play (DAN, "mode dev"), grandma exploit, pour contourner les refus intégrés | Lexique jailbreak + sortie qui dévie du mandat | ASI01, ASI09 |
+| Model / tool extraction | L'attaquant fait énumérer à l'agent ses tools, prompts système, limites, en vue d'une attaque ciblée | Requête de self-introspection + exfiltration | ASI08 |
+| Supply chain runtime | LoRA empoisonné, dépendance npm/pypi vérolée, image Docker compromise, backdoor qui signe à la place de l'agent | Hash de modèle/adapter, SBOM, intégrité du conteneur | ASI04 |
+| Slopsquatting | Squat proactif des noms de packages, adresses, APIs que les modèles hallucinent le plus | Nom cité sans source, âge du package / de l'adresse | ASI04 |
+| Capability escalation MCP | Chaque tool est OK isolément, mais la composition (ex `read_file` + `http_post`) = exfiltration | Chaîne de tools qui excède le mandat | ASI02, ASI07 |
+| DoS économique / griefing | Spam de requêtes payantes pour cramer le budget de l'agent victime sur du bruit | Vélocité anormale + ratio succès/coût effondré | ASI08 (cascading) |
+| Reward hacking sur L1 | Si la chaîne distribue de la crypto en reward (roadmap §9), un bot boucle des transactions bidon pour farmer | Même émetteur en boucle, montants juste au-dessus du seuil de reward | product-specific |
+
+Impact scoring : features à ajouter côté Transaction / Autorité : `chainid_in_signature` (bool, faux → block), `permit_signature_detected` (bool, vrai sans mandat → needs_approval), `tool_chain_capability_score` (float, > seuil → needs_approval), `reward_claim_velocity` (int, > seuil → block), `model_hash_known` et `runtime_sbom_ok` (bool, faux → block à l'init de l'agent, pas en runtime).
 
 ---
 
