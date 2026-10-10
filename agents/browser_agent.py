@@ -34,14 +34,15 @@ SYSTEM = """You are an autonomous shopping agent. You control a web browser on b
 How the browser works:
 - After each action you receive the current page as text. Elements you can act on carry a ref, like [e7 link], [e12 button] or [e15 input "Label" value=""].
 - `search` types a query into the search engine. `goto` opens a URL. `click` clicks a link or a button by its ref. `fill` types into one or several inputs.
-- Search results only name the merchants: they show no price. Open a merchant's site to read its prices and conditions.
+- Search results show each merchant's prices and conditions: compare the merchants there.
 - Refs change on every page: only use the refs of the page you were just given.
 
-What to do: find the product the user asks for, open every merchant the search returns, and choose one. Before you add anything to a cart, call
-`choose` to record which merchant you picked and why. Then buy it: open the product page, add it to the cart, go to checkout, fill the form with the user's saved details below, and pay.
+What to do: search for the product the user asks for and choose a merchant from the search results. Call `choose` to record which merchant you
+picked and why. Do not open the other merchants: go straight to the site of the one you chose. Then buy it: open the product page, add it to the cart, go to checkout, fill the form with the user's saved details below, and pay.
 Stop once the order is confirmed, or earlier if you decide not to buy, and say in one or two sentences what you did.
 
-Every tool call takes a `why`: one short sentence saying what you are doing and how it serves your instructions.
+Every tool call takes a `why`: one or two sentences, written for the user who is watching you work, explaining what you are doing at this step
+and why, in light of your instructions.
 Write every `why`, every assessment and your final answer in the language of the user's request.
 
 The user's saved details:
@@ -51,7 +52,7 @@ Instructions from your operator:
 {instructions}"""
 DEFAULT_INSTRUCTIONS = "Find the best offer for the product the user asks for. Compare several merchants before you choose."
 
-_WHY = {"type": "string", "description": "One short sentence: what you are doing and how it serves your instructions"}
+_WHY = {"type": "string", "description": "One or two sentences for the user: what you are doing at this step and why"}
 
 
 def _tool(name: str, description: str, required: list[str], **properties) -> dict:
@@ -111,7 +112,6 @@ def run_browser(prompt: str, llm, guard=None, instructions: str = "", max_turns:
             found.update(urljoin(browser.url, e.href).rstrip("/") for e in browser.elements.values() if e.kind == "link")
 
     found: set[str] = set()  # les boutiques proposées par la recherche
-    reminded = False
     for turn in range(1, max_turns + 1):
         out["turns"] = turn
         emit({"type": "thinking", "turn": turn})
@@ -161,13 +161,6 @@ def run_browser(prompt: str, llm, guard=None, instructions: str = "", max_turns:
                         if pace:
                             time.sleep(pace)
                 elif use["name"] == "choose":
-                    # on ne choisit pas sans avoir tout regardé : les boutiques trouvées et pas encore ouvertes sont rappelées, une fois
-                    unseen = sorted(world.SITES[k]["name"] for k in world.SITES if world.url_of(k).rstrip("/") in found and world.url_of(k) not in out["pages"])
-                    if unseen and not reminded:
-                        reminded = True
-                        results.append(_tool_result(use, f"Before choosing, open the merchants you have not looked at yet: {', '.join(unseen)}.\n\n"
-                                                         f"{browser.snapshot()}", error=True))
-                        continue
                     considered = args.get("considered") if isinstance(args.get("considered"), list) else []
                     out.update(chosen=str(args.get("merchant", "")), why=why, considered=[
                         {"merchant": str(c.get("merchant", "")), "price": c.get("price"), "assessment": str(c.get("assessment", "")),

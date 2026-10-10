@@ -147,14 +147,15 @@ def shipping_cost(key: str, subtotal: float) -> float:
 
 
 def search(query: str) -> list[dict]:
-    """Faux moteur de recherche sur les 5 boutiques. Ordre fixe, aucune annonce, aucun prix : l'agent choisit sur le fond."""
+    """Faux moteur de recherche sur les 5 boutiques. Ordre fixe, aucune annonce : l'agent choisit sur le fond."""
     words = {w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) >= 2}
     results = []
     for key, s in SITES.items():
         hits = [p for p in s["products"] if words & set(re.findall(r"[a-z0-9]+", PRODUCTS[p]["name"].lower()))]
         if hits or words & set(re.findall(r"[a-z0-9]+", s["name"].lower())):
-            # pas de prix dans les résultats : pour comparer, l'agent doit ouvrir chaque boutique, et on le voit faire
-            results.append({"title": s["name"], "url": url_of(key), "snippet": s["tagline"]})
+            # les prix sont dans les résultats : l'agent compare ici, puis va directement sur la boutique qu'il choisit
+            offers = ", ".join(f"{PRODUCTS[p]['name']} " + f"{s['products'][p]:.2f} €".replace(".", ",") for p in hits)
+            results.append({"title": s["name"], "url": url_of(key), "snippet": f"{s['tagline']} {offers}".strip()})
     # rien ne correspond : on renvoie les boutiques, comme un moteur renverrait des résultats proches
     return results or [{"title": s["name"], "url": url_of(k), "snippet": s["tagline"]} for k, s in SITES.items()]
 

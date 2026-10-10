@@ -7,7 +7,7 @@ import { BrowserView } from './components/BrowserView';
 import { Composer } from './components/Composer';
 import { Panel } from './components/Panel';
 import { applyEvent, type AgentMessage, type Message } from './run';
-import { durationOf, sleep } from './timing';
+import { durationOf, sleep, spoken } from './timing';
 import type { Agent, World } from './types';
 
 const IDEAS = [
@@ -35,6 +35,17 @@ function Thread({ messages, shown, onIdea, onSelect, onRetry }: ThreadProps) {
   useEffect(() => {
     if (stick.current && thread.current) thread.current.scrollTop = thread.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    // le texte qui s'écrit allonge le fil sans changer les messages : on suit aussi ces changements
+    const el = thread.current;
+    if (!el) return;
+    const follow = new MutationObserver(() => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    });
+    follow.observe(el, { childList: true, subtree: true, characterData: true });
+    return () => follow.disconnect();
+  }, []);
 
   return (
     <div
@@ -130,11 +141,14 @@ export default function App() {
       const abort = new AbortController();
       controller.current = abort;
       let ended = false;
+      let said = ''; // la dernière explication écrite dans le fil
       try {
         for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model }, abort.signal)) {
           ended ||= ev.type === 'end' || ev.type === 'error';
           patch((m) => applyEvent(m, ev, shopName));
-          await sleep(durationOf(ev), abort.signal); // le geste se joue à l'écran avant le suivant
+          const narrated = spoken(ev) !== '' && spoken(ev) !== said;
+          if (narrated) said = spoken(ev);
+          await sleep(durationOf(ev, narrated), abort.signal); // le geste se joue et son explication s'écrit, avant le suivant
         }
         if (!ended) patch((m) => ({ ...m, status: 'error', error: 'Le serveur a coupé la réponse avant la fin du run.' }));
       } catch (err) {

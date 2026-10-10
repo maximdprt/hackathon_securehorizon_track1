@@ -1,7 +1,9 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../App';
 import { applyEvent, planOf, type AgentMessage } from '../run';
+import { Typed } from '../components/Typed';
+import { durationOf, setPace, spoken } from '../timing';
 import type { Confirmation, RunEvent, Site, View, World } from '../types';
 
 const MERIDIAN: Site = { key: 'meridian', name: 'Meridian Watch Co.', domain: 'meridian-watch.example', kind: 'fraud', why: 'Boutique fantôme.', preview: '/shop/meridian/' };
@@ -289,4 +291,51 @@ test('applyEvent groups form fields into one step, keeps a frame per page, and p
   const back = applyEvent(start, { type: 'nav', how: 'back', url: `${SEARCH}/?q=x`, title: 'x | Recherche', status: 200, site: null, why: 'voir la suivante', view: search(SEARCH, 'x') }, name);
   expect([back.steps[0].label, back.frames[0].how]).toEqual(['Revient aux résultats de recherche', 'back']);
   expect(start.steps).toHaveLength(0); // le message de départ n'est pas modifié
+});
+
+test('the reasoning is written letter by letter while the step is live, and whole afterwards', async () => {
+  vi.useFakeTimers();
+  setPace(1);
+  try {
+    const done = vi.fn();
+    const text = 'Je compare les prix sur la page de résultats.';
+    const { container, rerender } = render(<Typed text={text} live onDone={done} />);
+    expect(container.querySelector('[aria-hidden]')!.textContent).toBe(''); // rien d'écrit encore, mais la phrase entière existe pour un lecteur d'écran
+    expect(container.querySelector('.sr-only')!.textContent).toBe(text);
+    const tick = () => act(() => vi.advanceTimersByTimeAsync(40)); // une lettre ou deux par battement, rendu compris
+    for (let i = 0; i < 4; i++) await tick();
+    const partial = container.querySelector('[aria-hidden]')!.textContent!;
+    expect(partial.length).toBeGreaterThan(0);
+    expect(partial.length).toBeLessThan(text.length);
+    expect(text.startsWith(partial)).toBe(true);
+    expect(container.querySelector('.caret')).not.toBeNull();
+    expect(done).not.toHaveBeenCalled();
+    for (let i = 0; i < 60; i++) await tick();
+    expect(container.textContent).toBe(text);
+    expect(container.querySelector('.caret')).toBeNull();
+    expect(done).toHaveBeenCalled();
+    rerender(<Typed text="Autre phrase." live={false} />); // une étape passée s'affiche en entier, sans se réécrire
+    expect(container.textContent).toBe('Autre phrase.');
+  } finally {
+    setPace(0);
+    vi.useRealTimers();
+  }
+});
+
+test('a reason repeated on consecutive steps is written once, and a step waits for its reasoning to be written', () => {
+  const start: AgentMessage = { id: 'a', role: 'agent', agentName: 'x', model: 'm', prompt: 'p', status: 'running', steps: [], frames: [] };
+  const msg = run().slice(0, 6).reduce((m, ev) => applyEvent(m, ev, () => undefined), start);
+  expect(msg.steps.map((s) => s.why)).toEqual(['trouver les boutiques', undefined, undefined, undefined, 'voir ses prix']);
+  setPace(1);
+  try {
+    const click = run()[5];
+    expect(spoken(click)).toBe('voir ses prix');
+    expect(spoken(run()[4])).toBe(''); // une page qui s'affiche à la suite d'un clic n'a rien à dire de plus
+    const long: RunEvent = { type: 'choose', merchant: 'x', site: null, why: 'a'.repeat(120), considered: [] };
+    expect(durationOf(long, true)).toBeGreaterThan(durationOf(long, false) + 1000);
+    expect(durationOf(click, true)).toBe(durationOf(click, false)); // une raison courte tient dans le temps du geste
+  } finally {
+    setPace(0);
+  }
+  expect(durationOf(run()[5], true)).toBe(0);
 });

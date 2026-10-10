@@ -3,6 +3,7 @@ import { initials } from '../agents';
 import { amount, planOf, type AgentMessage, type Step } from '../run';
 import type { EndEvent } from '../types';
 import { Alert, Card, Check, Doc, Globe, Pen, Pointer, Scale } from './Icons';
+import { Typed } from './Typed';
 
 const ICON: Record<Step['kind'], ReactNode> = {
   search: <Globe />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, invalid: <Alert />, thought: <Doc />,
@@ -24,13 +25,26 @@ function Plan({ msg }: { msg: AgentMessage }) {
   );
 }
 
-function StepLine({ step, selected, onSelect }: { step: Step; selected: boolean; onSelect: (frame: number) => void }) {
+type StepProps = { step: Step; selected: boolean; /** Le geste en cours : son explication s'écrit. */ live: boolean; onSelect: (frame: number) => void };
+
+function StepLine({ step, selected, live, onSelect }: StepProps) {
+  const [written, setWritten] = useState(!live);
   const body = (
     <>
       <span className="tool__icon">{ICON[step.kind]}</span>
       <span className="tool__name">{step.label}</span>
-      {step.meta && <span className={`tool__meta${step.kind === 'thought' || step.kind === 'invalid' || step.kind === 'pay' ? '' : ' mono'}`}>{step.meta}</span>}
-      {step.why && <span className="tool__note">{step.why}</span>}
+      {step.meta && step.kind !== 'thought' && <span className={`tool__meta${step.kind === 'invalid' || step.kind === 'pay' ? '' : ' mono'}`}>{step.meta}</span>}
+      {step.kind === 'thought' && step.meta ? (
+        <span className="tool__note">
+          <Typed text={step.meta} live={live} />
+        </span>
+      ) : (
+        step.why && (
+          <span className="tool__note">
+            <Typed text={step.why} live={live} onDone={() => setWritten(true)} />
+          </span>
+        )
+      )}
       {step.fields && (
         <span className="tool__fields">
           {step.fields.map((f, i) => (
@@ -41,7 +55,7 @@ function StepLine({ step, selected, onSelect }: { step: Step; selected: boolean;
           ))}
         </span>
       )}
-      {step.considered && step.considered.length > 0 && (
+      {step.considered && step.considered.length > 0 && (written || !step.why) && (
         <span className="tool__fields">
           {step.considered.map((c, i) => (
             <span key={i} className={`tool__field tool__field--stack${c.site && c.site === step.site ? ' tool__field--picked' : ''}`}>
@@ -149,7 +163,8 @@ export function AgentReply({ msg, shownFrame, onSelect, onRetry }: Props) {
         <Plan msg={msg} />
         <ol className="tools" aria-label="Gestes de l'agent">
           {msg.steps.map((step) => (
-            <StepLine key={step.id} step={step} selected={step.frame !== undefined && step.frame === shownFrame} onSelect={onSelect} />
+            <StepLine key={step.id} step={step} selected={step.frame !== undefined && step.frame === shownFrame} onSelect={onSelect}
+              live={msg.status === 'running' && step.id === msg.steps.length - 1} />
           ))}
           {msg.status === 'running' && (
             <li>

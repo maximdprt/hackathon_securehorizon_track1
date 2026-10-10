@@ -53,7 +53,13 @@ export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: stri
         ? [...msg.frames, { ...ev.view, id: msg.frames.length, kind: ev.type, ref: ev.ref }]
         : msg.frames;
   const frame = 'view' in ev ? frames.length - 1 : undefined;
-  const add = (step: Omit<Step, 'id'>): AgentMessage => ({ ...msg, frames, steps: [...msg.steps, { ...step, id: msg.steps.length, frame }] });
+  const said = [...msg.steps].reverse().find((s) => s.why)?.why;
+  const add = (step: Omit<Step, 'id'>): AgentMessage => ({
+    ...msg,
+    frames,
+    // l'agent redit parfois la même raison pour plusieurs gestes d'affilée : elle n'est écrite qu'une fois
+    steps: [...msg.steps, { ...step, why: step.why && step.why !== said ? step.why : undefined, id: msg.steps.length, frame }],
+  });
   switch (ev.type) {
     case 'thinking':
       return msg;

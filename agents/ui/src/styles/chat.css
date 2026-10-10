@@ -53,11 +53,14 @@
 .tool--button:hover { border-color: #D3D9E1; background: #F7F8FA; }
 .tool--button[aria-pressed="true"] { border-color: var(--accent); background: #F1FAF8; }
 .tool--running { border-color: var(--accent); background: #F1FAF8; }
-.tool--page .tool__name { font-weight: 500; color: #44505E; }
+.tool--page .tool__name { font-weight: 500; }
 .tool__icon { flex: none; color: var(--accent); display: grid; }
-.tool__name { font-weight: 600; }
-.tool__meta { color: #5E6B7A; min-width: 0; overflow-wrap: anywhere; }
-.tool__note { flex-basis: 100%; padding-left: 26px; color: #5E6B7A; line-height: 1.5; }
+.tool__name { font-size: 12.5px; font-weight: 600; color: #5E6B7A; }
+.tool__meta { color: #8A95A3; min-width: 0; overflow-wrap: anywhere; }
+/* l'explication de l'agent : c'est le texte principal du geste, il s'écrit pendant que le geste se joue */
+.tool__note { flex-basis: 100%; padding-left: 26px; font-size: 14.5px; line-height: 1.5; color: #16202B; white-space: pre-wrap; }
+.caret { display: inline-block; width: 2px; height: 1em; margin-left: 2px; vertical-align: -0.15em; background: var(--accent); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .tool__fields { flex-basis: 100%; padding-left: 26px; display: flex; flex-direction: column; gap: 4px; }
 .tool__field { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 2px 10px; line-height: 1.5; overflow-wrap: anywhere; }
 .tool__field--stack { display: block; }
