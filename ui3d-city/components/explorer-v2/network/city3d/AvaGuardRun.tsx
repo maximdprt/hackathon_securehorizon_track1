@@ -36,7 +36,7 @@ function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
   const out = (p: Vector3) => Math.PI / 2 - Math.atan2(p.z, p.x);
   return {
     security: { key: "guard:security", points: [new Vector3(g.hq.x, top + 10, g.hq.z), g.toll.p, g.parking.c, g.scrapyard.c, ...ring(new Vector3(g.hq.x, 0, g.hq.z), g.S * 2.6)].map((p) => p.clone()), polar: 0.9, cap: 1 / 3.2, fill: 0.9, az: out(g.toll.p) },
-    toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.9), ...ring(g.toll.p, g.S * 1.2)], polar: 0.62, cap: 1 / 6, fill: 0.8, az: out(g.toll.p) },
+    toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.1), ...ring(g.toll.p, g.S * 0.95)], polar: 0.46, cap: 1 / 5.4, fill: 0.92, az: out(g.toll.p) },
     parking: { key: "guard:parking", points: [g.parking.c.clone().setY(g.S * 0.9), ...ring(g.parking.c, g.parking.w * 0.7)], polar: 0.7, cap: 1 / 6, fill: 0.86, az: out(g.parking.c) },
     scrapyard: { key: "guard:scrapyard", points: [g.scrapyard.c.clone().setY(g.S * 1.1), ...ring(g.scrapyard.c, g.scrapyard.w * 0.75)], polar: 0.7, cap: 1 / 6, fill: 0.86, az: out(g.scrapyard.c) },
     cchain: { key: "guard:cchain", points: [new Vector3(0, g.hubTop * 0.75, 0), g.out.clone(), g.stop.p.clone(), ...ring(new Vector3(0, 0, 0), g.S * 2.4)], polar: 1.0, cap: 1 / 3, fill: 0.88 },

@@ -113,7 +113,8 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   let iExit = iDoor;
   while (iExit < n - 1 && inBlock(laneOut.x[iExit], laneOut.z[iExit])) iExit++;
   const iToll = Math.min(n - 2, Math.max(iDoor + Math.round(carL * 1.6), iExit));
-  const iStop = Math.max(iDoor + 1, iToll - Math.round(carL * 0.7));
+  // SENTINEL: the car stops UNDER the gate (not before it), so the scanner sweeps the car at the toll
+  const iStop = Math.max(iDoor + 1, iToll);
   const tollP = lp(laneOut, iToll);
   const stopP = lp(laneOut, iStop);
   const fwd = new Vector3(Math.cos(laneOut.yaw[iStop]), 0, Math.sin(laneOut.yaw[iStop]));

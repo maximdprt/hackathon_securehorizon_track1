@@ -76,7 +76,8 @@ export function Toll({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
     const on = motion.scan > 0 && motion.scan < 1;
     if (curtain.current) {
       curtain.current.visible = on;
-      curtain.current.position.x = -span * 0.35 + (0.5 - motion.scan) * geo.carL * 1.3 - geo.carL * 0.9;
+      // sweep the light curtain across the car, which is stopped centred under the gantry
+      curtain.current.position.x = (0.5 - motion.scan) * geo.carL * 1.15;
     }
     if (floor.current) (floor.current.material as MeshBasicMaterial).opacity = on ? 0.45 + 0.2 * Math.sin(clock.elapsedTime * 20) : 0.18;
   });
@@ -97,7 +98,7 @@ export function Toll({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
         ))}
       </group>
       {/* the floor scanner, and its light curtain */}
-      <mesh ref={floor} position={[-geo.carL * 0.9, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.floor}>
+      <mesh ref={floor} position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.floor}>
         <planeGeometry args={[geo.carL * 1.4, span * 0.8]} />
       </mesh>
       <mesh ref={curtain} position={[0, H * 0.45, 0]} rotation={[0, Math.PI / 2, 0]} material={mats.scan} visible={false}>
