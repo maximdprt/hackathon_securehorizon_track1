@@ -33,6 +33,10 @@ export type TxEvent = {
   raw?: unknown;
 };
 
+/** a transaction as the audit screens read it: the event, where it stands, who decided it and when */
+export type AuditStatus = "ALLOW" | "BLOCK" | "HUMAN" | "PENDING";
+export type AuditTx = TxEvent & { status: AuditStatus; via: "AvaGuard" | "humain" | "registre"; decided_at?: string };
+
 export const CHECK_ORDER: CheckKey[] = ["authority", "beneficiary", "mandate", "intent_ai", "contract"];
 export const CHECK_LABEL: Record<CheckKey, string> = { authority: "Autorité", beneficiary: "Bénéficiaire", mandate: "Mandat", intent_ai: "Intention IA", contract: "Contrat" };
 

@@ -16,11 +16,19 @@ import type { PchainNetwork } from "@/lib/pchain-explorer";
 import { AVAGUARD_ID } from "@/components/explorer-v2/network/avaguard";
 import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused } from "@/sim/Director";
 import { startLiveFeed } from "@/sim/liveFeed";
-import { motion, sim, useSim, type Panel } from "@/sim/store";
+import { motion, sim, useSim, type View } from "@/sim/store";
+import { closeView, listenUrl, openView } from "@/sim/nav";
 import { STATE, fmtAmount } from "@/sim/types";
 import type { SceneKey } from "@/sim/scenario";
 import { AnalysisCard } from "./ui/AnalysisCard";
-import { AuditPanel, DetailPanel, HumanAlert, JournalPanel, RegistryPanel, Toasts } from "./ui/Panels";
+import { HumanAlert, Toasts } from "./ui/Panels";
+import { ViewHost } from "./views/ViewHost";
+import { TransactionsView } from "./views/TransactionsView";
+import { RegistryView } from "./views/RegistryView";
+import { ParkingView } from "./views/ParkingView";
+import { AuditView } from "./views/AuditView";
+import { ChainSheet } from "./ui/ChainSheet";
+import { useAudit } from "@/data/source";
 import { StateIcon } from "./ui/charts";
 
 /* The page around the City, rebuilt after builders-hub's NetworkChains.tsx, city-app.tsx and city-frame.tsx (their
@@ -69,14 +77,15 @@ const SEG_ON = "flex items-center rounded-xl bg-zinc-100 px-3 text-zinc-900 dark
 const SEG_OFF = "flex items-center rounded-xl px-3 text-zinc-400 dark:text-zinc-600";
 
 /** the site's navbar replaced by ours: the shield and AvaGuard+, our tabs, the search, the theme, the badge */
-function TopBar({ panel, onTab, onSearch }: { panel: Panel; onTab: (p: Panel) => void; onSearch: () => void }) {
+function TopBar({ view, onSearch }: { view: View; onSearch: () => void }) {
   const [dark, setDark] = useState(true);
   useEffect(() => setDark(document.documentElement.classList.contains("dark")), []);
-  const tabs: { label: string; panel: Panel }[] = [
-    { label: "City", panel: null },
-    { label: "Transactions", panel: "journal" },
-    { label: "Registre", panel: "registry" },
-    { label: "Audit", panel: "audit" },
+  const tabs: { label: string; view: View }[] = [
+    { label: "City", view: null },
+    { label: "Transactions", view: "transactions" },
+    { label: "Registre", view: "registry" },
+    { label: "Validation", view: "parking" },
+    { label: "Audit", view: "audit" },
   ];
   return (
     <header className="relative z-40 flex shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-5 dark:border-zinc-800 dark:bg-zinc-950" style={{ height: NAV_H }}>
@@ -89,9 +98,9 @@ function TopBar({ panel, onTab, onSearch }: { panel: Panel; onTab: (p: Panel) =>
       </div>
       <nav aria-label="Sections" className="absolute left-1/2 flex -translate-x-1/2 items-center gap-6">
         {tabs.map((t) => {
-          const on = panel === t.panel || (t.panel === null && panel !== "journal" && panel !== "registry" && panel !== "audit");
+          const on = view === t.view;
           return (
-            <button key={t.label} type="button" onClick={() => onTab(t.panel)} aria-current={on ? "page" : undefined} className={cn("border-b-2 py-[15px] text-[14px] transition-colors", on ? "border-[#3FD08F] text-zinc-900 dark:text-zinc-50" : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100")}>
+            <button key={t.label} type="button" onClick={() => (t.view ? openView(t.view) : closeView())} aria-current={on ? "page" : undefined} className={cn("border-b-2 py-[15px] text-[14px] transition-colors", on ? "border-[#3FD08F] text-zinc-900 dark:text-zinc-50" : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100")}>
               {t.label}
             </button>
           );
@@ -153,7 +162,18 @@ export default function CityShell() {
   const mode = useSim((s) => s.mode);
   const liveStatus = useSim((s) => s.liveStatus);
 
-  const onSelect = useCallback((id: string | null) => setSelected(id), []);
+  // the C-Chain's tower opens the transactions it settles, AvaGuard's tower the audit; any other tower stays the City's
+  const hubId = data.hubId;
+  const onSelect = useCallback(
+    (id: string | null) => {
+      if (id && id === hubId) return openView("transactions");
+      if (id === AVAGUARD_ID) return openView("audit");
+      setSelected(id);
+    },
+    [hubId],
+  );
+  const screen = useSim((s) => s.view);
+  useEffect(() => listenUrl(), []);
   const onFocus = useCallback((d: District | null) => {
     setRoute(null);
     setFocus(d);
@@ -171,7 +191,17 @@ export default function CityShell() {
     return m;
   }, [activityById]);
   // the camera keeps the city clear of the open card at the right
-  const rightOpen = !!panel || (!!tx && phase !== "idle") || !!human;
+  const busyRight = !!panel || (!!tx && phase !== "idle") || !!human;
+  // another tower picked: its sheet at the right, while no transaction holds that place
+  const sheetNode = !busyRight && selected ? (data.nodes.find((n) => n.id === selected) ?? null) : null;
+  const sheetPartner = useMemo(() => {
+    if (!sheetNode) return null;
+    const by = new Map<string, number>();
+    for (const r of data.routes) if (r.from === sheetNode.id || r.to === sheetNode.id) by.set(r.from === sheetNode.id ? r.to : r.from, (by.get(r.from === sheetNode.id ? r.to : r.from) ?? 0) + r.messages);
+    const top = [...by.entries()].sort((a, b) => b[1] - a[1])[0];
+    return top ? (data.nodes.find((n) => n.id === top[0])?.name ?? null) : null;
+  }, [sheetNode, data]);
+  const rightOpen = busyRight || !!sheetNode;
   const inset = useMemo<Inset>(() => ({ left: 20, right: rightOpen ? 372 + 28 : 20, top: 150, bottom: 112 }), [rightOpen]);
 
   // the network's own figures, real and dated (the snapshot), apart from ours
@@ -181,11 +211,21 @@ export default function CityShell() {
     return { chains: sets.length, validators: sets.reduce((a, n) => a + (n.validators ?? 0), 0), icm: realIcm };
   }, [data]);
   const day = takenAt ? new Date(takenAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "…";
-  const avgRisk = useMemo(() => {
-    const done = journal.filter((j) => j.outcome !== "PENDING");
-    return done.length ? Math.round(done.reduce((a, j) => a + (j.outcome === "BLOCK" ? 90 : 15), 0) / done.length) : null;
-  }, [journal]);
+  // the strip's AvaGuard figures and the risk chip, from the same source as the screens (history plus this session)
+  const audit = useAudit();
+  const avgRisk = useMemo(() => (audit.txs.length ? Math.round(audit.txs.reduce((a, t) => a + t.score, 0) / audit.txs.length) : null), [audit.txs]);
   const pending = human ? 1 : 0;
+  const stats = useMemo(() => {
+    const t = audit.txs;
+    const final = t.filter((x) => x.status === "ALLOW" || x.status === "BLOCK");
+    return {
+      total: t.length,
+      visas: t.filter((x) => x.status === "ALLOW").length,
+      blocked: t.filter((x) => x.status === "BLOCK").length,
+      usd: t.filter((x) => x.status === "BLOCK" && x.amount.token === "USDC").reduce((a, x) => a + x.amount.value, 0),
+      avg: final.length ? final.reduce((a, x) => a + x.timings_ms.decide, 0) / final.length : 0,
+    };
+  }, [audit.txs]);
 
   // the presenter's keys
   useEffect(() => {
@@ -197,6 +237,8 @@ export default function CityShell() {
         return;
       }
       if (e.repeat || el.tagName === "INPUT" || el.tagName === "TEXTAREA") return;
+      // a screen over the city keeps the keyboard for itself
+      if (sim.get().view) return;
       const digit = /^(Digit|Numpad)\d$/.test(e.code) ? e.code.slice(-1) : null;
       if (digit && ["1", "2", "3", "4"].includes(digit)) return playScene(SCENES[Number(digit) - 1].k);
       if (digit === "0") return resetAll();
@@ -212,7 +254,7 @@ export default function CityShell() {
           camera.current?.home();
           break;
         case "d":
-          sim.set((s) => ({ panel: s.panel === "detail" ? null : "detail" }));
+          openView("transactions", { tx: sim.get().tx?.tx_id ?? sim.get().ledger[0]?.tx_id ?? null });
           break;
         case "a":
           answerHuman(true);
@@ -244,10 +286,9 @@ export default function CityShell() {
     (window as unknown as { __ag: unknown }).__ag = { sim, motion, playScene, resetAll, answerHuman, setPaused };
   }, []);
 
-  const tab = (p: Panel) => sim.set({ panel: p });
   return (
     <div className="flex h-full w-full flex-col">
-      <TopBar panel={panel} onTab={tab} onSearch={() => searchRef.current?.focus()} />
+      <TopBar view={screen} onSearch={() => searchRef.current?.focus()} />
       <div
         data-city-app
         className={`${FRAME} relative min-h-0 w-full flex-1 overflow-clip bg-[radial-gradient(ellipse_420px_300px_at_13%_11%,rgba(255,255,255,0.55),rgba(255,255,255,0.28)_45%,rgba(255,255,255,0)_100%),linear-gradient(to_bottom,#D6DDE5_0%,#D4DBE4_26%,#D3DAE3_39%,#D2D9E2_51%,#D1D7E0_57%,#CED3DB_63%,#CCD1D8_75%,#CACFD6_88%,#C9CED5_100%)] dark:bg-[radial-gradient(ellipse_420px_300px_at_13%_11%,rgba(160,175,200,0.2),rgba(160,175,200,0.13)_45%,rgba(160,175,200,0)_100%),linear-gradient(to_bottom,#161A21_0%,#151920_26%,#11141B_39%,#0E1219_51%,#12161B_57%,#191B20_63%,#1B1E22_69%,#1C1E23_75%,#1D1F24_88%,#1D1F24_100%)]`}
@@ -329,7 +370,10 @@ export default function CityShell() {
               <input
                 ref={searchRef}
                 value={search}
-                onChange={(e) => sim.set({ search: e.target.value, panel: e.target.value ? "journal" : sim.get().panel })}
+                onChange={(e) => sim.set({ search: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") openView("transactions");
+                }}
                 placeholder="Rechercher une transaction, une adresse, un agent…"
                 className="h-full flex-1 bg-transparent text-[13.5px] text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
               />
@@ -337,10 +381,10 @@ export default function CityShell() {
             </label>
             <div className="flex flex-wrap justify-center gap-1.5">
               {[
-                { label: "Transactions par état", on: () => tab("journal") },
+                { label: "Transactions par état", on: () => openView("transactions") },
                 { label: "Risque moyen", on: () => setChip(chip === "risk" ? null : "risk") },
-                { label: "Registre des hackers", on: () => tab("registry") },
-                { label: "Montant protégé", on: () => tab("audit") },
+                { label: "Registre des hackers", on: () => openView("registry") },
+                { label: "Montant protégé", on: () => openView("audit") },
               ].map((c) => (
                 <button key={c.label} type="button" onClick={c.on} className={cn("h-8 rounded-xl px-3 font-mono text-[11px] text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-50", GLASS)}>
                   {c.label}
@@ -387,12 +431,10 @@ export default function CityShell() {
         </div>
 
         <AnalysisCard />
-        <DetailPanel />
-        <JournalPanel />
-        <RegistryPanel />
-        <AuditPanel />
+        {sheetNode && <ChainSheet node={sheetNode} partner={sheetPartner} simulated={data.icmSimulated} onClose={() => setSelected(null)} />}
         <HumanAlert />
         <Toasts />
+        <ViewHost screens={{ transactions: <TransactionsView />, registry: <RegistryView />, parking: <ParkingView />, audit: <AuditView /> }} />
 
         {/* the figures at the city's foot (city-frame.tsx FigureStrip): the network's, real and dated, then ours */}
         <div className="absolute inset-x-0 bottom-[1.3rem] z-10">
@@ -400,13 +442,13 @@ export default function CityShell() {
             <Figure label="Chains" value={figures.chains.toLocaleString("fr-FR")} sub={`Fuji · instantané ${day}`} />
             <Figure label="Validators" value={fmtCompact(figures.validators)} sub="réels" />
             <Figure label="ICM · 24H" value={fmtCompact(figures.icm)} sub={data.icmSimulated ? "rues : trafic simulé" : "réels"} />
-            <Figure label="Transactions" value={kpi.transactions} sub="simulé" />
-            <Figure label="Visas" value={kpi.visas} sub="émis" tone={STATE.allow.hex} />
-            <Figure label="Bloquées" value={kpi.blocked} sub="refusées" tone={STATE.block.hex} />
+            <Figure label="Transactions" value={stats.total} sub={kpi.transactions ? `dont ${kpi.transactions} ici · simulé` : "simulé"} />
+            <Figure label="Visas" value={stats.visas} sub="émis" tone={STATE.allow.hex} />
+            <Figure label="Bloquées" value={stats.blocked} sub="refusées" tone={STATE.block.hex} />
             <Figure label="En attente" value={pending} sub="humain" tone={STATE.human.hex} />
-            <Figure label="Registre" value={registry.length} sub="adresses" />
-            <Figure label="Protégé" value={fmtAmount(kpi.protectedUsd)} sub="USDC" />
-            <Figure label="Décision" value={kpi.decisions ? `${(kpi.decisionMs / kpi.decisions / 1000).toFixed(1).replace(".", ",")} s` : "0 s"} sub="moyenne" />
+            <Figure label="Registre" value={audit.banned.length} sub="adresses" />
+            <Figure label="Protégé" value={fmtAmount(stats.usd)} sub="USDC" />
+            <Figure label="Décision" value={stats.avg ? `${(stats.avg / 1000).toFixed(1).replace(".", ",")} s` : "0 s"} sub="moyenne" />
           </FigureStrip>
         </div>
 
@@ -414,7 +456,7 @@ export default function CityShell() {
         {!rightOpen && <button
           type="button"
           aria-label="Journal des décisions"
-          onClick={() => tab(panel === "journal" ? null : "journal")}
+          onClick={() => openView("transactions")}
           className={cn("absolute bottom-[calc(var(--frame)+1.3rem)] right-(--frame) z-30 flex h-12 w-12 items-center justify-center rounded-full text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-50", GLASS)}
         >
           <History className="h-5 w-5" />

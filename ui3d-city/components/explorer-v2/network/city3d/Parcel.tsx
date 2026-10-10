@@ -1,8 +1,8 @@
 "use client";
 
 // AVAGUARD: our parcel's equipment (not from builders-hub), on the city's own grade (palette.ts MASS3, GROUND, ROOF,
-// AVAGUARD3), so it reads as part of the same white model: the toll on our street where it leaves our block, the human
-// lot, the scrapyard with its crusher and the hackers' registry, and the proof column at the HQ's foot. Its words are
+// AVAGUARD3), so it reads as part of the same white model: the toll on our street where it leaves our block (the human
+// lot is HumanLot.tsx), the scrapyard with its crusher and the hackers' registry, and the proof column at the HQ's foot. Its words are
 // DOM words over the scene, in the districts' own style (Labels.tsx HALO).
 import { useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
@@ -42,7 +42,7 @@ export function Word({ at, children, tone, small, near = NEAR }: { at: Vector3 |
 }
 
 /** a box resting on y0, centred on x/z in its parent's frame */
-function Block({ w, h, d, x = 0, y0 = 0, z = 0, mat }: { w: number; h: number; d: number; x?: number; y0?: number; z?: number; mat: MeshLambertMaterial | MeshBasicMaterial }) {
+export function Block({ w, h, d, x = 0, y0 = 0, z = 0, mat }: { w: number; h: number; d: number; x?: number; y0?: number; z?: number; mat: MeshLambertMaterial | MeshBasicMaterial }) {
   return (
     <mesh position={[x, y0 + h / 2, z]} material={mat} receiveShadow>
       <boxGeometry args={[w, h, d]} />
@@ -111,43 +111,6 @@ export function Toll({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* the human lot                                                       */
-/* ------------------------------------------------------------------ */
-
-export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
-  const { c, slots, slotYaw, w, d } = geo.parking;
-  const mats = useMemo(() => ({ pad: lambert(GROUND.pad[theme]), amber: basic(AVAGUARD3.amber[theme]), post: lambert(MASS3.frame[theme]), beacon: new MeshLambertMaterial({ color: AVAGUARD3.amber[theme], emissive: new Color(AVAGUARD3.amber[theme]), emissiveIntensity: 0.4 }) }), [theme]);
-  const beacon = useRef<Mesh>(null);
-  const human = useSim((s) => s.phase === "human");
-  useFrame(({ clock }) => {
-    if (!beacon.current) return;
-    beacon.current.rotation.y = human ? clock.elapsedTime * 6 : 0;
-    mats.beacon.emissiveIntensity = human ? 0.6 + 0.5 * Math.sin(clock.elapsedTime * 10) : 0.15;
-  });
-  const bay = w / 6.4;
-  // local frame: +x outward (the bays' noses), +z along the ring
-  return (
-    <group position={c} rotation={[0, -slotYaw, 0]}>
-      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.pad} receiveShadow>
-        <planeGeometry args={[d, w]} />
-      </mesh>
-      {Array.from({ length: 7 }, (_, k) => (
-        <Block key={k} w={d * 0.8} h={0.08} d={Math.max(0.25, bay * 0.06)} x={d * 0.05} y0={0.06} z={(k - 3) * bay} mat={mats.amber} />
-      ))}
-      <Block w={Math.max(0.25, bay * 0.06)} h={0.08} d={bay * 6} x={-d * 0.35} y0={0.06} mat={mats.amber} />
-      <Block w={bay * 0.22} h={bay * 0.8} d={bay * 0.22} x={d * 0.42} z={-bay * 3.4} mat={mats.post} />
-      <mesh ref={beacon} position={[d * 0.42, bay * 0.9, -bay * 3.4]} material={mats.beacon}>
-        <cylinderGeometry args={[bay * 0.16, bay * 0.16, bay * 0.22, 12]} />
-      </mesh>
-      <Word at={[d * 0.75, 0.5, 0]} tone={AVAGUARD3.amber[theme]} small>
-        Validation humaine
-      </Word>
-      {slots.length === 0 && null}
-    </group>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /* the scrapyard                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -203,20 +166,40 @@ export function Scrapyard({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
           <Block w={geo.carL * 1.17} h={geo.carW * 0.06} d={geo.carW * 1.42} mat={mats.red} />
         </group>
       </group>
-      {/* the hackers' registry: an open container, its rim in the refusal's red */}
-      <group position={bn}>
-        <Block w={geo.carL * 1.3} h={geo.carW * 1.1} d={geo.carW * 1.6} mat={mats.bin} />
-        <Block w={geo.carL * 1.32} h={geo.carW * 0.12} d={geo.carW * 1.62} y0={geo.carW * 1.1} mat={mats.red} />
-        <Word at={[0, geo.carW * 2.6, 0]} tone={AVAGUARD3.registry[theme]} small>
-          Registre des hackers
-        </Word>
-      </group>
       {pile.map((q, k) => (
         <mesh key={k} position={[bn[0] - geo.carL * 1.4 + q.x, q.y + geo.carW * 0.35, bn[2] + q.z - geo.carW * 0.4]} rotation={[0, q.r, 0]} material={mats.cube}>
           <boxGeometry args={[geo.carW * 0.7, geo.carW * 0.7, geo.carW * 0.7]} />
         </mesh>
       ))}
       <Word at={[0, fenceH + geo.carW * 3.5, 0]}>Déchetterie</Word>
+    </group>
+  );
+}
+
+/** the scrapyard's frame, where its container stands: shared by the yard and the registry's container */
+export function yardLocal(geo: GuardGeo, v: Vector3): [number, number, number] {
+  const { c, yaw } = geo.scrapyard;
+  const dx = v.x - c.x;
+  const dz = v.z - c.z;
+  return [dx * Math.cos(yaw) + dz * Math.sin(yaw), 0, -dx * Math.sin(yaw) + dz * Math.cos(yaw)];
+}
+
+/** the hackers' registry: an open container at the yard's far side, its rim in the refusal's red; a door of its own */
+export function RegistryBin({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
+  const { c, yaw, bin } = geo.scrapyard;
+  const mats = useMemo(() => ({ bin: lambert(MASS3.wall[theme]), red: new MeshLambertMaterial({ color: AVAGUARD3.registry[theme], emissive: new Color(AVAGUARD3.registry[theme]), emissiveIntensity: 0 }) }), [theme]);
+  useFrame(() => {
+    mats.red.emissiveIntensity = motion.registryFlash * 1.4;
+  });
+  return (
+    <group position={c} rotation={[0, -yaw, 0]}>
+      <group position={yardLocal(geo, bin)}>
+        <Block w={geo.carL * 1.3} h={geo.carW * 1.1} d={geo.carW * 1.6} mat={mats.bin} />
+        <Block w={geo.carL * 1.32} h={geo.carW * 0.12} d={geo.carW * 1.62} y0={geo.carW * 1.1} mat={mats.red} />
+        <Word at={[0, geo.carW * 2.6, 0]} tone={AVAGUARD3.registry[theme]} small>
+          Registre des hackers
+        </Word>
+      </group>
     </group>
   );
 }
@@ -231,13 +214,16 @@ export function ProofStack({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const mats = useMemo(() => ({ allow: lambert(AVAGUARD3.proof[theme]), block: lambert(AVAGUARD3.registry[theme]), base: lambert(MASS3.frame[theme]) }), [theme]);
   return (
     <group position={geo.proof}>
-      <Block w={size * 1.4} h={0.3} d={size * 1.4} mat={mats.base} />
+      {/* a pedestal, stepped, so the column stands even before its first proof */}
+      <Block w={size * 2} h={size * 0.3} d={size * 2} mat={mats.base} />
+      <Block w={size * 1.5} h={size * 0.3} d={size * 1.5} y0={size * 0.3} mat={mats.base} />
+      <Block w={size * 1.5} h={size * 0.06} d={size * 1.5} y0={size * 0.6} mat={mats.allow} />
       {blocks.map((b, i) => (
-        <mesh key={b.n} position={[0, 0.3 + size * (i + 0.5) * 1.08, 0]} material={b.tone === "allow" ? mats.allow : mats.block}>
+        <mesh key={b.n} position={[0, size * 0.66 + size * (i + 0.5) * 1.08, 0]} material={b.tone === "allow" ? mats.allow : mats.block}>
           <boxGeometry args={[size, size, size]} />
         </mesh>
       ))}
-      <Word at={[0, 0.3 + size * (blocks.length + 1.2) * 1.08, 0]} tone={AVAGUARD3.proof[theme]} small>
+      <Word at={[0, size * 0.66 + size * (blocks.length + 1.2) * 1.08, 0]} tone={AVAGUARD3.proof[theme]} small>
         Preuve on-chain{blocks.length ? ` · #${blocks[blocks.length - 1].n}` : ""}
       </Word>
     </group>

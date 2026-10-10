@@ -2,7 +2,7 @@
 // key presses, waits, evaluations and screenshots, for the phase captures and the GIF.
 //   node tools/capture.mjs <plan.json>
 // plan: { url, out, width, height, steps: [ {wait}, {key:"Digit1"}, {shot:"name"}, {frames:{prefix,count,every}},
-//         {eval:"js"}, {log:"js expression"}, {click:[x,y]}, {move:[x,y]} ] }
+//         {eval:"js"}, {log:"js expression"}, {click:[x,y]}, {move:[x,y]}, {evalMove:"registry"}, {evalClick:"hub"} ] }
 import { spawn } from 'node:child_process'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
@@ -65,8 +65,17 @@ for (const s of plan.steps) {
     await send('Input.dispatchKeyEvent', { type: 'keyDown', code: s.key, key })
     await send('Input.dispatchKeyEvent', { type: 'keyUp', code: s.key, key })
   }
+  // a door's place on screen, from the page's own test handle (city3d/AvaGuardRun.tsx window.__doorAt)
+  const door = s.evalMove ?? s.evalClick
+  if (door) {
+    const at = await evaluate(`window.__doorAt && window.__doorAt(${JSON.stringify(door)})`)
+    if (at) s[s.evalMove ? 'move' : 'click'] = at
+    console.log('DOOR', door, '=>', JSON.stringify(at))
+  }
   if (s.move) await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: s.move[0], y: s.move[1] })
   if (s.click) {
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: s.click[0], y: s.click[1] })
+    await sleep(120)
     await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: s.click[0], y: s.click[1], button: 'left', clickCount: 1 })
     await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: s.click[0], y: s.click[1], button: 'left', clickCount: 1 })
   }

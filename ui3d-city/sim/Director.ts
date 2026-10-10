@@ -92,10 +92,13 @@ async function next() {
 
 async function play(tx: TxEvent) {
   resetMotion();
+  // a scene played again is a new transaction: it keeps its number, with a replay suffix
+  const seen = sim.get().ledger.filter((l) => l.tx_id === tx.tx_id || l.tx_id.startsWith(`${tx.tx_id}-`)).length;
+  if (seen) tx.tx_id = `${tx.tx_id}-${seen + 1}`;
   const known = sim.get().registry.includes(tx.to.address.toLowerCase());
   const immune = !!tx.registry_hit && known;
   const entry: JournalEntry = { tx_id: tx.tx_id, outcome: "PENDING", via: "AvaGuard", amount: tx.amount.value, token: tx.amount.token, to: tx.to.address, at: new Date().toISOString() };
-  sim.set((s) => ({ tx, phase: "approach", step: -1, journal: [entry, ...s.journal].slice(0, 40) }));
+  sim.set((s) => ({ tx, phase: "approach", step: -1, journal: [entry, ...s.journal].slice(0, 40), ledger: [{ ...tx, status: "PENDING" as const, via: "AvaGuard" as const }, ...s.ledger] }));
   motion.visible = true;
   motion.tone = "verify";
   fly("follow");
@@ -156,6 +159,7 @@ function finish(tx: TxEvent, outcome: "ALLOW" | "BLOCK", via: "AvaGuard" | "huma
     blocks: [...st.blocks.slice(-15), { n, tone: outcome === "ALLOW" ? "allow" : "block", tx_id: tx.tx_id }],
     journal: st.journal.map((j) => (j.tx_id === tx.tx_id && j.outcome === "PENDING" ? { ...j, outcome, via, block: n } : j)),
     kpi: { ...st.kpi, visas: st.kpi.visas + (outcome === "ALLOW" ? 1 : 0), blocked: st.kpi.blocked + (outcome === "BLOCK" ? 1 : 0), protectedUsd: st.kpi.protectedUsd + (outcome === "BLOCK" ? tx.amount.value : 0) },
+    ledger: st.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: outcome, via, decided_at: new Date().toISOString(), onchain: { chain: tx.onchain?.chain ?? "AvaGuard L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n } } : l)),
     tx: st.tx && st.tx.tx_id === tx.tx_id ? { ...st.tx, onchain: { chain: tx.onchain?.chain ?? "AvaGuard L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n } } : st.tx,
   }));
   return n;
@@ -227,7 +231,7 @@ async function human(tx: TxEvent) {
     leg(t, "toParking", TIMINGS.toParking);
   });
   if (!busy) return;
-  sim.set({ human: { tx_id: tx.tx_id, deadline: Date.now() + TIMINGS.humanTimeout * 1000 } });
+  sim.set((s) => ({ human: { tx_id: tx.tx_id, deadline: Date.now() + TIMINGS.humanTimeout * 1000 }, ledger: s.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: "HUMAN" as const } : l)) }));
   // the timeline is paused-proof: the countdown only runs while the demo is not paused
   const approve = await new Promise<boolean>((resolve) => {
     humanAnswer = resolve;
@@ -243,11 +247,11 @@ async function human(tx: TxEvent) {
   toast(`${tx.tx_id} · ${approve ? "approuvée" : "refusée"} par un humain`, approve ? "allow" : "block");
   if (approve) {
     motion.tone = "allow";
-    await run((t) => leg(t, "fromParking", 1.6));
+    await run((t) => leg(t, "fromParking", TIMINGS.fromParking));
     await allow(tx, "humain", "toCChain");
   } else {
     // back out to the toll, then the same way as a refusal there: the U-turn, the scrapyard
-    await run((t) => leg(t, "fromParking", 1.6));
+    await run((t) => leg(t, "fromParking", TIMINGS.fromParking));
     await block(tx, "humain", true);
   }
 }

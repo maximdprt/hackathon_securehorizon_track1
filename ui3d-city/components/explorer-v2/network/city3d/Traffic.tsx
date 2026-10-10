@@ -246,8 +246,9 @@ function driven<T extends Material>(m: T, uniforms: Record<string, { value: unkn
 /* the pod's light: a thin strip along each flank, just over its widest line, painted
    on the shell itself so it follows its curve; its color is the pod's own (aGlow), and
    it is the one part of a pod that lights itself */
-const STRIP_Y = 0.045;
-const STRIP_HALF = 0.016;
+// AVAGUARD: exported, so our one car draws the same light strip (city3d/GuardCar.tsx)
+export const STRIP_Y = 0.045;
+export const STRIP_HALF = 0.016;
 function strip(s: WebGLProgramParametersWithUniforms) {
   s.vertexShader = s.vertexShader
     .replace("#include <common>", "#include <common>\nattribute vec3 aGlow;\nvarying vec3 vGlow;\nvarying vec3 vPod;")

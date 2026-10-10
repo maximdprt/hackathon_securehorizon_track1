@@ -59,8 +59,8 @@ export function Gauge({ tx, live }: { tx: TxEvent; live: boolean }) {
 
 /** radar of the five checks; a check draws once its line is lit */
 export function Radar({ tx, lit }: { tx: TxEvent; lit: (k: CheckKey) => boolean }) {
-  const R = 46;
-  const c = 60;
+  const R = 40;
+  const c = 80;
   const at = (i: number, v: number) => {
     const a = -Math.PI / 2 + (i * 2 * Math.PI) / 5;
     return [c + Math.cos(a) * R * v, c + Math.sin(a) * R * v];
@@ -68,13 +68,13 @@ export function Radar({ tx, lit }: { tx: TxEvent; lit: (k: CheckKey) => boolean 
   const poly = (vals: number[]) => vals.map((v, i) => at(i, v).map((n) => n.toFixed(1)).join(",")).join(" ");
   const vals = CHECK_ORDER.map((k) => (lit(k) ? tx.checks[k].score / 100 : 0));
   return (
-    <svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Radar des 5 contrôles">
+    <svg width="160" height="124" viewBox="0 18 160 124" role="img" aria-label="Radar des 5 contrôles">
       {[0.33, 0.66, 1].map((r) => (
         <polygon key={r} points={poly([r, r, r, r, r])} fill="none" stroke="currentColor" className="text-zinc-200 dark:text-zinc-800" />
       ))}
       <polygon points={poly(vals)} fill={zoneHex(tx.score, tx.thresholds)} fillOpacity={0.28} stroke={zoneHex(tx.score, tx.thresholds)} strokeWidth="1.5" />
       {CHECK_ORDER.map((k, i) => {
-        const [x, y] = at(i, 1.22);
+        const [x, y] = at(i, 1.3);
         return (
           <text key={k} x={x} y={y + 3} textAnchor="middle" fontSize="7.5" className="fill-zinc-500 font-mono uppercase">
             {CHECK_LABEL[k].split(" ")[0]}

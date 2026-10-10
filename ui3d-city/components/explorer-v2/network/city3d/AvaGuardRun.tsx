@@ -24,7 +24,10 @@ import type { Shot } from "./Rig";
 import { TIME } from "./shaders";
 import { CANOPY_H, EQUATOR, PODS, ROOF, podGeometry } from "./Traffic";
 import { guardGeoOf, poseAt, type GuardGeo } from "./guardGeo";
-import { Crown, HumanLot, ProofStack, Scrapyard, Toll } from "./Parcel";
+import { Crown, ProofStack, RegistryBin, Scrapyard, Toll } from "./Parcel";
+import { HumanLot } from "./HumanLot";
+import { GuardCar } from "./GuardCar";
+import { CarTip, Door, OPEN, ParkingTip, ProofTip, RegistryTip, ScrapTip, TollTip } from "./Door";
 
 type Props = { model: CityModel; city: City; routes: Route[]; streets: RouteStreets[]; theme: Theme; still: boolean; onShot: (s: Shot | null) => void; cameraRef?: RefObject<CameraHandle | null> };
 
@@ -34,94 +37,23 @@ function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
   const top = g.hq.base + g.hq.crest;
   // looked at from outside the ward, inward: the HQ and downtown stand behind what the shot shows
   const out = (p: Vector3) => Math.PI / 2 - Math.atan2(p.z, p.x);
+  /** halfway between outward and away from a tower beside it */
+  const awayFrom = (p: Vector3, b: { x: number; z: number }) => {
+    const r = Math.hypot(p.x, p.z) || 1;
+    const dx = p.x - b.x;
+    const dz = p.z - b.z;
+    const d = Math.hypot(dx, dz) || 1;
+    return Math.atan2(p.x / r + dx / d, p.z / r + dz / d);
+  };
   return {
     security: { key: "guard:security", points: [new Vector3(g.hq.x, top + 10, g.hq.z), g.toll.p, g.parking.c, g.scrapyard.c, ...ring(new Vector3(g.hq.x, 0, g.hq.z), g.S * 2.6)].map((p) => p.clone()), polar: 0.9, cap: 1 / 3.2, fill: 0.9, az: out(g.toll.p) },
     toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.9), ...ring(g.toll.p, g.S * 1.2)], polar: 0.62, cap: 1 / 6, fill: 0.8, az: out(g.toll.p) },
-    parking: { key: "guard:parking", points: [g.parking.c.clone().setY(g.S * 0.9), ...ring(g.parking.c, g.parking.w * 0.7)], polar: 0.7, cap: 1 / 6, fill: 0.86, az: out(g.parking.c) },
+    // the lot from the side away from the HQ and from outside the ward, high: the HQ's tower stands behind it, never over its bays
+    parking: { key: "guard:parking", points: [g.parking.c.clone().setY(g.carW * 2.4), ...ring(g.parking.c, g.parking.w * 0.55)], polar: 0.55, cap: 1 / 6, fill: 0.84, az: awayFrom(g.parking.c, g.hq) },
     scrapyard: { key: "guard:scrapyard", points: [g.scrapyard.c.clone().setY(g.S * 1.1), ...ring(g.scrapyard.c, g.scrapyard.w * 0.75)], polar: 0.7, cap: 1 / 6, fill: 0.86, az: out(g.scrapyard.c) },
     cchain: { key: "guard:cchain", points: [new Vector3(0, g.hubTop * 0.75, 0), g.out.clone(), g.stop.p.clone(), ...ring(new Vector3(0, 0, 0), g.S * 2.4)], polar: 1.0, cap: 1 / 3, fill: 0.88 },
     follow: { key: "guard:follow", points: [...g.legs.approach.pts.filter((_, i) => i % 4 === 0), g.toll.p.clone().setY(g.S * 1.2), new Vector3(g.hq.x, g.hq.base + g.hq.crest * 0.6, g.hq.z)], polar: 0.8, cap: 1 / 4.5, fill: 0.86, az: out(g.toll.p) },
   };
-}
-
-/* ------------------------------------------------------------------ */
-/* the car                                                             */
-/* ------------------------------------------------------------------ */
-
-function Car({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
-  const w = geo.carW;
-  const pod = PODS.car;
-  const root = useRef<Group>(null);
-  const car = useRef<Group>(null);
-  const cube = useRef<Mesh>(null);
-  const mats = useMemo(() => {
-    const tone = new Color(STATE.verify.hex);
-    return {
-      body: new MeshLambertMaterial({ color: FLEET.box[theme] }),
-      canopy: new MeshPhongMaterial({ color: "#EBF0FA", specular: "#5C6674", shininess: 60 }),
-      bar: new MeshBasicMaterial({ color: tone, toneMapped: false }),
-      halo: new MeshBasicMaterial({ color: tone, transparent: true, opacity: 0.32, depthWrite: false, blending: AdditiveBlending, toneMapped: false }),
-      xray: new MeshBasicMaterial({ color: STATE.verify.hex, wireframe: true, transparent: true, opacity: 0.8, toneMapped: false }),
-      cube: new MeshLambertMaterial({ color: "#7B8394" }),
-    };
-  }, [theme]);
-  const geos = useMemo(() => ({ body: podGeometry(), canopy: podGeometry() }), []);
-  const body = useRef<Mesh>(null);
-  const canopy = useRef<Mesh>(null);
-  const tmp = useMemo(() => new Vector3(), []);
-  const frost = useMemo(() => new Color("#DCE8F7"), []);
-  const white = useMemo(() => new Color(FLEET.box[theme]), [theme]);
-  useFrame(() => {
-    const r = root.current;
-    if (!r) return;
-    r.visible = motion.visible && motion.leg !== "none";
-    if (!r.visible) return;
-    const path = geo.legs[motion.leg as keyof GuardGeo["legs"]];
-    if (!path) return;
-    const { p, yaw } = poseAt(path, motion.u, tmp);
-    if (!motion.cube) {
-      r.position.copy(p);
-      r.rotation.y = -yaw;
-    }
-    const c = STATE[motion.tone].hex;
-    mats.bar.color.set(c);
-    mats.halo.color.set(c);
-    const xr = motion.xray > 0.5;
-    if (body.current) body.current.material = xr ? mats.xray : mats.body;
-    if (canopy.current) canopy.current.material = xr ? mats.xray : mats.canopy;
-    // the refusal's frost: the shell goes icy, edged in red
-    mats.body.color.copy(white).lerp(frost, motion.frost);
-    mats.body.emissive.set(AVAGUARD3.block[theme]).multiplyScalar(motion.frost * 0.25);
-    if (car.current) car.current.visible = !motion.cube;
-    if (cube.current) {
-      cube.current.visible = motion.cube;
-      if (motion.cube) {
-        // squashed under the press, then thrown in an arc into the registry's container
-        const from = geo.scrapyard.crusher;
-        const to = geo.scrapyard.bin;
-        const k = motion.dump;
-        r.position.set(from.x + (to.x - from.x) * k, from.y + Math.sin(k * Math.PI) * w * 3 + (to.y - from.y) * k, from.z + (to.z - from.z) * k);
-      }
-    }
-  });
-  return (
-    <group ref={root} visible={false}>
-      <group ref={car}>
-        <mesh ref={body} geometry={geos.body} material={mats.body} position={[0, EQUATOR * w, 0]} scale={[w * (pod.length / 2.2), w, w]} castShadow />
-        <mesh ref={canopy} geometry={geos.canopy} material={mats.canopy} position={[pod.canopy.x * w, (ROOF - 0.055) * w, 0]} scale={[w * (pod.canopy.length / 2.2), w * CANOPY_H * 0.55, w * pod.canopy.width]} />
-        {/* the roof bar and the ground halo, in the state's colour */}
-        <mesh material={mats.bar} position={[0, (ROOF + 0.32) * w, 0]}>
-          <boxGeometry args={[w * 0.5, w * 0.12, w * 0.7]} />
-        </mesh>
-        <mesh material={mats.halo} position={[0, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <circleGeometry args={[w * 1.7, 32]} />
-        </mesh>
-      </group>
-      <mesh ref={cube} material={mats.cube} position={[0, w * 0.4, 0]} visible={false}>
-        <boxGeometry args={[w * 0.9, w * 0.8, w * 0.9]} />
-      </mesh>
-    </group>
-  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -427,9 +359,45 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
       },
       still: () => stillRef.current,
     });
+    // a debug flight: the ward from straight above (tools/capture.mjs)
+    (window as unknown as { __guardTop?: (r: number) => void }).__guardTop = (r) => onShot({ key: `guard:top:${r}`, points: [new Vector3(geo!.hq.x - r, 0, geo!.hq.z - r), new Vector3(geo!.hq.x + r, 0, geo!.hq.z + r)], polar: 0.02, cap: 0.01, fill: 0.95, az: 0 });
     // a test and debug handle: the parcel's places, read by tools/capture.mjs
-    (window as unknown as { __guard?: unknown }).__guard = geo && { S: geo.S, carW: geo.carW, toll: geo.toll.p.toArray(), parking: geo.parking.c.toArray(), scrapyard: geo.scrapyard.c.toArray(), legs: Object.fromEntries(Object.entries(geo.legs).map(([k, v]) => [k, Math.round(v.len)])) };
+    (window as unknown as { __guard?: unknown }).__guard = geo && { dbg: geo.dbg, S: geo.S, carW: geo.carW, toll: geo.toll.p.toArray(), parking: geo.parking.c.toArray(), scrapyard: geo.scrapyard.c.toArray(), legs: Object.fromEntries(Object.entries(geo.legs).map(([k, v]) => [k, Math.round(v.len)])) };
   }, [shots, geo, onShot, cameraRef]);
+
+  // a test handle: where each door stands on screen now (tools/capture.mjs and the Playwright suite click them)
+  const size = useThree((s) => s.size);
+  const el = useThree((s) => s.gl.domElement);
+  useEffect(() => {
+    if (!geo) return;
+    // a few points of each door: the first one the canvas itself takes on screen (an HTML label may lie over another)
+    const spots: Record<string, Vector3[]> = {
+      toll: [geo.toll.p.clone().setY(geo.S * 0.4)],
+      parking: [geo.parking.slots[0], geo.parking.slots[1], geo.parking.slots[4], geo.parking.slots[5], geo.parking.c].map((v) => v.clone().setY(v.y + 0.4)),
+      scrapyard: [geo.scrapyard.c.clone().setY(geo.scrapyard.c.y + 0.3), geo.scrapyard.crusher.clone().setY(geo.carW * 0.6)],
+      registry: [geo.scrapyard.bin.clone().setY(geo.carW * 0.9)],
+      proof: [geo.proof.clone().setY(geo.proof.y + Math.max(1.6, geo.S * 0.12) * 0.45)],
+      hub: [new Vector3(0, geo.hubTop * 0.55, 0)],
+      hq: [new Vector3(geo.hq.x, geo.hq.base + geo.hq.crest * 0.5, geo.hq.z), new Vector3(geo.hq.x, geo.hq.base + geo.hq.crest * 0.3, geo.hq.z)],
+      // another chain's tower: tall ones on the city's near side (the camera's home looks from +z), none behind downtown
+      chain: [...model.buildings]
+        .filter((b) => b.id !== geo.hq.id && b !== model.buildings[model.hub] && b.z > Math.abs(b.x) * 0.3 && Math.hypot(b.x, b.z) > 160)
+        .sort((a, b) => b.crest - a.crest)
+        .slice(0, 6)
+        .map((b) => new Vector3(b.x, b.base + b.crest * 0.6, b.z)),
+    };
+    (window as unknown as { __doorAt?: (k: string) => [number, number] | null }).__doorAt = (k) => {
+      const r = el.getBoundingClientRect();
+      let first: [number, number] | null = null;
+      for (const v of spots[k] ?? []) {
+        const p = v.clone().project(camera);
+        const at: [number, number] = [Math.round(r.left + (p.x * 0.5 + 0.5) * size.width), Math.round(r.top + (-p.y * 0.5 + 0.5) * size.height)];
+        first ??= at;
+        if (document.elementFromPoint(at[0], at[1]) === el) return at;
+      }
+      return first;
+    };
+  }, [geo, camera, size, el, model]);
 
   // a still city draws on demand: keep it drawing while a transaction plays
   useEffect(() => {
@@ -457,11 +425,23 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
   return (
     <group>
       <Crown geo={geo} theme={theme} />
-      <Toll geo={geo} theme={theme} />
-      <HumanLot geo={geo} theme={theme} />
-      <Scrapyard geo={geo} theme={theme} />
-      <ProofStack geo={geo} theme={theme} />
-      <Car geo={geo} theme={theme} />
+      {/* each piece of the parcel is a door to its screen (Door.tsx, sim/nav.ts) */}
+      <Door name="guard:toll" at={[geo.toll.p.x, geo.S * 1.1, geo.toll.p.z]} tip={<TollTip />} onOpen={OPEN.toll}>
+        <Toll geo={geo} theme={theme} />
+      </Door>
+      <Door name="guard:parking" at={[geo.parking.c.x, geo.S * 0.5, geo.parking.c.z]} tip={<ParkingTip />} onOpen={OPEN.parking}>
+        <HumanLot geo={geo} theme={theme} />
+      </Door>
+      <Door name="guard:scrapyard" at={[geo.scrapyard.crusher.x, geo.carW * 3.2, geo.scrapyard.crusher.z]} tip={<ScrapTip />} onOpen={OPEN.scrapyard}>
+        <Scrapyard geo={geo} theme={theme} />
+      </Door>
+      <Door name="guard:registry" at={[geo.scrapyard.bin.x, geo.carW * 2, geo.scrapyard.bin.z]} tip={<RegistryTip />} onOpen={OPEN.registry}>
+        <RegistryBin geo={geo} theme={theme} />
+      </Door>
+      <Door name="guard:proof" at={[geo.proof.x, geo.S * 0.4, geo.proof.z]} tip={<ProofTip />} onOpen={OPEN.proof}>
+        <ProofStack geo={geo} theme={theme} />
+      </Door>
+      <GuardCar geo={geo} theme={theme} />
       <ContractHolo geo={geo} />
       <AuthorityThread geo={geo} />
       <Snowball geo={geo} />

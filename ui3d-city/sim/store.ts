@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-import type { Tone, TxEvent } from "./types";
+import type { AuditTx, Tone, TxEvent } from "./types";
 
 /* The simulation's state for the UI (cards, figures, alerts). It changes at step boundaries only; the per-frame
    values (positions, sweeps, gauges) live in `motion`, which GSAP tweens and the scene reads in useFrame. */
@@ -7,6 +7,9 @@ import type { Tone, TxEvent } from "./types";
 export type Phase = "idle" | "approach" | "analysis" | "allow" | "block" | "human" | "home";
 export type Leg = "approach" | "toCChain" | "uTurn" | "toScrapyard" | "toParking" | "fromParking" | "none";
 export type Panel = null | "detail" | "journal" | "registry" | "audit";
+/** the screens that open over the city, a building's door each (sim/nav.ts) */
+export type View = null | "transactions" | "registry" | "parking" | "audit";
+export type ViewFilter = "all" | "ALLOW" | "BLOCK" | "HUMAN" | "PENDING" | "proof";
 
 export type JournalEntry = { tx_id: string; outcome: "ALLOW" | "BLOCK" | "PENDING"; via: "AvaGuard" | "humain" | "registre"; amount: number; token: string; to: string; at: string; block?: number };
 
@@ -29,6 +32,12 @@ export type SimState = {
   liveStatus: string;
   /** our street lit in green while a visa drives it to the C-Chain */
   routeLit: boolean;
+  /** every transaction played in the city, whole, newest first (the audit screens read it through data/source.ts) */
+  ledger: AuditTx[];
+  /** the screen open over the city, the transaction it shows, the filter it opened on */
+  view: View;
+  viewTx: string | null;
+  viewFilter: ViewFilter;
 };
 
 const initial = (): SimState => ({
@@ -48,6 +57,10 @@ const initial = (): SimState => ({
   mode: typeof window !== "undefined" && new URLSearchParams(window.location.search).get("live") === "1" ? "live" : "demo",
   liveStatus: "",
   routeLit: false,
+  ledger: [],
+  view: null,
+  viewTx: null,
+  viewFilter: "all",
 });
 
 let state = initial();
@@ -63,7 +76,7 @@ export const sim = {
     return () => subs.delete(f);
   },
   reset() {
-    const keep = { mode: state.mode, liveStatus: state.liveStatus };
+    const keep = { mode: state.mode, liveStatus: state.liveStatus, view: state.view, viewTx: state.viewTx, viewFilter: state.viewFilter };
     state = { ...initial(), ...keep };
     subs.forEach((f) => f());
   },

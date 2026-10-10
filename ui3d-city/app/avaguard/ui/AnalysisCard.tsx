@@ -1,5 +1,6 @@
 "use client";
 
+import { openView } from "@/sim/nav";
 import { cn } from "@/lib/utils";
 import { PANE, PANEL_W } from "@/components/explorer-v2/network/city-frame";
 import { sim, useSim } from "@/sim/store";
@@ -99,7 +100,7 @@ export function AnalysisCard() {
             <span className="font-mono text-[10.5px] text-zinc-500 dark:text-zinc-400">{tx.onchain && step >= 6 ? `Preuve on-chain : bloc #${fmtAmount(tx.onchain.block)} · ${shortAddr(tx.onchain.tx_hash)}` : "Preuve on-chain : en attente"}</span>
             <button
               type="button"
-              onClick={() => sim.set({ panel: "detail" })}
+              onClick={() => tx && openView("transactions", { tx: tx.tx_id })}
               className="shrink-0 rounded-md border border-zinc-200 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-100"
             >
               Voir le détail

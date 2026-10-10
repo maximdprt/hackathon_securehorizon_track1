@@ -33,6 +33,26 @@ seule fois. Aucune requête en boucle vers build.avax.network.
 
 Une seule transaction à la fois ; les suivantes attendent en file (`sim/Director.ts`).
 
+## Chaque bâtiment est une porte
+
+Survol : la plaque d'info au style de la City. Clic : l'écran s'ouvre par-dessus la ville (la scène reste montée),
+l'URL suit (`?view=transactions&tx=tx_0042`), `Échap` ou Précédent ramène à la ville.
+
+| Clic sur | Ouvre |
+| --- | --- |
+| Tour C-Chain (rouge) | **Transactions** : toutes les transactions, filtres, recherche, et pour chacune l'audit (score, 5 contrôles, seuils KPMG, chaîne d'autorité, contrat, preuve on-chain, conformité, JSON brut) |
+| Conteneur rouge | **Registre des hackers** : adresses et empreintes de clé bannies, tentatives, preuve, export CSV |
+| Parking couvert | **Validation humaine** : demande en attente (compte à rebours, A / R), plan du parking, historique |
+| Péage | Transactions, ouvert sur la transaction en cours |
+| Déchetterie | Transactions filtrées « Bloquées » |
+| Colonne de preuves | Transactions filtrées « Preuve on-chain » |
+| Tour AvaGuard L1 | **Audit** : détection, escalades, délais, incidents DORA, contrôle décisif, seuils, conformité |
+| La voiture | Transactions, ouvert sur sa transaction |
+| Toute autre tour | Vol caméra de la City et fiche de la chaîne |
+
+Les écrans lisent une seule source (`data/source.ts`) : historique synthétique plus transactions jouées. Pour le MCP
+agent : `NEXT_PUBLIC_AVAGUARD_MCP_URL` dans `.env.local` (`GET /transactions` au format `verdict.schema.json`).
+
 ## Mode live
 
 Copier les variables dans `.env.local` (jamais commité), puis ouvrir `http://localhost:3000/?live=1`.
@@ -58,16 +78,19 @@ Aucune clé privée côté front ; les identifiants AWS restent dans le `.env` d
 - `components/explorer-v2/**`, `lib/**`, `types/**` : code extrait de builders-hub (liste dans `VENDORED.md`). Chaque
   modification locale est marquée `// AVAGUARD:`.
 - `components/explorer-v2/network/avaguard.ts` : la chaîne AvaGuard L1, son district, ses flux ICM simulés.
-- `components/explorer-v2/network/city3d/guardGeo.ts`, `Parcel.tsx`, `AvaGuardRun.tsx` : la parcelle, la voiture,
-  l'analyse au péage.
+- `components/explorer-v2/network/city3d/guardGeo.ts`, `Parcel.tsx`, `HumanLot.tsx`, `GuardCar.tsx`, `Door.tsx`,
+  `AvaGuardRun.tsx` : la parcelle (péage, parking clos, déchetterie, registre, preuves), la voiture (le module de la
+  flotte builders-hub), les portes cliquables, l'analyse au péage.
+- `data/` : la source des écrans (historique synthétique, registre dérivé des refus, branchement MCP).
+- `app/avaguard/views/` : les écrans Transactions, Registre, Validation humaine, Audit.
 - `sim/` : scénarios, timings, store, Director (GSAP), adaptateur verdict, flux live.
 - `app/avaguard/` : la page autour de la City (barre, recherche, chiffres, carte d'analyse, panneaux, alerte humaine).
 
 ## Scripts
 
 ```bash
-npm test                  # vitest : city-wards (+ cas Security) et Director (4 scènes)
-npm run test:visual       # Playwright (Chrome installé) : captures home / péage / déchetterie dans docs/captures
+npm test                  # vitest : city-wards (+ cas Security), Director (4 scènes), source des écrans
+npm run test:visual       # Playwright (Chrome installé) : captures home / péage / déchetterie, et chaque porte, dans docs/captures
 npm run extract           # ré-extraire la City depuis un clone de builders-hub
 npm run snapshot          # ré-enregistrer l'instantané Fuji (une fois)
 node tools/capture.mjs <plan.json>   # captures et images pour GIF via Chrome headless

@@ -10,7 +10,7 @@ export const AVAGUARD_VALIDATORS = 5;
 /** our HQ is a skyline landmark whatever its validator count, so it reads from the home view */
 export const AVAGUARD_MIN_H = 104;
 /** the room our ward claims on the circle, in lots' worth: the toll, the parking and the scrapyard stand on it */
-export const SECURITY_ROOM = 9;
+export const SECURITY_ROOM = 16;
 /** the ICM messages our street carries each way (simulated: ours is a demo L1) */
 export const AVAGUARD_FLOW = { out: 180, in: 120 };
 

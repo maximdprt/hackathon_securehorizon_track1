@@ -18,11 +18,13 @@ export const TIMINGS = {
   toCChain: 7,
   arrivalHold: 2.2,
   uTurn: 2.2,
-  toScrapyard: 4.5,
+  toScrapyard: 6.5,
   press: 0.55,
   shake: 0.45,
   dump: 1.3,
-  toParking: 3,
+  toParking: 7.5,
+  /** out of the bay, back through the gate and round the block to the toll */
+  fromParking: 7,
   humanTimeout: 120,
   /** back to the city's home view between two transactions */
   home: 1.6,
