@@ -17,7 +17,7 @@ const port = 9333 + Math.floor(Math.random() * 400)
 const profile = resolve('tools/.chrome-profile')
 const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', [
   '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
-  `--window-size=${W},${H}`, '--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', 'about:blank',
+  `--window-size=${W},${H}`, '--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--js-flags=--expose-gc', 'about:blank',
 ], { stdio: 'ignore' })
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))

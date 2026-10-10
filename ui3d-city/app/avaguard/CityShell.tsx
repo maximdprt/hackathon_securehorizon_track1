@@ -28,6 +28,7 @@ import { RegistryView } from "./views/RegistryView";
 import { ParkingView } from "./views/ParkingView";
 import { AuditView } from "./views/AuditView";
 import { ChainSheet } from "./ui/ChainSheet";
+import { GuardYardModal } from "@/components/guard-yard/GuardYardModal";
 import { LIVE_CONFIGURED, protectedOf, useAudit } from "@/data/source";
 import { StateIcon } from "./ui/charts";
 
@@ -238,7 +239,7 @@ export default function CityShell() {
       }
       if (e.repeat || el.tagName === "INPUT" || el.tagName === "TEXTAREA") return;
       // a screen over the city keeps the keyboard for itself
-      if (sim.get().view) return;
+      if (sim.get().view || sim.get().guard) return;
       const digit = /^(Digit|Numpad)\d$/.test(e.code) ? e.code.slice(-1) : null;
       if (digit && ["1", "2", "3", "4"].includes(digit)) return playScene(SCENES[Number(digit) - 1].k);
       if (digit === "0") return resetAll();
@@ -434,6 +435,7 @@ export default function CityShell() {
         {sheetNode && <ChainSheet node={sheetNode} partner={sheetPartner} simulated={data.icmSimulated} onClose={() => setSelected(null)} />}
         <HumanAlert />
         <Toasts />
+        <GuardYardModal />
         <ViewHost screens={{ transactions: <TransactionsView />, registry: <RegistryView />, parking: <ParkingView />, audit: <AuditView /> }} />
 
         {/* the figures at the city's foot (city-frame.tsx FigureStrip): the network's, real and dated, then ours */}
