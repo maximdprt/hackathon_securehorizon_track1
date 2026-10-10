@@ -47,6 +47,22 @@ ABI = [
     {"name": "isAuthorized", "type": "function", "stateMutability": "view",
      "inputs": [{"name": "issuer", "type": "address"}, {"name": "amount", "type": "uint256"}],
      "outputs": [{"name": "", "type": "bool"}]},
+    # events (decoded for the 3D feed / audit)
+    {"name": "DecisionRecorded", "type": "event", "anonymous": False, "inputs": [
+        {"indexed": True, "name": "paymentId", "type": "bytes32"},
+        {"indexed": True, "name": "issuer", "type": "address"},
+        {"indexed": False, "name": "verdict", "type": "string"},
+        {"indexed": False, "name": "reason", "type": "string"}]},
+    {"name": "VisaGranted", "type": "event", "anonymous": False, "inputs": [
+        {"indexed": True, "name": "paymentId", "type": "bytes32"},
+        {"indexed": True, "name": "issuer", "type": "address"},
+        {"indexed": False, "name": "recipient", "type": "address"},
+        {"indexed": False, "name": "amount", "type": "uint256"},
+        {"indexed": False, "name": "expiry", "type": "uint256"}]},
+    {"name": "ThreatFlagged", "type": "event", "anonymous": False, "inputs": [
+        {"indexed": True, "name": "subject", "type": "bytes32"},
+        {"indexed": False, "name": "severity", "type": "uint8"},
+        {"indexed": False, "name": "reason", "type": "string"}]},
 ]
 
 w3 = Web3(Web3.HTTPProvider(RPC_URL))

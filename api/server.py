@@ -16,12 +16,15 @@ Env (EnvironmentFile on the EC2):
   L1_RPC_URL  REGISTRY_ADDRESS  AUTHORIZER_KEY  [VISA_TTL_SECONDS]
 Run:  uvicorn server:app --host 0.0.0.0 --port 8080
 """
+import asyncio
+import json
 import os
 from typing import Optional
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from web3 import Web3
 
@@ -82,6 +85,70 @@ def flagged(address: str):
     key = az.address_key(address)  # left-padded address -> bytes32 (matches registry)
     is_flagged, severity = az._reg.functions.isFlagged(key).call()
     return {"address": Web3.to_checksum_address(address), "flagged": bool(is_flagged), "severity": int(severity)}
+
+
+# ---- 3D UI feed (Maxime) : each on-chain decision = one car ----
+# lane mapping: allow -> passes the toll, block -> u-turn, needs_human -> parks
+LANE = {"allow": "pass", "block": "uturn", "needs_human": "park"}
+
+
+def _collect_cars(from_block: int, to_block: int):
+    """Decode AuthorityRegistry.DecisionRecorded (+ VisaGranted context) into car events."""
+    reg = az._reg
+    visas = {}
+    try:
+        for ev in reg.events.VisaGranted().get_logs(from_block=from_block, to_block=to_block):
+            visas["0x" + ev.args.paymentId.hex()] = ev
+    except Exception:
+        pass
+    cars = []
+    for ev in reg.events.DecisionRecorded().get_logs(from_block=from_block, to_block=to_block):
+        pid = "0x" + ev.args.paymentId.hex()
+        vg = visas.get(pid)
+        verdict = ev.args.verdict
+        cars.append({
+            "verdict": verdict,
+            "lane": LANE.get(verdict, "park"),
+            "paymentId": pid,
+            "issuer": ev.args.issuer,
+            "recipient": (vg.args.recipient if vg else None),
+            "amount": (str(vg.args.amount) if vg else None),
+            "reason": ev.args.reason,
+            "txHash": az.w3.to_hex(ev.transactionHash),
+            "block": ev.blockNumber,
+        })
+    cars.sort(key=lambda c: c["block"])
+    return cars
+
+
+@app.get("/cars")
+def cars(sinceBlock: int = -1, lookback: int = 300):
+    """Polling feed for the 3D UI. Pass the returned latestBlock back as sinceBlock next time.
+    First call (sinceBlock omitted) returns the last `lookback` blocks of cars."""
+    latest = az.w3.eth.block_number
+    frm = (sinceBlock + 1) if sinceBlock >= 0 else max(0, latest - lookback)
+    return {"cars": _collect_cars(frm, latest), "latestBlock": latest, "fromBlock": frm}
+
+
+@app.get("/feed")
+async def feed():
+    """Server-Sent Events stream: one `data:` line per new car as decisions land on-chain."""
+    async def gen():
+        last = az.w3.eth.block_number
+        yield "retry: 2000\n\n"
+        while True:
+            try:
+                latest = az.w3.eth.block_number
+                if latest > last:
+                    for car in _collect_cars(last + 1, latest):
+                        yield f"data: {json.dumps(car)}\n\n"
+                    last = latest
+                else:
+                    yield ": ping\n\n"
+            except Exception as e:  # keep the stream alive on transient RPC errors
+                yield f": err {type(e).__name__}\n\n"
+            await asyncio.sleep(2)
+    return StreamingResponse(gen(), media_type="text/event-stream")
 
 
 @app.post("/rpc")

@@ -106,12 +106,13 @@ Donner de la **crypto en récompense** quand un utilisateur fait une transaction
   - **Cerveau** : `POST /authorize` body `{"payment":{"issuer","recipient","amount","nonce"?},"verdict":"allow|block|needs_human","reason","ttl"}` → écrit visa/flag/pending on-chain, renvoie `payment_id` + tx hashes (preuve DORA).
   - **MetaMask / ethers** : `POST /rpc` (proxy JSON-RPC transparent).
   - **UI / lecture** : `GET /health`, `GET /visa/{paymentId}`, `GET /flagged/{address}`.
+  - **Feed 3D (Maxime)** : `GET /cars?sinceBlock=N` (polling) + `GET /feed` (SSE). Voir §11.7.
   - CORS ouvert. Testé bout-en-bout via `https://rpc.petroi.fr` (allow→visa valid, block→flagged severity 3, rpc→chainId 0x1869f).
 - URL fixe via named tunnel (cert `cloudflared tunnel login` sur zone petroi.fr → tunnel `sentinel` → CNAME proxied `rpc.petroi.fr`). Stable même après reboot.
 - L'authorizer = le wallet owner (déjà `authorizers[owner]=true`). Pour la prod on ferait un `setAuthorizer(clé_API_dédiée)`.
 
 ### 11.5 Block explorer SentinelScan (EROL, rebrandé) ✅
-- Explorer custom basé sur l'outil **EROL de Yassir** (`github.com/yassirboudda/erol-explorer-backend` + `EROL_explorer-frontend-main`), cloné sur l'EC2, pointé sur notre L1, **rebrandé SentinelScan** + **design system Vercel** (voir `DESIGN.md`).
+- Explorer **SentinelScan** (code dans le repo : **`explorer/backend`** + **`explorer/frontend`**), pointé sur notre L1, **design system Vercel** (voir `DESIGN.md`). Déployé sur l'EC2.
 - **URL publique FIXE** : **`https://explorer.petroi.fr`** (ingress ajouté au même named tunnel `sentinel`).
 - Stack sur l'EC2 : **MongoDB** (Docker `mongo:7`, port 127.0.0.1:27017) + **backend** Node/Koa (`erol-api` :3002, REST `/blocks /transactions /entity`) + **indexer** (`erol-indexer`, suit les nouveaux blocs via `provider.on("block")`) + **frontend** SvelteKit adapter-node (`erol-frontend` :3005).
 - Fixes faits : (a) `TransactionService.getTransaction` rendu robuste (accepte string ou objet `TransactionResponse` → corrige le `CastError` de l'indexer/backfill, compat ethers v6) ; (b) adapter `vercel`→`node` ; (c) adapter-node épinglé **v5** (v6 casse avec kit 2.27, `reading 'base'`) + `--legacy-peer-deps` ; (d) toutes les `PUBLIC_*` définies dans `.env` ; (e) thème Vercel (`:root` override daisyUI : base-100 #fff, base-200 #fafafa, base-content/primary #171717, info/success #0070f3, error #ee0000, Geist + Geist Mono, hairlines + ombres empilées) ; (f) rebrand texte complet (en.json + Footer + suppression logos Martian + langue "martian" retirée).
@@ -123,6 +124,20 @@ Services systemd (`Restart=always`) : `sentinel-api` (API authorize uvicorn:8080
 - Redémarrer un service : `systemctl restart <nom>` via SSM. Relire l'URL tunnel : `journalctl -u sentinel-tunnel`.
 - **URLs publiques** : API/RPC `https://rpc.petroi.fr` · Explorer `https://explorer.petroi.fr`.
 - ⚠️ les creds AWS du `.env` expirent (rafraîchir depuis la page event) ; l'IP publique EC2 peut changer au reboot mais les 2 URLs petroi.fr sont stables (named tunnel).
+
+### 11.7 Feed 3D pour Maxime (transactions = voitures)
+L'UI 3D consomme les **décisions on-chain** (events `DecisionRecorded` + contexte `VisaGranted` de `AuthorityRegistry`), déjà mappées en couloirs. Deux modes, même payload :
+- **Polling** (recommandé, robuste) : `GET https://rpc.petroi.fr/cars?sinceBlock=N` → `{ "cars":[...], "latestBlock":N, "fromBlock":N }`. Au 1er appel omets `sinceBlock` (renvoie les ~300 derniers blocs) ; ensuite renvoie `latestBlock` comme `sinceBlock` et poll toutes les 1-2s.
+- **SSE temps réel** : `GET https://rpc.petroi.fr/feed` → une ligne `data: {car}` par nouvelle décision.
+
+Schéma d'une **voiture** :
+```json
+{ "verdict":"allow|block|needs_human",
+  "lane":"pass|uturn|park",          // pass=passe le péage, uturn=demi-tour, park=se gare (attente humain)
+  "paymentId":"0x…", "issuer":"0x…", "recipient":"0x…|null",
+  "amount":"<wei string>|null", "reason":"…", "txHash":"0x…", "block": 123 }
+```
+Mapping 3D : `pass`→franchit le péage (vert), `uturn`→demi-tour (rouge, paiement refusé + preuve on-chain), `park`→se gare (ambre, escalade humaine). `reason` = le "pourquoi" lisible (ex. "scam site, prompt injection detected"). Chaque voiture est cliquable → `txHash` ouvrable sur `https://explorer.petroi.fr`.
 
 ### 11.2 ⚠️ Leçon versions (bloquant résolu)
 Sur Fuji actuel (post-upgrade Granite), seul **avalanchego ≥ 1.15.x (RPCChainVM protocole 46)** peer (1.14.x = 0 peer, trop vieux). Le subnet-evm standalone (repo `ava-labs/subnet-evm`) plafonne à **v0.8.0 = protocole 44** → incompatible. **Le bon plugin protocole 46 est livré DANS la release avalanchego v1.15.1** : asset `subnet-evm-linux-amd64-v1.15.1.tar.gz` (le code subnet-evm est désormais "greffé" dans le repo avalanchego, `graft/subnet-evm`). Paire qui marche = **avalanchego 1.15.1 + subnet-evm plugin v1.15.1** (tous deux proto 46), plugin posé en `~/.avalanchego/plugins/srEXiWaHuhNyGwPUi444Tu47ZEDwxTWrbQiuD7FmgSAQ6X7Dy`. Node en **partial-sync** (`--partial-sync-primary-network`, `track-subnets`) = pas de C-Chain, bootstrap P-Chain seul (~10 min), 80 Go large.

@@ -1,0 +1,31 @@
+{
+  "header": { "brand": "SentinelScan", "subtitle": "SentinelL1 Authority Explorer" },
+  "home": {
+    "gasPrice": "Gas Price", "chainId": "Chain ID", "blocks": "Blocks", "transactions": "Transactions",
+    "copy": "Copy", "copied": "Copied!",
+    "indexingMessage": "Live view of SentinelL1. Lists index as new blocks arrive — search any tx hash, address or block for live data.",
+    "essentials": "SentinelL1 essentials", "highlights": "SentinelL1 highlights",
+    "latestTransactions": "Latest Transactions", "latestBlocks": "Latest Blocks", "viewAll": "View All"
+  },
+  "chain": {
+    "chainName": "Chain Name", "chainId": "Chain ID", "blockTime": "Block Time", "gasLimit": "Gas Limit",
+    "baseFee": "Base Fee", "nativeToken": "Native Token",
+    "site": "petroi.fr", "docs": "RPC / Health", "subnet": "Explorer", "rpc": "RPC endpoint",
+    "fuji": "Avalanche Fuji", "github": "GitHub", "contracts": "Contracts", "repo": "Repo"
+  },
+  "footer": { "tagline": "SentinelScan brings real-time visibility to blocks, transactions, visas and blocked payments on SentinelL1 — the on-chain authority layer for agentic payments." },
+  "search": { "placeholder": "Search by address, tx hash, block, token, ..." },
+  "meta": {
+    "title": "SentinelScan | SentinelL1 Explorer",
+    "description": "SentinelScan is the explorer for SentinelL1, the Avalanche L1 that enforces an on-chain authority/visa check before AI-agent payments.",
+    "ogDescription": "Explore SentinelL1 blocks, transactions, visas and blocked agent payments with SentinelScan.",
+    "keywords": "SentinelScan, SentinelL1, Avalanche L1 explorer, agentic payments, on-chain authority, visa registry"
+  },
+  "languages": {
+    "en": "English", "es": "Spanish", "fr": "French", "de": "German", "it": "Italian", "pt": "Portuguese",
+    "ru": "Russian", "zh": "Chinese", "ja": "Japanese", "ko": "Korean", "ar": "Arabic", "hi": "Hindi",
+    "tr": "Turkish", "vi": "Vietnamese", "th": "Thai", "id": "Indonesian", "ms": "Malay", "sw": "Swahili",
+    "zu": "Zulu", "xh": "Xhosa", "af": "Afrikaans", "ha": "Hausa", "yo": "Yoruba", "ig": "Igbo",
+    "am": "Amharic", "so": "Somali", "ti": "Tigrinya", "om": "Oromo"
+  }
+}
