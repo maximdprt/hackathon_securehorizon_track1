@@ -4,6 +4,11 @@ De vrais agents Bedrock (Claude, tool use) qui naviguent, lisent et paient. Le g
 `verify_payment`) est posé devant le wallet : l'outil `pay` ne peut pas le contourner, et le mandat de l'agent est
 résolu côté serveur depuis `data/mandates.json`, jamais déclaré par l'agent.
 
+**Sandbox de Corentin** (branche `corentin`, mergée) : `sandbox_agent.py` + `world.py` (5 boutiques d'Apple Watch dont
+une frauduleuse, `sites/`), chat en direct `app.py --open` (http://127.0.0.1:8765, consignes réglables par agent, arrêt
+juste avant le paiement), runner `run_shopping.py`, client du garde `guard_client.py` (stub ou moteur). Tests :
+`.venv/bin/pytest agents/tests`.
+
 | Agent | Use case | Issuer (mandat) | Outils | Pièges joués |
 |---|---|---|---|---|
 | `shopping_agent.py` | 1. agentic shopping | shopping-agent `0xA11ce…02` (pay, 300 USDC max) ou treasury-agent `…01` (pay/transfer, 100 USDC, vendeurs allowlistés) | `open_page`, `read_document`, `pay` | faux Walmart PromptFix (`demo/fake_store`), PDF trésorerie empoisonné, mail CEO, facture propre vers une adresse déjà flaguée |
