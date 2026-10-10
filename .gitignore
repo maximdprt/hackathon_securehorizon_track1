@@ -1,2 +1,30 @@
+# Secrets - NEVER commit (AWS temp creds, keys, wallets)
 .env
+*.env
 .env.*
+credentials
+*.pem
+*.key
+*.keystore
+secrets.json
+
+# Node
+node_modules/
+dist/
+build/
+.next/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# AWS / misc
+.aws/
+*.log
+.DS_Store
+Thumbs.db
+cdk.out/
+.terraform/
