@@ -13,6 +13,12 @@ VERDICTS = ("allow", "needs_approval", "block")
 ORIGINS = ("user", "document", "tool_output", "agent", "email", "webpage", "memory")
 
 
+def safe_json(obj, **kw) -> str:
+    """json.dumps that never raises on lone surrogates (garbage bytes decoded as text)."""
+    kw.setdefault("ensure_ascii", False)
+    return json.dumps(obj, **kw).encode("utf-8", "replace").decode("utf-8")
+
+
 def norm_addr(a: str | None) -> str:
     return (a or "").strip().lower()
 
@@ -29,16 +35,47 @@ class PaymentOrder:
     memo: str = ""
 
     def __post_init__(self):
+        for f in ("issuer", "recipient", "action", "currency", "calldata", "nonce", "memo"):
+            v = getattr(self, f)
+            if v is None:
+                if f in ("calldata", "nonce"):
+                    continue
+                if f in ("memo", "recipient"):
+                    setattr(self, f, "")
+                    continue
+                if f == "currency":
+                    self.currency = "USDC"
+                    continue
+                raise ValueError(f"{f} is required")
+            if isinstance(v, bool) or not isinstance(v, (str, int)):
+                raise ValueError(f"{f} must be a string, got {type(v).__name__}")
+            if isinstance(v, int):
+                if f not in ("nonce",):
+                    raise ValueError(f"{f} must be a string, got int")
+                setattr(self, f, str(v))
         self.issuer = norm_addr(self.issuer)
         self.recipient = norm_addr(self.recipient)
         self.action = (self.action or "").strip().lower()
+        self.currency = (self.currency or "USDC").strip()
         if self.action not in ACTIONS:
             raise ValueError(f"action must be one of {ACTIONS}, got {self.action!r}")
-        self.amount = float(self.amount)
-        if self.amount <= 0:
+        if isinstance(self.amount, bool) or not isinstance(self.amount, (int, float, str)):
+            raise ValueError(f"amount must be a number, got {type(self.amount).__name__}")
+        try:
+            amount = float(self.amount)
+        except (TypeError, ValueError, OverflowError) as e:
+            raise ValueError(f"amount is not a number: {self.amount!r}") from e
+        if amount != amount or amount in (float("inf"), float("-inf")):
+            raise ValueError("amount must be finite")
+        if amount <= 0:
             raise ValueError("amount must be > 0")
+        if amount > 1e18:
+            raise ValueError("amount is implausibly large")
+        self.amount = amount
         if not self.issuer:
             raise ValueError("issuer is required")
+        if len(self.issuer) > 4096 or len(self.recipient) > 4096:
+            raise ValueError("address too long")
 
     def canonical(self) -> str:
         return json.dumps(
@@ -50,7 +87,7 @@ class PaymentOrder:
 
     def instruction_id(self) -> str:
         h = keccak.new(digest_bits=256)
-        h.update(self.canonical().encode())
+        h.update(self.canonical().encode("utf-8", "replace"))
         return "0x" + h.hexdigest()
 
 
@@ -80,15 +117,27 @@ class VerifyRequest:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "VerifyRequest":
+        if not isinstance(d, dict):
+            raise ValueError("request must be an object")
         order = d.get("order")
         if not isinstance(order, dict):
-            raise ValueError("order is required")
+            raise ValueError("order is required and must be an object")
+        for k in ("issuer", "action", "amount"):
+            if k not in order:
+                raise ValueError(f"order.{k} is required")
+        ctx = d.get("context")
+        if ctx is None:
+            ctx = {}
+        if not isinstance(ctx, dict):
+            raise ValueError("context must be an object")
+        src = d.get("source_context")
+        task = d.get("task")
         return cls(
             order=PaymentOrder(**{k: order[k] for k in order if k in PaymentOrder.__dataclass_fields__}),
-            source_context=str(d.get("source_context") or ""),
+            source_context=src if isinstance(src, str) else ("" if src is None else safe_json(src)),
             context_type=str(d.get("context_type") or "text").lower(),
-            task=str(d.get("task") or ""),
-            context=dict(d.get("context") or {}),
+            task=task if isinstance(task, str) else ("" if task is None else safe_json(task)),
+            context=dict(ctx),
         )
 
     @property

@@ -28,11 +28,12 @@ def extract(req: VerifyRequest, mandate: Mandate | None) -> list[Signal]:
         sig.append(Signal("currency_mismatch", LAYER, 0.30, f"order currency {o.currency} differs from mandate currency {mandate.currency}"))
 
     if mandate.allowed_recipients and o.recipient and o.recipient not in mandate.allowed_recipients:
-        merchant = (req.context.get("merchant") or {}).get("domain", "")
-        if not (merchant and merchant.lower() in mandate.allowed_recipients):
+        merchant = req.context.get("merchant") if isinstance(req.context.get("merchant"), dict) else {}
+        dom = merchant.get("domain")
+        if not (isinstance(dom, str) and dom.lower() in mandate.allowed_recipients):
             sig.append(Signal("recipient_whitelisted", LAYER, 0.35, f"recipient {o.recipient} not in the issuer's allowlist", owasp=["ASI03"]))
 
     if req.origin != "user":
-        sig.append(Signal("order_origin", LAYER, 0.20, f"order originates from {req.origin}, not from the principal", owasp=["ASI07"]))
+        sig.append(Signal("order_origin", LAYER, 0.10, f"order originates from {req.origin}, not from the principal", owasp=["ASI07"]))
 
     return sig

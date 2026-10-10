@@ -120,12 +120,12 @@ def test_html_wrappers_hide_the_text_from_the_visible_layer():
         c = clean(out, "html")
         assert "ignore all previous instructions" not in c.visible, op.__name__
         assert "ignore all previous instructions" in c.hidden, op.__name__
-    # data-* attribute: the payload is parked in an attribute the parser does not read
+    # data-* attribute: nobody renders it, so the sanitizer files it as hidden text (closed by the evasion campaign)
     out = E.html_data_attr(TXT)
     soup = BeautifulSoup(out, "html.parser")
     assert soup.find(attrs={"data-agent-note": True})["data-agent-note"] == TXT
     c = clean(out, "html")
-    assert "ignore all previous" not in c.visible and "ignore all previous" not in c.hidden
+    assert "ignore all previous" not in c.visible and "ignore all previous" in c.hidden and "hidden:data-attr" in c.hidden_sources
 
 
 # ----- 9. wrapping -----

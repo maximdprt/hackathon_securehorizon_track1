@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import re
 import unicodedata
+from urllib.parse import unquote
 from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup, Comment
@@ -79,8 +80,21 @@ def _homoglyph_words(text: str) -> list[str]:
     return words[:10]
 
 
+URL_ENCODED = re.compile(r"%[0-9A-Fa-f]{2}")
+
+
 def _decode_blobs(text: str) -> list[str]:
     out = []
+    # url-encoded runs ("ignore%20previous%20instructions"): decode the surrounding token
+    for m in re.finditer(r"\S+", text) if "%" in text else ():
+        tok = m.group(0)
+        if "%" in tok and len(URL_ENCODED.findall(tok)) >= 3:
+            try:
+                dec = unquote(tok)
+            except Exception:
+                continue
+            if dec != tok and re.search(r"[A-Za-z]{3}", dec):
+                out.append(dec)
     for m in B64_BLOB.findall(text):
         try:
             raw = base64.b64decode(m + "=" * (-len(m) % 4), validate=False)
@@ -132,6 +146,11 @@ def _split_html(html: str) -> tuple[str, str, str, list[str]]:
         if el.name == "meta" and el.get("content"):
             attr_parts.append(str(el["content"]))
             sources.append("meta")
+        # any data-* attribute long enough to carry a sentence: nobody renders it, so it is hidden text
+        for k, v in list(el.attrs.items()):
+            if k.startswith("data-") and k not in TEXT_ATTRS and isinstance(v, str) and len(v) > 15 and re.search(r"[A-Za-z]{3}", v):
+                hidden_parts.append(v)
+                sources.append("hidden:data-attr")
         # form fields: a hidden input's value is the classic place to park an instruction
         if el.name in ("input", "textarea", "option") and el.get("value") and len(str(el["value"])) > 3:
             if str(el.get("type", "")).lower() == "hidden" or _is_hidden_element(el) or any(_is_hidden_element(a) for a in el.parents if a.name):

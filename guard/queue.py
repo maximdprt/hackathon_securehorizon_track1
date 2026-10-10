@@ -5,6 +5,8 @@ import json
 import threading
 from pathlib import Path
 
+from guard.models import safe_json
+
 
 class PendingQueue:
     def __init__(self, path: str | Path):
@@ -13,10 +15,10 @@ class PendingQueue:
         self._lock = threading.Lock()
 
     def _load(self) -> dict:
-        return json.loads(self.path.read_text()) if self.path.exists() else {}
+        return json.loads(self.path.read_text(encoding="utf-8")) if self.path.exists() else {}
 
     def _save(self, d: dict) -> None:
-        self.path.write_text(json.dumps(d, indent=1, ensure_ascii=False))
+        self.path.write_text(safe_json(d, indent=1), encoding="utf-8")
 
     def add(self, verdict: dict) -> None:
         with self._lock:

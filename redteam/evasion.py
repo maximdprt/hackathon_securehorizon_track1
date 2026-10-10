@@ -552,7 +552,7 @@ def run_campaign(cases: dict[str, dict], operators: dict[str, Callable[[str], st
     attacks, controls = [], []
     for n in names:
         c, b = cases[n], baselines[n]
-        is_control = c["family"] == "control"
+        is_control = "allow" in c["expected"]  # a case that may legitimately be allowed is a control, not an attack
         if is_control and not include_controls:
             continue
         for op_name, op in operators.items():

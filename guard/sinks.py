@@ -7,6 +7,8 @@ import threading
 from pathlib import Path
 from typing import Protocol
 
+from guard.models import safe_json
+
 log = logging.getLogger("guard.sinks")
 VERDICT_CODE = {"allow": 0, "needs_approval": 1, "block": 2}
 
@@ -22,13 +24,13 @@ class JsonlSink:
         self._lock = threading.Lock()
 
     def record(self, verdict: dict) -> None:
-        with self._lock, self.path.open("a") as f:
-            f.write(json.dumps(verdict, ensure_ascii=False) + "\n")
+        with self._lock, self.path.open("a", encoding="utf-8") as f:
+            f.write(safe_json(verdict) + "\n")
 
     def read_all(self) -> list[dict]:
         if not self.path.exists():
             return []
-        return [json.loads(l) for l in self.path.read_text().splitlines() if l.strip()]
+        return [json.loads(l) for l in self.path.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
 class ChainSink:

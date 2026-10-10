@@ -6,6 +6,27 @@ from guard.sources import AuthoritySource
 
 LAYER = "transaction"
 MAX_UINT = (1 << 256) - 1
+
+
+def _num(x):
+    """float or None: context facts come from agents and may be mistyped."""
+    if isinstance(x, bool) or x is None:
+        return None
+    try:
+        v = float(x)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return v if v == v and v not in (float("inf"), float("-inf")) else None
+
+
+def _dict(x) -> dict:
+    return x if isinstance(x, dict) else {}
+
+
+def _str(x) -> str:
+    return x if isinstance(x, str) else ("" if x is None else str(x))
+
+
 SELECTORS = {
     "095ea7b3": "approve(address,uint256)",
     "a22cb465": "setApprovalForAll(address,bool)",
@@ -56,35 +77,36 @@ def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource
         if source.nonce_seen(o.nonce):
             sig.append(Signal("nonce_replay", LAYER, 1.0, f"nonce {o.nonce} already used (replay)", hard=True))
 
-    x = req.context.get("x402") or {}
+    x = _dict(req.context.get("x402"))
     if x:
-        q = x.get("quote_amount")
-        if q is not None and o.amount > float(q) * 1.01:
+        q = _num(x.get("quote_amount"))
+        if q is not None and o.amount > q * 1.01:
             sig.append(Signal("amount_matches_402_quote", LAYER, 1.0, f"order amount {o.amount} exceeds the 402 quote {q}", hard=True))
-        fac = (x.get("facilitator") or "").lower()
+        fac = _str(x.get("facilitator")).lower()
         endorsed = [f.lower() for f in data.get("facilitators", [])]
         if fac and endorsed and fac not in endorsed:
             sig.append(Signal("facilitator_endorsed", LAYER, 1.0, f"settlement submitted by non-endorsed facilitator {fac}", hard=True))
         elif fac and source.is_flagged(fac)[0]:
             sig.append(Signal("facilitator_endorsed", LAYER, 1.0, f"facilitator {fac} is flagged in the incident registry", hard=True))
-        if x.get("sybil_score", 0) > 0.5:
+        if (_num(x.get("sybil_score")) or 0) > 0.5:
             sig.append(Signal("server_metadata_sybil_score", LAYER, 0.30, f"service metadata duplicated across endpoints (sybil score {x['sybil_score']})"))
         if x.get("confirmations_met") is False:
             sig.append(Signal("confirmations_required_met", LAYER, 0.20, "settlement delivered before the required block confirmations"))
 
-    h = req.context.get("history") or {}
+    h = _dict(req.context.get("history"))
     if h:
-        avg = h.get("avg_amount")
-        if avg and o.amount > 3 * float(avg):
-            sig.append(Signal("amount_vs_history_zscore", LAYER, 0.35, f"amount {o.amount} is {o.amount / float(avg):.1f}x this agent's average {avg}"))
-        if h.get("payments_last_hour", 0) > 3:
-            sig.append(Signal("velocity_1h", LAYER, 0.30, f"{h['payments_last_hour']} payments in the last hour"))
-        bal = h.get("balance")
-        if bal and o.amount > 0.5 * float(bal):
+        avg = _num(h.get("avg_amount"))
+        if avg and o.amount > 3 * avg:
+            sig.append(Signal("amount_vs_history_zscore", LAYER, 0.35, f"amount {o.amount} is {o.amount / avg:.1f}x this agent's average {avg}"))
+        plh = _num(h.get("payments_last_hour"))
+        if plh is not None and plh > 3:
+            sig.append(Signal("velocity_1h", LAYER, 0.30, f"{int(plh)} payments in the last hour"))
+        bal = _num(h.get("balance"))
+        if bal and o.amount > 0.5 * bal:
             sig.append(Signal("amount_vs_balance_ratio", LAYER, 0.30, f"amount is {round(100 * o.amount / float(bal))}% of the balance"))
-        if h.get("bank_detail_change_recent"):
+        if h.get("bank_detail_change_recent") is True:
             sig.append(Signal("bank_detail_change_recent", LAYER, 0.35, "beneficiary details changed recently (call-back verification needed)"))
-        if h.get("geo_mismatch"):
+        if h.get("geo_mismatch") is True:
             sig.append(Signal("geo_mismatch", LAYER, 0.15, "IP / billing / card countries disagree"))
 
     return sig

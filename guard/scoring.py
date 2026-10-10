@@ -12,7 +12,7 @@ DEFAULT_THRESHOLDS = {"allow_below": 0.30, "block_at_or_above": 0.70,
 
 FLOOR_NEEDS_APPROVAL = {"calldata_undecodable", "authority_source_unavailable", "order_from_memory_not_current_turn"}
 # context, not evidence: they raise the score but never justify an escalation by themselves
-INFORMATIONAL = {"order_origin", "hidden_text_ratio", "recipient_prior_incident_info", "amount_just_under_threshold", "tld_risk", "source_is_ad", "tls_missing", "legal_pages_missing", "geo_mismatch"}
+INFORMATIONAL = {"order_origin", "hidden_text_ratio", "recipient_prior_incident_info", "invisible_unicode_trace", "payment_details_mention", "amount_just_under_threshold", "tld_risk", "source_is_ad", "tls_missing", "legal_pages_missing", "geo_mismatch"}
 
 
 def load_thresholds(path: str | Path | None) -> dict:
@@ -111,7 +111,7 @@ def combine(signals: list[Signal], llm: dict | None, amount: float, max_amount: 
     if verdict == "allow" and llm is None and substantive:
         verdict = "needs_approval"
         notes.append("llm unavailable and signals present: never guess allow")
-    if verdict == "allow" and any(s.id in FLOOR_NEEDS_APPROVAL for s in signals):
+    if verdict == "allow" and any(s.id in FLOOR_NEEDS_APPROVAL or s.id.startswith("layer_error_") for s in signals):
         verdict = "needs_approval"
         notes.append("floored to needs_approval (cannot verify)")
 

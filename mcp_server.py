@@ -9,6 +9,7 @@ import logging
 from typing import Any
 
 from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 
 from guard.engine import Engine
 
@@ -31,8 +32,11 @@ def verify_payment(order: dict[str, Any], source_context: str = "", context_type
              pinned_hash}], history{avg_amount, payments_last_hour, prior_purchase, balance}, email{from_display, from_address, reply_to}.
     The mandate is resolved server-side from the issuer: the agent cannot declare its own permissions.
     """
-    return engine.verify({"order": order, "source_context": source_context, "context_type": context_type,
-                          "task": task, "context": context or {}})
+    try:
+        return engine.verify({"order": order, "source_context": source_context, "context_type": context_type,
+                              "task": task, "context": context or {}})
+    except ValueError as e:  # malformed order: the caller's mistake, reported verbatim, never a verdict
+        raise ToolError(f"invalid request: {e}") from e
 
 
 @mcp.tool()
@@ -44,7 +48,10 @@ def list_pending() -> list[dict[str, Any]]:
 @mcp.tool()
 def approve_pending(instruction_id: str, decision: str, approver: str, note: str = "") -> dict[str, Any]:
     """A human settles a pending decision. decision: allow | block. Recorded in the audit trail."""
-    return engine.approve(instruction_id, decision, approver, note)
+    try:
+        return engine.approve(instruction_id, decision, approver, note)
+    except (ValueError, KeyError) as e:
+        raise ToolError(f"cannot settle: {e}") from e
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from typing import Protocol
 
 from Crypto.Hash import keccak
 
-from guard.models import norm_addr
+from guard.models import norm_addr, safe_json
 
 
 @dataclass
@@ -48,10 +48,10 @@ class MockJsonSource:
 
     def _load(self, name: str) -> dict:
         p = self.dir / name
-        return json.loads(p.read_text()) if p.exists() else {}
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 
     def _save(self, name: str, obj) -> None:
-        (self.dir / name).write_text(json.dumps(obj, indent=1, sort_keys=True))
+        (self.dir / name).write_text(safe_json(obj, indent=1, sort_keys=True), encoding="utf-8")
 
     def get_authority(self, issuer: str) -> Authority | None:
         a = self.authorities.get(norm_addr(issuer))

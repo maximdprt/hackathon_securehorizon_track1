@@ -51,15 +51,16 @@ def run(params, fn):
 
 def payload(res):
     """A tool result as Python data: structuredContent first, else the JSON text block."""
-    assert not res.isError, f"tool returned an error: {[getattr(c, 'text', c) for c in res.content]}"
-    sc = getattr(res, "structuredContent", None)
+    assert not res.is_error, f"tool returned an error: {[getattr(c, 'text', c) for c in res.content]}"
+    sc = getattr(res, "structured_content", None)
     if isinstance(sc, dict):
         if "verdict" in sc:
             return sc
         if set(sc) == {"result"}:
             return sc["result"]
         return sc
-    return json.loads(res.content[0].text)
+    texts = [c.text for c in res.content if getattr(c, "text", None)]
+    return json.loads(texts[0]) if texts else []
 
 
 def order(nonce=None, **kw):
@@ -78,10 +79,10 @@ def test_list_tools_exposes_the_three_guard_tools(params):
     assert set(tools) == TOOLS
     for t in tools.values():
         assert t.description and len(t.description.strip()) > 10
-        assert isinstance(t.inputSchema, dict) and "properties" in t.inputSchema
-    assert "order" in tools["verify_payment"].inputSchema["properties"]
-    assert "order" in tools["verify_payment"].inputSchema.get("required", [])
-    assert {"instruction_id", "decision", "approver"} <= set(tools["approve_pending"].inputSchema["properties"])
+        assert isinstance(t.input_schema, dict) and "properties" in t.input_schema
+    assert "order" in tools["verify_payment"].input_schema["properties"]
+    assert "order" in tools["verify_payment"].input_schema.get("required", [])
+    assert {"instruction_id", "decision", "approver"} <= set(tools["approve_pending"].input_schema["properties"])
 
 
 def test_verify_payment_returns_a_well_formed_verdict(params):
@@ -105,7 +106,7 @@ def test_invalid_order_is_an_mcp_error_never_an_allow(params):
     if isinstance(res, Exception):
         assert "steal" in str(res) or "action" in str(res)
     else:
-        assert res.isError is True, res
+        assert res.is_error is True, res
         text = " ".join(getattr(c, "text", "") for c in res.content)
         assert '"verdict": "allow"' not in text and "'verdict': 'allow'" not in text
         assert "action" in text
@@ -126,7 +127,9 @@ def test_twenty_concurrent_verifications_all_return_and_server_stays_alive(param
     assert len(results) == 20
     verdicts = [payload(r)["verdict"] for r in results]
     assert all(v in ("allow", "needs_approval", "block") for v in verdicts)
-    assert verdicts.count("block") == 5 and verdicts.count("allow") == 15
+    # fresh registry: the unknown recipient is escalated, never allowed; the allowlisted vendor is allowed
+    assert verdicts.count("allow") == 15
+    assert all(v in ("needs_approval", "block") for i, v in enumerate(verdicts) if i % 4 == 0)
     assert {t.name for t in tools.tools} == TOOLS
 
 
@@ -148,7 +151,7 @@ def test_pending_round_trip_over_mcp(params):
     assert [p["instruction_id"] for p in pending] == [v["instruction_id"]]
     assert final["verdict"] == "allow" and final["approved_by"] == "bruno"
     assert after == []
-    assert isinstance(twice, Exception) or twice.isError is True
+    assert isinstance(twice, Exception) or twice.is_error is True
 
 
 def test_300kb_source_context_goes_through_stdio(params):

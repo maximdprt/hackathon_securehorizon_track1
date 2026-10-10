@@ -95,12 +95,20 @@ class Engine:
         mandate = self.resolve_mandate(o.issuer, auth)
 
         signals: list[Signal] = []
-        signals += f_content.extract(req, cleaned)
-        signals += f_mandate.extract(req, mandate)
-        signals += f_auth.extract(req, auth, source_ok)
-        signals += f_cp.extract(req, mandate, self.source, self.data)
-        signals += f_tx.extract(req, mandate, self.source, self.data)
-        signals += f_tools.extract(req, self.data)
+        layers = [
+            ("content", lambda: f_content.extract(req, cleaned)),
+            ("mandate", lambda: f_mandate.extract(req, mandate)),
+            ("authority", lambda: f_auth.extract(req, auth, source_ok)),
+            ("counterparty", lambda: f_cp.extract(req, mandate, self.source, self.data)),
+            ("transaction", lambda: f_tx.extract(req, mandate, self.source, self.data)),
+            ("tools", lambda: f_tools.extract(req, self.data)),
+        ]
+        for name, fn in layers:
+            try:
+                signals += fn()
+            except Exception as e:  # malformed context facts: fail closed, never crash
+                log.warning("layer %s failed: %s", name, e)
+                signals.append(Signal(f"layer_error_{name}", name, 0.30, f"could not evaluate this layer ({type(e).__name__}: {str(e)[:80]}): treated as unverifiable"))
         # dedupe by id, keep the strongest
         best: dict[str, Signal] = {}
         for s in signals:
