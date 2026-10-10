@@ -1,0 +1,1 @@
+{"url":"https://build.avax.network/api/icm-flow?days=1&sides=both&network=fuji","method":"GET","status":200,"contentType":"application/json","takenAt":"2026-10-10T18:29:31.550Z","body":"{\"flows\":[],\"sourceNodes\":[],\"targetNodes\":[],\"totalMessages\":0,\"last_updated\":1791655088263,\"failedChainIds\":[],\"sides\":\"both\"}"}

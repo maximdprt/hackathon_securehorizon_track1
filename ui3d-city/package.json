@@ -1,0 +1,50 @@
+{
+  "name": "ui3d-city",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AvaGuard+ City: the Avalanche Builder Hub 3D City (BSD-3) with our L1 and a payment-guard simulation",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "extract": "node scripts/extract-city.mjs ../vendor/builders-hub",
+    "snapshot": "node scripts/snapshot.mjs",
+    "test": "vitest run",
+    "test:visual": "playwright test"
+  },
+  "dependencies": {
+    "@react-three/drei": "10.7.7",
+    "@react-three/fiber": "9.5.0",
+    "@scure/base": "2.0.0",
+    "clsx": "2.1.1",
+    "framer-motion": "12.23.24",
+    "geist": "1.5.1",
+    "gsap": "3.13.0",
+    "lucide-react": "0.553.0",
+    "n8ao": "2.0.1",
+    "next": "16.3.3",
+    "postprocessing": "6.39.5",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "2.15.4",
+    "tailwind-merge": "3.4.0",
+    "three": "0.180.0",
+    "viem": "2.45.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.1",
+    "@tailwindcss/postcss": "4.1.13",
+    "@types/node": "24.10.1",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "@types/three": "0.182.0",
+    "tailwindcss": "4.1.13",
+    "tailwindcss-animate": "1.0.7",
+    "typescript": "5.9.2",
+    "vitest": "4.1.11"
+  },
+  "overrides": {
+    "motion-dom": "12.23.23",
+    "motion-utils": "12.23.6"
+  }
+}

@@ -1,0 +1,4 @@
+HTTP 404 http://localhost:3000/favicon.ico
+WARNING [city3d] pick self-test: mesh 7dcb29 count 0 inInteraction true tag true misses 0 of 0 (sphere r null)
+WARNING [city3d] pick self-test: mesh 07616b count 231 inInteraction true tag true misses 0 of 3 (sphere r 435)
+WARNING [city3d] pick self-test: mesh ee1a39 count 232 inInteraction true tag true misses 0 of 3 (sphere r 434)

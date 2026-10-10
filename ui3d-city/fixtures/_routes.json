@@ -1,0 +1,79 @@
+[
+  {
+    "method": "GET",
+    "path": "/api/icm-flow",
+    "search": "?days=1&sides=both&network=fuji",
+    "body": "",
+    "file": "GET_api_icm_flow_4620c899ac.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/l1-registry/fuji",
+    "search": "",
+    "body": "",
+    "file": "GET_api_l1_registry_fuji_beac00a442.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pchain/fuji/txs",
+    "search": "?limit=96",
+    "body": "",
+    "file": "GET_api_pchain_fuji_txs_a43b26420a.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pchain/fuji/tx/2En9ZdtAeeAECegmXPJn2S3U37afMKBLXGC7rU5HDhjfmpq1ZU",
+    "search": "",
+    "body": "",
+    "file": "GET_api_pchain_fuji_tx_2En9ZdtAeeAECegmXPJn2S3U37afMKBLXGC7rU5HDhjfmpq1ZU_fa57d6c1f9.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pchain/fuji/stats",
+    "search": "",
+    "body": "",
+    "file": "GET_api_pchain_fuji_stats_992fd21f44.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pchain/fuji/tx/SkpW4ffjMf73MeTS7H784LDrydPb2fMqgpP2MLxBqVba221Qq",
+    "search": "",
+    "body": "",
+    "file": "GET_api_pchain_fuji_tx_SkpW4ffjMf73MeTS7H784LDrydPb2fMqgpP2MLxBqVba221Qq_6a5f532bf0.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pchain/fuji/txs",
+    "search": "?limit=20",
+    "body": "",
+    "file": "GET_api_pchain_fuji_txs_41d08447a7.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pchain/fuji/tx/2HxMVTcRc1ZmgN18oemXZPSMnarWoWMA8H1g48orwbEuqxSBks",
+    "search": "",
+    "body": "",
+    "file": "GET_api_pchain_fuji_tx_2HxMVTcRc1ZmgN18oemXZPSMnarWoWMA8H1g48orwbEuqxSBks_283b5030af.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/pchain/fuji/tx/2fMSA79mBSTLBvGc7hKqM7qvyACZCM4kLKU4X9WYo15iQqRYaW",
+    "search": "",
+    "body": "",
+    "file": "GET_api_pchain_fuji_tx_2fMSA79mBSTLBvGc7hKqM7qvyACZCM4kLKU4X9WYo15iQqRYaW_59fa4c703b.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/overview-stats",
+    "search": "?timeRange=month&network=fuji",
+    "body": "",
+    "file": "GET_api_overview_stats_16fc61cdee.json"
+  },
+  {
+    "method": "GET",
+    "path": "/api/overview-stats",
+    "search": "?timeRange=day&network=fuji",
+    "body": "",
+    "file": "GET_api_overview_stats_f1878f6f7e.json"
+  }
+]
