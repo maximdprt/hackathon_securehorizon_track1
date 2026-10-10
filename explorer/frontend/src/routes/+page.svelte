@@ -1,0 +1,93 @@
+<script lang="ts">
+	import BlocksNumberStat from '$lib/components/home/BlocksNumberStat.svelte';
+	import TxsNumberStat from '$lib/components/home/TxsNumberStat.svelte';
+	import GasPriceStat from '$lib/components/home/GasPriceStat.svelte';
+	import ChainIdStat from '$lib/components/home/ChainIdStat.svelte';
+	import LatestTxsChart from '$lib/components/home/LatestTxsChart.svelte';
+	import LatestBlocksList from '$lib/components/home/LatestBlocksList.svelte';
+	import LatestTxsList from '$lib/components/home/LatestTxsList.svelte';
+	import ChainInfo from '$lib/components/home/ChainInfo.svelte';
+	import InfoIcon from 'virtual:icons/hugeicons/information-square'
+	import {isFullyIndexed} from "$lib/utils";
+	import { _ } from 'svelte-i18n';
+
+	export let data;
+</script>
+
+<svelte:head>
+	<title>SentinelScan | SentinelL1 Explorer</title>
+	<meta
+		name="description"
+		content="Explore SentinelL1 blocks, transactions, and smart contracts with SentinelScan—your real-time window into the SEC ecosystem."
+	/>
+</svelte:head>
+
+{#if isFullyIndexed()}
+	<div class="container grid grid-cols-1 md:grid-cols-6 xl:grid-cols-12">
+		<div class="col-span-4 flex w-full flex-col gap-2 rounded-xl bg-base-200">
+			<GasPriceStat />
+			<ChainIdStat />
+		</div>
+		<div class="col-span-4 flex w-full flex-col gap-2">
+			<BlocksNumberStat />
+			<TxsNumberStat />
+		</div>
+		<div class="col-span-4">
+			<LatestTxsChart />
+		</div>
+	</div>
+{:else}
+	<div class="container grid grid-cols-1 md:grid-cols-3">
+		<GasPriceStat />
+		<ChainIdStat />
+		<BlocksNumberStat />
+	</div>
+	<div class="container flex items-center !px-4">
+		<InfoIcon class="text-xl min-w-10" />
+		<span>{$_('home.indexingMessage')}</span>
+	</div>
+{/if}
+
+<div class="container grid flex-1 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
+	<div class="list-col">
+		<div class="title">
+			<span>{$_('home.latestTransactions')}</span>
+			<a href="/txs" class="btn ml-auto">{$_('home.viewAll')}</a>
+		</div>
+		<LatestTxsList latestTxs={data.latestTxs} />
+	</div>
+	<div class="list-col">
+		<div class="title">
+			<span>{$_('home.latestBlocks')}</span>
+			<a href="/blocks" class="btn ml-auto">{$_('home.viewAll')}</a>
+		</div>
+		<LatestBlocksList latestBlocks={data.latestBlocks} />
+	</div>
+	<div class="list-col chain-info">
+		<div class="title">
+			<span>{$_('home.essentials')}</span>
+		</div>
+		<ChainInfo />
+	</div>
+</div>
+
+<style lang="postcss">
+	@reference "$lib/../app.css";
+	.container {
+		@apply gap-2 p-2;
+		@apply mx-auto rounded-2xl bg-base-200;
+	}
+	.list-col {
+		@apply flex h-full w-full flex-col gap-2;
+		> .title {
+			@apply flex items-center gap-2 p-4 pl-6;
+			@apply rounded-xl bg-base-100 text-2xl font-medium;
+		}
+	}
+	.chain-info {
+		@apply h-full;
+		> .title {
+			@apply justify-start;
+		}
+	}
+</style>
