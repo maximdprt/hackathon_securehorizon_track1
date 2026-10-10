@@ -15,10 +15,10 @@ if [[ "$MODE" == "x402" ]]; then
   $PY agents/x402_agent.py --resource /premium --guard off --port 8420
   echo "\n########## ACTE 2 · même appel AVEC le garde ##########"
   $PY agents/x402_agent.py --resource /premium --guard on --expected block --family F --port 8420
-  echo "\n########## ACTE 3 · le serveur renvoie le même nonce pour le 2e appel : replay ##########"
-  $PY agents/x402_agent.py --resource /replay --guard on --expected block --family F --calls 2 --port 8420
-  echo "\n########## CONTRÔLE · API honnête, 2 appels, 2 nonces frais ##########"
-  $PY agents/x402_agent.py --resource /weather --guard on --expected allow --family control --calls 2 --port 8420
+  echo "\n########## ACTE 3 · le serveur renvoie le même nonce pour le 2e appel : replay (même état que l'acte 2) ##########"
+  $PY agents/x402_agent.py --resource /replay --guard on --expected block --family F --calls 2 --data-dir $DATA --port 8420
+  echo "\n########## CONTRÔLE · API honnête sur le même recipient : allow, avec la trace de l'incident précédent ##########"
+  $PY agents/x402_agent.py --resource /weather --guard on --expected allow --family control --data-dir $DATA --port 8420
 else
   echo "\n########## ACTE 1 · shopping-agent SANS garde sur le faux Walmart ##########"
   $PY agents/shopping_agent.py --page demo/fake_store/index.html --guard off
