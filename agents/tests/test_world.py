@@ -11,7 +11,7 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 from agents import app, shops, world
-from agents.browser import Browser
+from agents.browser import SEARCH_ROOT, Browser
 from agents.browser_agent import PROFILE, TOOLS, masked, run_browser
 from agents.guard_client import INJECTION
 from agents.shopping_agent import ADDRESS
@@ -109,9 +109,14 @@ def ref(page, label, kind=""):
 
 def test_browser_searches_opens_shops_and_marks_what_can_be_acted_on():
     b = Browser()
-    b.search("apple watch series 10")
-    assert b.url.startswith("https://recherche.example/?q=") and [el.label for el in b.elements.values() if el.kind == "link"] == [s["name"] for s in world.SITES.values()]
-    assert "Apple Watch Series 10 46 mm 389,00 €" in b.snapshot()
+    b.goto(SEARCH_ROOT)
+    assert not b.results and [el.kind for el in b.elements.values()] == ["input", "button"]  # la page d'accueil du moteur : un champ, un bouton
+    b.fill(ref(b, "Rechercher", "input"), "apple watch series 10")
+    b.click(ref(b, "Rechercher", "button"))
+    assert b.url.startswith("https://recherche.example/?q=") and b.results == b.url
+    assert [el.label for el in b.elements.values() if el.kind == "link"] == [s["name"] for s in world.SITES.values()]
+    assert not re.search(r"\d,\d\d €", b.snapshot())  # aucun prix d'article dans les résultats : pour comparer, il faut ouvrir les boutiques
+    assert b.elements[b.link_to("https://meridian-watch.example")].label == "Meridian Watch Co." and b.link_to("https://amazon.com/") is None
     b.click(ref(b, "Meridian Watch Co."))
     assert b.url == "https://meridian-watch.example/" and b.title == "Apple Watch | Meridian Watch Co." and b.status == 200
     assert f'[{ref(b, S10_NAME)} link] {S10_NAME} 389,00 € En stock' in b.snapshot()
@@ -177,10 +182,11 @@ def fill_checkout(page):
 
 
 def buy(site, product=S10):
+    """Un achat complet : la recherche, les 5 boutiques ouvertes (celle où l'on achète en dernier), le choix, le panier, le paiement."""
     name = world.PRODUCTS[product]["name"]
     return [
         ("search", {"query": name}),
-        ("goto", {"url": world.url_of(site)}),
+        *[("goto", {"url": world.url_of(k)}) for k in [*(k for k in world.SITES if k != site), site]],
         ("choose", {"merchant": world.SITES[site]["name"], "considered": [{"merchant": "Nimbus Store", "price": 429, "assessment": "plus cher"},
                                                                          {"merchant": world.SITES[site]["name"], "price": 389, "assessment": "retenu"}]}),
         lambda page: ("click", {"ref": ref(page, name)}),
@@ -197,18 +203,22 @@ def test_agent_browses_buys_and_pays_and_every_step_is_shown():
     assert "Instructions from your operator:\nTrouve le prix le plus bas." in llm.system and "4242 4242 4242 4242" in llm.system and llm.tools is TOOLS
     assert all("why" in t["inputSchema"]["json"]["required"] for t in TOOLS)
     kinds = [e["type"] if e["type"] != "nav" else f"nav:{e['how']}" for e in events if e["type"] != "thinking"]
-    assert kinds == ["nav:search", "nav:goto", "choose", "click", "nav:click", "click", "nav:click", "click", "nav:click"] + ["fill"] * 10 + ["click", "pay", "nav:click"]
+    # la recherche se tape dans le champ puis se lance au bouton ; la boutique s'ouvre en cliquant sur son résultat
+    visit = ["click", "nav:click"]
+    assert kinds == ["nav:goto", "fill", "click", "nav:click"] + visit + (["nav:back"] + visit) * 4 + ["choose"] + visit * 3 + ["fill"] * 10 + ["click", "pay", "nav:click"]
     assert all(e["why"] for e in events if e["type"] in ("nav", "click", "fill", "choose"))
     assert all(e["view"]["html"].startswith("<!DOCTYPE html>") for e in events if e["type"] in ("nav", "click", "fill"))
     # ce que l'écran montre : la page avant chaque clic avec l'élément encadré, les champs qui se remplissent un à un
     clicks = [e for e in events if e["type"] == "click"]
-    assert [c["label"] for c in clicks] == [f"{S10_NAME}", "Ajouter au panier", "Passer au paiement", "Payer 389,00 €"]
+    assert [c["label"] for c in clicks] == ["Rechercher", "Nimbus Store", "Orchard Electronics", "TechBazaar", "Tempo Wearables", "Meridian Watch Co.",
+                                            S10_NAME, "Ajouter au panier", "Passer au paiement", "Payer 389,00 €"]
     assert all(c["view"]["html"].count('data-hl="1"') == 1 for c in clicks)
     fills = [e for e in events if e["type"] == "fill"]
     assert [f["label"] for f in fills][-4:] == ["Titulaire de la carte", "Numéro de carte", "Expiration (MM/AA)", "Cryptogramme (CVC)"]
     assert [f["value"] for f in fills][-4:] == ["CAMILLE MARTIN", "•••• •••• •••• 4242", "12/28", "•••"]
-    assert 'value="4242 4242 4242 4242"' in fills[-1]["view"]["html"] and fills[0]["view"]["url"].endswith("/checkout")
-    assert [e["site"] for e in events if e["type"] == "nav"] == [None, "meridian", "meridian", "meridian", "meridian", "meridian"]
+    assert (fills[0]["label"], fills[0]["value"], fills[0]["view"]["url"]) == ("Rechercher", S10_NAME, "https://recherche.example")
+    assert 'value="4242 4242 4242 4242"' in fills[-1]["view"]["html"] and fills[1]["view"]["url"].endswith("/checkout")
+    assert [e["site"] for e in events if e["type"] == "nav"] == [None, None, "nimbus", None, "orchard", None, "techbazaar", None, "tempo", None] + ["meridian"] * 5
     assert events[-1]["view"]["title"] == "Commande confirmée | Meridian Watch Co."
 
     # la commande est passée, et le journal garde de quoi rejouer la décision contre le vrai garde, sans la carte en clair
@@ -224,9 +234,37 @@ def test_agent_browses_buys_and_pays_and_every_step_is_shown():
     assert "4242 4242" not in json.dumps({k: v for k, v in run.items() if k != "pages"}, ensure_ascii=False)
 
 
+def test_every_shop_is_opened_from_the_results_page_like_a_human_would():
+    visits = [("goto", {"url": world.url_of(k)}) for k in ("nimbus", "orchard")] + [("goto", {"url": "meridian-watch.example"})]
+    events, llm = [], Driver(("search", {"query": "apple watch"}), *visits, ("goto", {"url": "https://tempo-wearables.example/cart"}), ("search", {"query": "montre"}))
+    run_browser("Achète une montre", llm, emit=events.append)
+    trail = [(e["how"], e["url"].replace("https://", "")) if e["type"] == "nav" else (e["type"], e["label"]) for e in events if e["type"] in ("nav", "click", "fill")]
+    results = "recherche.example/?q=apple+watch"
+    assert trail == [
+        ("goto", "recherche.example"), ("fill", "Rechercher"), ("click", "Rechercher"), ("click", results),
+        ("click", "Nimbus Store"), ("click", "store.nimbus.example/"),
+        ("back", results), ("click", "Orchard Electronics"), ("click", "orchard-electronics.example/"),
+        ("back", results), ("click", "Meridian Watch Co."), ("click", "meridian-watch.example/"),
+        ("goto", "tempo-wearables.example/cart"),  # une adresse qui n'est pas un résultat se tape dans la barre
+        ("goto", "recherche.example"), ("fill", "Rechercher"), ("click", "Rechercher"), ("click", "recherche.example/?q=montre"),
+    ]
+    assert "show no price" in llm.system and "open every merchant the search returns" in llm.system
+
+
+def test_the_agent_is_sent_back_to_the_shops_it_skipped_before_it_can_choose():
+    choice = ("choose", {"merchant": "Nimbus Store", "considered": []})
+    events, llm = [], Driver(("search", {"query": "apple watch"}), ("goto", {"url": "store.nimbus.example/?q=apple+watch"}), choice, choice)
+    run = run_browser("Achète une montre", llm, emit=events.append)
+    assert [e["label"] for e in events if e["type"] == "click"] == ["Rechercher", "Nimbus Store"]  # l'adresse avec ?q= est bien un résultat : il s'ouvre par un clic
+    assert llm.pages[3].startswith("Before choosing, open the merchants you have not looked at yet: Meridian Watch Co., Orchard Electronics, TechBazaar, Tempo Wearables.")
+    assert "URL: https://store.nimbus.example/" in llm.pages[3]  # la page courante lui est redonnée avec le rappel
+    assert [e["type"] for e in events if e["type"] == "choose"] == ["choose"] and run["chosen"] == "Nimbus Store"  # rappelé une fois, pas bloqué
+
+
 def test_a_refused_form_is_handed_back_to_the_agent_and_its_content_stays_out_of_the_request():
     script = buy("tempo")
-    script[6] = lambda page: ("fill", {"fields": [{"ref": ref(page, "E-mail"), "value": "camille.martin@example.com"}]})
+    form = script.index(fill_checkout)
+    script[form] = lambda page: ("fill", {"fields": [{"ref": ref(page, "E-mail"), "value": "camille.martin@example.com"}]})
     script += [fill_checkout, lambda page: ("click", {"ref": ref(page, "Payer")})]
     llm = Driver(*script)
     run = run_browser("Achète une Apple Watch", llm)

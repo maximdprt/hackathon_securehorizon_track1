@@ -81,7 +81,7 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
 
       if (!doc || !target) {
         // une autre page : l'adresse se tape dans la barre, l'ancienne page s'efface, la nouvelle apparaît
-        if (play && frame.kind === 'nav' && frame.how !== 'click') {
+        if (play && frame.kind === 'nav' && (frame.how === 'goto' || frame.how === 'search')) {
           const text = shortUrl(frame.url);
           for (let i = 2; i < text.length && current(); i += 2) {
             setAddress(text.slice(0, i));
@@ -140,7 +140,12 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
     arriving.current = null;
     const doc = iframe.current?.contentDocument;
     const el = doc && arrived ? byRef(doc, arrived.ref) : null;
-    if (!el) return;
+    if (!el) {
+      // le curseur est là dès la première page, posé au milieu, prêt à bouger
+      const box = iframe.current?.getBoundingClientRect();
+      if (box) setCursor((c) => (c.visible ? c : { x: box.width * 0.52, y: box.height * 0.4, visible: true, travel: 0, pressed: false }));
+      return;
+    }
     el.scrollIntoView({ block: 'center' });
     const box = el.getBoundingClientRect();
     setCursor({ x: box.left + Math.min(box.width / 2, 60), y: box.top + box.height / 2, visible: true, travel: 0, pressed: false });

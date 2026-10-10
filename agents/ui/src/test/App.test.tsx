@@ -27,12 +27,18 @@ const view = (path: string, title: string, body = ''): View => ({
   url: `https://meridian-watch.example${path}`, title: `${title} | Meridian Watch Co.`, status: 200, html: `<!DOCTYPE html><html><head><title>${title}</title></head><body>${body}</body></html>`,
 });
 
+const SEARCH = 'https://recherche.example';
+const search = (url: string, title: string): View => ({ url, title: `${title} | Recherche`, status: 200, html: `<html><body>${title}</body></html>` });
+
 function run(site: Site | null = MERIDIAN): RunEvent[] {
   return [
     { type: 'thinking', turn: 1 },
-    { type: 'nav', how: 'search', url: 'https://recherche.example/?q=apple+watch', title: 'apple watch | Recherche', status: 200, site: null, why: 'trouver les boutiques', query: 'apple watch',
-      view: { url: 'https://recherche.example/?q=apple+watch', title: 'apple watch | Recherche', status: 200, html: '<html><body>résultats</body></html>' } },
-    { type: 'nav', how: 'goto', url: 'https://meridian-watch.example/', title: 'Apple Watch | Meridian Watch Co.', status: 200, site: 'meridian', why: 'voir ses prix', view: view('/', 'Apple Watch') },
+    { type: 'nav', how: 'goto', url: SEARCH, title: 'Recherche | Recherche', status: 200, site: null, why: 'trouver les boutiques', view: search(SEARCH, 'Recherche') },
+    { type: 'fill', ref: 'e1', label: 'Rechercher', value: 'apple watch', why: 'trouver les boutiques', view: search(SEARCH, 'Recherche') },
+    { type: 'click', ref: 'e2', label: 'Rechercher', kind: 'button', why: 'trouver les boutiques', view: search(SEARCH, 'Recherche') },
+    { type: 'nav', how: 'click', url: `${SEARCH}/?q=apple+watch`, title: 'apple watch | Recherche', status: 200, site: null, why: '', view: search(`${SEARCH}/?q=apple+watch`, 'apple watch') },
+    { type: 'click', ref: 'e5', label: 'Meridian Watch Co.', kind: 'link', why: 'voir ses prix', view: search(`${SEARCH}/?q=apple+watch`, 'apple watch') },
+    { type: 'nav', how: 'click', url: 'https://meridian-watch.example/', title: 'Apple Watch | Meridian Watch Co.', status: 200, site: 'meridian', why: '', view: view('/', 'Apple Watch') },
     { type: 'choose', merchant: 'Meridian Watch Co.', site: 'meridian', why: 'prix le plus bas', considered: CONSIDERED },
     { type: 'click', ref: 'e6', label: 'Ajouter au panier', kind: 'button', why: 'mettre la montre au panier', view: view('/product/series-10-46', 'Apple Watch Series 10 46 mm') },
     { type: 'nav', how: 'click', url: 'https://meridian-watch.example/cart', title: 'Panier | Meridian Watch Co.', status: 200, site: 'meridian', why: '', view: view('/cart', 'Panier') },
@@ -94,12 +100,14 @@ test('the browser shows what the agent does, step by step, up to the confirmed o
   // le fil : un geste par ligne, les champs d'un formulaire regroupés, le choix avec son comparatif
   const steps = within(screen.getByRole('list', { name: "Gestes de l'agent" })).getAllByRole('listitem');
   expect(steps.map((li) => li.querySelector('.tool__name')!.textContent)).toEqual([
-    'Recherche « apple watch »', 'Ouvre Meridian Watch Co.', 'Choisit Meridian Watch Co', 'Clique sur « Ajouter au panier »', 'Arrive sur « Panier »',
+    'Ouvre recherche.example', 'Tape dans « Rechercher »', 'Clique sur « Rechercher »', 'Arrive sur « apple watch »',
+    'Clique sur « Meridian Watch Co. »', 'Arrive sur « Apple Watch »', 'Choisit Meridian Watch Co', 'Clique sur « Ajouter au panier »', 'Arrive sur « Panier »',
     'Remplit le formulaire', 'Clique sur « Payer 389,00 € »', 'Envoie le paiement de 389,00 €', 'Arrive sur « Commande confirmée »',
   ]);
-  expect(within(steps[1]).getByText('voir ses prix')).toBeInTheDocument();
-  expect(within(steps[2]).getByText('Meridian Watch Co. · 389,00 €').closest('.tool__field')).toHaveClass('tool__field--picked');
-  expect(within(steps[5]).getByText('•••• •••• •••• 4242')).toBeInTheDocument();
+  expect(within(steps[1]).getByText('apple watch')).toBeInTheDocument(); // ce qu'il tape dans le moteur de recherche
+  expect(within(steps[4]).getByText('voir ses prix')).toBeInTheDocument();
+  expect(within(steps[6]).getByText('Meridian Watch Co. · 389,00 €').closest('.tool__field')).toHaveClass('tool__field--picked');
+  expect(within(steps[9]).getByText('•••• •••• •••• 4242')).toBeInTheDocument();
   expect(steps.filter((li) => li.querySelector('.plan__step--done'))).toHaveLength(0);
   expect(document.querySelectorAll('.plan__step--done')).toHaveLength(4);
 
@@ -130,7 +138,7 @@ test('clicking a past step replays its page, and one click returns to the live v
 });
 
 test('a running agent shows its plan and can be stopped', async () => {
-  server(run().slice(0, 5), { hang: true });
+  server(run().slice(0, 9), { hang: true }); // jusqu'au clic sur « Ajouter au panier »
   render(<App />);
   await ready();
   await ask('Une montre');
@@ -264,18 +272,21 @@ test('applyEvent groups form fields into one step, keeps a frame per page, and p
   const start: AgentMessage = { id: 'a', role: 'agent', agentName: 'x', model: 'm', prompt: 'p', status: 'running', steps: [], frames: [] };
   const name = (key: string | null) => (key === 'meridian' ? 'Meridian Watch Co.' : undefined);
   expect(planOf(start).map((s) => s.state)).toEqual(['current', 'todo', 'todo', 'todo']);
-  const events = run().slice(0, 10);
+  const events = run().slice(0, 14); // jusqu'à l'envoi du paiement
   const msg = events.reduce((m, ev) => applyEvent(m, ev, name), start);
-  expect(msg.frames).toHaveLength(7); // recherche, boutique, clic, panier, deux champs, clic sur Payer
-  expect(msg.frames.map((f) => f.kind)).toEqual(['nav', 'nav', 'click', 'nav', 'fill', 'fill', 'click']);
-  expect(msg.frames.map((f) => f.how ?? f.ref)).toEqual(['search', 'goto', 'e6', 'click', 'e5', 'e11', 'e14']);
-  const form = msg.steps.find((s) => s.kind === 'fill')!;
+  expect(msg.frames.map((f) => f.kind)).toEqual(['nav', 'fill', 'click', 'nav', 'click', 'nav', 'click', 'nav', 'fill', 'fill', 'click']);
+  expect(msg.frames.map((f) => f.how ?? f.ref)).toEqual(['goto', 'e1', 'e2', 'click', 'e5', 'click', 'e6', 'click', 'e5', 'e11', 'e14']);
+  const [typed, form] = msg.steps.filter((s) => s.kind === 'fill');
+  expect([typed.label, typed.fields]).toEqual(['Tape dans « Rechercher »', [{ label: 'Rechercher', value: 'apple watch' }]]);
+  expect(form.label).toBe('Remplit le formulaire'); // plusieurs champs : c'est un formulaire
   expect(form.fields).toEqual([{ label: 'E-mail', value: 'camille.martin@example.com' }, { label: 'Numéro de carte', value: '•••• •••• •••• 4242' }]);
-  expect(form.frame).toBe(5); // le geste montre le dernier champ rempli
+  expect(form.frame).toBe(9); // le geste montre le dernier champ rempli
   expect(msg.steps.find((s) => s.kind === 'choose')!.frame).toBeUndefined(); // un choix n'a pas de page à montrer
   expect(planOf(msg).map((s) => s.state)).toEqual(['done', 'done', 'done', 'current']);
   expect(planOf({ ...msg, status: 'stopped' }).map((s) => s.state)).toEqual(['done', 'done', 'done', 'todo']);
   const lost = applyEvent(start, { type: 'nav', how: 'click', url: 'https://x.example/y', title: 'Site introuvable', status: 404, site: null, why: '', view: view('/', 'x') }, name);
   expect(lost.steps[0].label).toBe('Page introuvable');
+  const back = applyEvent(start, { type: 'nav', how: 'back', url: `${SEARCH}/?q=x`, title: 'x | Recherche', status: 200, site: null, why: 'voir la suivante', view: search(SEARCH, 'x') }, name);
+  expect([back.steps[0].label, back.frames[0].how]).toEqual(['Revient aux résultats de recherche', 'back']);
   expect(start.steps).toHaveLength(0); // le message de départ n'est pas modifié
 });

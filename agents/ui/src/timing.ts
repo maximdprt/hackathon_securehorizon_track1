@@ -31,7 +31,7 @@ export function durationOf(ev: RunEvent): number {
     case 'fill':
       return ms(T.hesitate + T.move * 0.7 + T.press + typingTime(ev.value.length) + 160);
     case 'nav':
-      return ms((ev.how === 'click' ? 0 : T.address) + T.fade + T.load + 250);
+      return ms((ev.how === 'goto' || ev.how === 'search' ? T.address : 0) + T.fade + T.load + 250);
     case 'choose':
       return ms(900);
     case 'pay':

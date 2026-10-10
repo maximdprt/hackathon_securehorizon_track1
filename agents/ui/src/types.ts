@@ -35,7 +35,7 @@ export type EndEvent = {
 export type RunEvent =
   | { type: 'thinking'; turn: number }
   | { type: 'thought'; text: string }
-  | { type: 'nav'; how: 'search' | 'goto' | 'click'; url: string; title: string; status: number; site: string | null; why: string; query?: string; view: View }
+  | { type: 'nav'; how: 'search' | 'goto' | 'click' | 'back'; url: string; title: string; status: number; site: string | null; why: string; query?: string; view: View }
   | { type: 'click'; ref: string; label: string; kind: string; why: string; view: View }
   | { type: 'fill'; ref: string; label: string; value: string; why: string; view: View }
   | { type: 'choose'; merchant: string; site: string | null; why: string; considered: Considered[] }

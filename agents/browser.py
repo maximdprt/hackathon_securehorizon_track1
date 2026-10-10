@@ -129,6 +129,7 @@ class Browser:
         self.values: dict[str, str] = {}  # ce que l'agent a saisi dans la page courante, par repère
         self.status = 0
         self.visited: list[tuple[str, str]] = []  # (url, html) de chaque page chargée, dans l'ordre
+        self.results = ""  # adresse de la dernière page de résultats de recherche
         self._text = ""
 
     # ---- chargement ----
@@ -160,15 +161,23 @@ class Browser:
         self.elements, self.forms, self.values = reader.elements, reader.forms, {}
         self._text = re.sub(r"[ \t]*\n\s*", "\n", "".join(reader.out)).strip()
         self.visited.append((url, html))
+        if urlsplit(url).hostname == world.SEARCH_HOST and "q=" in url:
+            self.results = url
+
+    def resolve(self, url: str) -> str:
+        """L'adresse complète que désigne ce que l'agent a écrit : URL, domaine seul, ou lien relatif à la page courante."""
+        url = url.strip()
+        if "://" not in url:
+            url = urljoin(self.url, url) if self.url and not re.match(r"^[\w.-]+\.[a-z]{2,}(/|$)", url) else "https://" + url.lstrip("/")
+        return url
 
     def goto(self, url: str) -> None:
-        url = url.strip()
-        if "://" not in url:  # domaine seul, ou lien relatif à la page courante
-            url = urljoin(self.url, url) if self.url and not re.match(r"^[\w.-]+\.[a-z]{2,}(/|$)", url) else "https://" + url.lstrip("/")
-        self._load("GET", url)
+        self._load("GET", self.resolve(url))
 
-    def search(self, query: str) -> None:
-        self._load("GET", f"{SEARCH_ROOT}/?{urlencode({'q': query})}")
+    def link_to(self, url: str) -> str | None:
+        """Le repère du lien de la page courante qui mène à cette adresse, s'il y en a un."""
+        wanted = url.rstrip("/")
+        return next((ref for ref, el in self.elements.items() if el.kind == "link" and urljoin(self.url, el.href).rstrip("/") == wanted), None)
 
     # ---- actions ----
     def fill(self, ref: str, value: str) -> Element:
