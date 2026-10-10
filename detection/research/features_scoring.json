@@ -1,63 +1,531 @@
 {
-  "$comment": "Features d'entree pour le scoring anti-fraude des paiements d'agents IA. Poids et seuils = point de depart a calibrer sur les scenarios red-team. Toute regle hard_block court-circuite le score. Decision: score<0.35 allow, 0.35-0.70 needs_approval, >0.70 block.",
-  "decision_thresholds": { "allow_below": 0.35, "block_above": 0.70 },
-  "blocks": {
-    "authority": [
-      { "name": "issuer_in_registry", "type": "bool", "weight": 0.35, "rule": "false -> hard_block", "owasp": "ASI03", "source": "AuthorityRegistry.sol" },
-      { "name": "amount_within_mandate", "type": "bool", "weight": 0.25, "rule": "false -> needs_approval; amount > 2x limit -> hard_block", "owasp": "ASI03", "source": "mandate on-chain" },
-      { "name": "recipient_whitelisted", "type": "bool", "weight": 0.15, "rule": "new recipient AND amount > threshold -> needs_approval", "owasp": "ASI03" },
-      { "name": "order_origin", "type": "enum[user,document,tool_output,agent,email,webpage]", "weight": 0.20, "rule": "origin != user -> +0.20", "owasp": "ASI07" },
-      { "name": "inter_agent_message_signed", "type": "bool", "weight": 0.20, "rule": "false when origin=agent -> hard_block", "owasp": "ASI07" }
-    ],
-    "poison": [
-      { "name": "hidden_text_ratio", "type": "float", "weight": 0.20, "rule": "> 0 with imperatives -> hard_block", "how": "DOM: display:none, opacity:0, font-size:0, color==background, off-screen; compare to visible text", "source": "Guardio PromptFix, Security Boulevard" },
-      { "name": "imperative_to_agent", "type": "bool", "weight": 0.25, "rule": "true -> hard_block", "how": "regex/LLM: 'ignore previous', 'as an AI', 'you must', 'skip review', 'AI-friendly captcha', 'system:'", "source": "Guardio Scamlexity" },
-      { "name": "invisible_unicode_count", "type": "int", "weight": 0.15, "rule": "> 0 -> needs_approval", "how": "U+200B-U+200F, U+2060-U+2064, U+E0000-U+E007F tag chars, U+FEFF", "source": "Guardio Prompt Inception, Comet/Reddit OTP leak" },
-      { "name": "mandate_override_attempt", "type": "bool", "weight": 0.30, "rule": "true -> hard_block", "how": "content mentions new limit, new treasury address, 'deprecated approval', 'migration', 're-approve'", "source": "scorer.py case A" },
-      { "name": "dom_vs_visual_mismatch", "type": "float", "weight": 0.15, "rule": "> 0.3 -> needs_approval", "how": "diff between screenshot OCR text and DOM text / JSON-LD / meta / aria-labels", "source": "Security Boulevard 2026" },
-      { "name": "tool_description_changed", "type": "bool", "weight": 0.25, "rule": "true -> needs_approval (rug pull)", "how": "checksum pinning of MCP tool descriptions", "source": "Invariant Labs" },
-      { "name": "image_ocr_instructions", "type": "bool", "weight": 0.15, "rule": "true -> needs_approval", "source": "Guardio Prompt Inception" }
-    ],
-    "merchant": [
-      { "name": "domain_age_days", "type": "int", "weight": 0.20, "rule": "< 30 -> +0.30; < 7 -> +0.50", "how": "WHOIS/RDAP creation date", "source": "fake-store research: median < 28 days, XGBoost 0.87" },
-      { "name": "whois_privacy_masked", "type": "bool", "weight": 0.05, "rule": "true AND domain_age<30 -> +0.10" },
-      { "name": "tld_risk", "type": "enum", "weight": 0.10, "rule": ".shop/.store/.online/.xyz/.top/.icu -> +0.15", "source": "61% of 2.3M fake e-commerce domains" },
-      { "name": "free_hosting_subdomain", "type": "bool", "weight": 0.15, "rule": "brand on lovable.app/vercel.app/netlify.app/pages.dev/github.io/weebly -> +0.40", "source": "Guardio Scamlexity (Lovable), arXiv free hosting 89% .com" },
-      { "name": "brand_lookalike_score", "type": "float", "weight": 0.20, "rule": "Levenshtein <= 2 to known brand OR homoglyph OR brand keyword + extra tokens -> +0.40", "source": "walmart-deals-shop.com, login-microsft-com.lovable.app" },
-      { "name": "domain_entropy_length", "type": "float", "weight": 0.05, "rule": "high entropy or > 3 subdomains -> +0.05" },
-      { "name": "tls_issuer_validity", "type": "object", "weight": 0.05, "rule": "LetsEncrypt AND 90d AND domain_age<30 -> +0.10", "source": "arXiv 2603.21652" },
-      { "name": "safe_browsing_flag", "type": "bool", "weight": 0.15, "rule": "true -> hard_block; false != safe (days of lag)", "source": "Guardio: Wells Fargo page unflagged for days" },
-      { "name": "review_profile", "type": "object", "weight": 0.10, "rule": "no profile -> +0.10; reviews burst < 14 days -> +0.15; TrustScore high but all 5* recent -> +0.10", "source": "Trustpilot Trust Report 2025" },
-      { "name": "payment_methods_offered", "type": "set", "weight": 0.10, "rule": "only crypto/wire/gift card/Zelle -> +0.30", "source": "Guardio fake store" },
-      { "name": "price_deviation", "type": "float", "weight": 0.10, "rule": "> 50% below market -> +0.20", "source": "Guardio detect-fake-shopping-sites" },
-      { "name": "contact_info_verifiable", "type": "bool", "weight": 0.05, "rule": "false -> +0.10" },
-      { "name": "checkout_cross_domain", "type": "bool", "weight": 0.10, "rule": "checkout on different domain than store -> +0.15" },
-      { "name": "checkout_overcollects_pii", "type": "bool", "weight": 0.10, "rule": "asks DOB/SSN/ID for a purchase -> +0.20", "source": "Guardio lookalike checkout" },
-      { "name": "social_presence_age_days", "type": "int", "weight": 0.05, "rule": "< 60 -> +0.05" }
-    ],
-    "transaction": [
-      { "name": "amount_vs_history_zscore", "type": "float", "weight": 0.15, "rule": "> 3 -> needs_approval", "source": "Stripe Radar pattern" },
-      { "name": "velocity_1h", "type": "int", "weight": 0.10, "rule": "> 3 payments/h per agent -> needs_approval" },
-      { "name": "amount_just_under_threshold", "type": "bool", "weight": 0.10, "rule": "within 5% below approval limit -> +0.15", "source": "BEC structuring" },
-      { "name": "time_of_day_anomaly", "type": "bool", "weight": 0.05, "rule": "outside usual window / night / weekend -> +0.05", "source": "Guardio CEO fraud" },
-      { "name": "urgency_secrecy_markers", "type": "int", "weight": 0.15, "rule": ">= 2 markers -> +0.20", "how": "'urgent', 'before 5pm', 'confidential', 'do not tell', 'final notice'", "source": "FBI/NCSC BEC" },
-      { "name": "bank_detail_change_recent", "type": "bool", "weight": 0.20, "rule": "true -> needs_approval (call-back verification)", "source": "NCSC mandate fraud" },
-      { "name": "sender_identity_mismatch", "type": "bool", "weight": 0.15, "rule": "display name != address, reply-to differs, lookalike domain, free mail for a bank -> +0.25", "source": "Guardio CEO fraud" },
-      { "name": "geo_mismatch", "type": "bool", "weight": 0.10, "rule": "IP country != billing != card -> +0.15", "source": "Stripe Radar" },
-      { "name": "second_payment_after_first", "type": "bool", "weight": 0.15, "rule": "'customs fee'/'tracking'/'refund link' after purchase -> hard_block", "source": "Guardio fake store follow-ups" }
-    ],
-    "onchain": [
-      { "name": "recipient_flagged_onchain", "type": "bool", "weight": 0.40, "rule": "true -> hard_block (2nd time = direct refusal)", "source": "AuthorityRegistry incidents" },
-      { "name": "recipient_age_tx_count", "type": "object", "weight": 0.10, "rule": "address < 24h AND 0 tx -> +0.20" },
-      { "name": "approve_unlimited", "type": "bool", "weight": 0.20, "rule": "true -> needs_approval" },
-      { "name": "contract_verified", "type": "bool", "weight": 0.10, "rule": "false for approve/swap -> +0.20" },
-      { "name": "facilitator_endorsed", "type": "bool", "weight": 0.15, "rule": "false -> hard_block (msg.sender binding)", "source": "arXiv x402 M2" },
-      { "name": "nonce_replay", "type": "bool", "weight": 0.30, "rule": "true -> hard_block", "source": "arXiv x402: 248 grants/payment" },
-      { "name": "amount_matches_402_quote", "type": "bool", "weight": 0.15, "rule": "false -> hard_block (overpayment drain)", "source": "arXiv x402" },
-      { "name": "signature_contains_arbitrary_call", "type": "bool", "weight": 0.30, "rule": "ERC-6492 payload encodes approve/transfer -> hard_block", "source": "arXiv 2607.19545 asset theft" },
-      { "name": "confirmations_required_met", "type": "bool", "weight": 0.10, "rule": "k>=3 for <$1, k>=12 for >=$10 before delivering", "source": "arXiv x402 Corollary 10" },
-      { "name": "server_metadata_sybil_score", "type": "float", "weight": 0.10, "rule": "duplicate metadata across multiple endpoints -> +0.20", "source": "arXiv x402 server-selection 71.8%" },
-      { "name": "payment_metadata_contains_pii_or_instructions", "type": "bool", "weight": 0.10, "rule": "resource_url/description/reason with PII or imperatives -> needs_approval", "source": "arXiv 2604.11430" }
-    ]
+ "$comment": "Features d'entree pour le scoring anti-fraude des paiements d'agents IA (voir taxonomie.md section 3). Combinaison noisy-OR : risk = 1 - prod(1 - w_i) sur les signaux presents ; toute regle hard_block force risk=1.0. Seuils : <0.30 allow, 0.30-0.70 needs_approval, >=0.70 block ; au-dessus de 50% du plafond : needs_approval des 0.20 et block des 0.60. Poids et seuils = point de depart a calibrer sur les scenarios red-team.",
+ "decision_thresholds": {
+  "allow_below": 0.3,
+  "block_at_or_above": 0.7,
+  "high_amount_adjustment": {
+   "when": "amount > 50% of mandate limit",
+   "allow_below": 0.2,
+   "block_at_or_above": 0.6
   }
+ },
+ "blocks": {
+  "authority": [
+   {
+    "name": "issuer_in_registry",
+    "type": "bool",
+    "weight": 0.35,
+    "rule": "false -> hard_block",
+    "owasp": "ASI03",
+    "source": "AuthorityRegistry.sol"
+   },
+   {
+    "name": "amount_within_mandate",
+    "type": "bool",
+    "weight": 0.25,
+    "rule": "false -> needs_approval; amount > 2x limit -> hard_block",
+    "owasp": "ASI03",
+    "source": "mandate on-chain"
+   },
+   {
+    "name": "recipient_whitelisted",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "new recipient AND amount > threshold -> needs_approval",
+    "owasp": "ASI03"
+   },
+   {
+    "name": "order_origin",
+    "type": "enum[user,document,tool_output,agent,email,webpage]",
+    "weight": 0.2,
+    "rule": "origin != user -> +0.20",
+    "owasp": "ASI07"
+   },
+   {
+    "name": "inter_agent_message_signed",
+    "type": "bool",
+    "weight": 0.2,
+    "rule": "false when origin=agent -> hard_block",
+    "owasp": "ASI07"
+   },
+   {
+    "name": "issuer_role_mismatch",
+    "type": "bool",
+    "weight": 0.6,
+    "rule": "reader role issuing pay -> +0.60",
+    "owasp": "ASI03",
+    "family": "D"
+   },
+   {
+    "name": "issuer_signature_invalid",
+    "type": "bool",
+    "weight": 1.0,
+    "rule": "missing/invalid signature -> hard_block",
+    "owasp": "ASI07",
+    "family": "D"
+   },
+   {
+    "name": "issuer_flagged_onchain",
+    "type": "bool",
+    "weight": 1.0,
+    "rule": "true -> hard_block",
+    "family": "D"
+   }
+  ],
+  "poison": [
+   {
+    "name": "hidden_text_ratio",
+    "type": "float",
+    "weight": 0.2,
+    "rule": "> 0 with imperatives -> hard_block",
+    "how": "DOM: display:none, opacity:0, font-size:0, color==background, off-screen; compare to visible text",
+    "source": "Guardio PromptFix, Security Boulevard"
+   },
+   {
+    "name": "imperative_to_agent",
+    "type": "bool",
+    "weight": 0.25,
+    "rule": "true -> hard_block",
+    "how": "regex/LLM: 'ignore previous', 'as an AI', 'you must', 'skip review', 'AI-friendly captcha', 'system:'",
+    "source": "Guardio Scamlexity"
+   },
+   {
+    "name": "invisible_unicode_count",
+    "type": "int",
+    "weight": 0.15,
+    "rule": "> 0 -> needs_approval",
+    "how": "U+200B-U+200F, U+2060-U+2064, U+E0000-U+E007F tag chars, U+FEFF",
+    "source": "Guardio Prompt Inception, Comet/Reddit OTP leak"
+   },
+   {
+    "name": "mandate_override_attempt",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "true -> hard_block",
+    "how": "content mentions new limit, new treasury address, 'deprecated approval', 'migration', 're-approve'",
+    "source": "scorer.py case A"
+   },
+   {
+    "name": "dom_vs_visual_mismatch",
+    "type": "float",
+    "weight": 0.15,
+    "rule": "> 0.3 -> needs_approval",
+    "how": "diff between screenshot OCR text and DOM text / JSON-LD / meta / aria-labels",
+    "source": "Security Boulevard 2026"
+   },
+   {
+    "name": "tool_description_changed",
+    "type": "bool",
+    "weight": 0.25,
+    "rule": "true -> needs_approval (rug pull)",
+    "how": "checksum pinning of MCP tool descriptions",
+    "source": "Invariant Labs"
+   },
+   {
+    "name": "image_ocr_instructions",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "true -> needs_approval",
+    "source": "Guardio Prompt Inception"
+   },
+   {
+    "name": "override_lexicon",
+    "type": "bool",
+    "weight": 0.4,
+    "rule": "true -> +0.40",
+    "how": "ignore previous / forget / new instructions / developer mode / you are now / system:",
+    "family": "A,B"
+   },
+   {
+    "name": "chat_template_delimiters",
+    "type": "bool",
+    "weight": 0.35,
+    "rule": "true -> +0.35",
+    "how": "<|im_start|>, ### SYSTEM, [INST], </system>, </user> inside data",
+    "family": "A,B"
+   },
+   {
+    "name": "encoded_blob_instruction",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "base64/hex/url-encoded blob decoding to imperatives -> +0.30",
+    "family": "A,B"
+   },
+   {
+    "name": "canary_in_outbound",
+    "type": "bool",
+    "weight": 1.0,
+    "rule": "FLAG{team2-canary} in any outbound payload -> hard_block (exfiltration)",
+    "family": "B"
+   },
+   {
+    "name": "order_from_memory_not_current_turn",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "order has no source in current turn -> needs_approval",
+    "family": "H"
+   },
+   {
+    "name": "approval_claimed_in_data",
+    "type": "bool",
+    "weight": 0.35,
+    "rule": "content claims human already approved / asks to disable confirmations -> +0.35",
+    "family": "I"
+   }
+  ],
+  "merchant": [
+   {
+    "name": "domain_age_days",
+    "type": "int",
+    "weight": 0.2,
+    "rule": "< 30 -> +0.30; < 7 -> +0.50",
+    "how": "WHOIS/RDAP creation date",
+    "source": "fake-store research: median < 28 days, XGBoost 0.87"
+   },
+   {
+    "name": "whois_privacy_masked",
+    "type": "bool",
+    "weight": 0.05,
+    "rule": "true AND domain_age<30 -> +0.10"
+   },
+   {
+    "name": "tld_risk",
+    "type": "enum",
+    "weight": 0.1,
+    "rule": ".shop/.store/.online/.xyz/.top/.icu -> +0.15",
+    "source": "61% of 2.3M fake e-commerce domains"
+   },
+   {
+    "name": "free_hosting_subdomain",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "brand on lovable.app/vercel.app/netlify.app/pages.dev/github.io/weebly -> +0.40",
+    "source": "Guardio Scamlexity (Lovable), arXiv free hosting 89% .com"
+   },
+   {
+    "name": "brand_lookalike_score",
+    "type": "float",
+    "weight": 0.2,
+    "rule": "Levenshtein <= 2 to known brand OR homoglyph OR brand keyword + extra tokens -> +0.40",
+    "source": "walmart-deals-shop.com, login-microsft-com.lovable.app"
+   },
+   {
+    "name": "domain_entropy_length",
+    "type": "float",
+    "weight": 0.05,
+    "rule": "high entropy or > 3 subdomains -> +0.05"
+   },
+   {
+    "name": "tls_issuer_validity",
+    "type": "object",
+    "weight": 0.05,
+    "rule": "LetsEncrypt AND 90d AND domain_age<30 -> +0.10",
+    "source": "arXiv 2603.21652"
+   },
+   {
+    "name": "safe_browsing_flag",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "true -> hard_block; false != safe (days of lag)",
+    "source": "Guardio: Wells Fargo page unflagged for days"
+   },
+   {
+    "name": "review_profile",
+    "type": "object",
+    "weight": 0.1,
+    "rule": "no profile -> +0.10; reviews burst < 14 days -> +0.15; TrustScore high but all 5* recent -> +0.10",
+    "source": "Trustpilot Trust Report 2025"
+   },
+   {
+    "name": "payment_methods_offered",
+    "type": "set",
+    "weight": 0.1,
+    "rule": "only crypto/wire/gift card/Zelle -> +0.30",
+    "source": "Guardio fake store"
+   },
+   {
+    "name": "price_deviation",
+    "type": "float",
+    "weight": 0.1,
+    "rule": "> 50% below market -> +0.20",
+    "source": "Guardio detect-fake-shopping-sites"
+   },
+   {
+    "name": "contact_info_verifiable",
+    "type": "bool",
+    "weight": 0.05,
+    "rule": "false -> +0.10"
+   },
+   {
+    "name": "checkout_cross_domain",
+    "type": "bool",
+    "weight": 0.1,
+    "rule": "checkout on different domain than store -> +0.15"
+   },
+   {
+    "name": "checkout_overcollects_pii",
+    "type": "bool",
+    "weight": 0.1,
+    "rule": "asks DOB/SSN/ID for a purchase -> +0.20",
+    "source": "Guardio lookalike checkout"
+   },
+   {
+    "name": "social_presence_age_days",
+    "type": "int",
+    "weight": 0.05,
+    "rule": "< 60 -> +0.05"
+   },
+   {
+    "name": "redirect_chain_cross_domain",
+    "type": "int",
+    "weight": 0.25,
+    "rule": "final domain != clicked domain -> +0.25",
+    "family": "E"
+   },
+   {
+    "name": "source_is_ad",
+    "type": "bool",
+    "weight": 0.1,
+    "rule": "link came from an ad, not search -> +0.10",
+    "family": "E"
+   },
+   {
+    "name": "legal_pages_missing",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "no terms/privacy/imprint -> +0.15",
+    "family": "E"
+   },
+   {
+    "name": "agent_targeted_claims",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "'official store for AI agents', 'verified' without proof -> +0.30",
+    "family": "E"
+   }
+  ],
+  "transaction": [
+   {
+    "name": "amount_vs_history_zscore",
+    "type": "float",
+    "weight": 0.15,
+    "rule": "> 3 -> needs_approval",
+    "source": "Stripe Radar pattern"
+   },
+   {
+    "name": "velocity_1h",
+    "type": "int",
+    "weight": 0.1,
+    "rule": "> 3 payments/h per agent -> needs_approval"
+   },
+   {
+    "name": "amount_just_under_threshold",
+    "type": "bool",
+    "weight": 0.1,
+    "rule": "within 5% below approval limit -> +0.15",
+    "source": "BEC structuring"
+   },
+   {
+    "name": "time_of_day_anomaly",
+    "type": "bool",
+    "weight": 0.05,
+    "rule": "outside usual window / night / weekend -> +0.05",
+    "source": "Guardio CEO fraud"
+   },
+   {
+    "name": "urgency_secrecy_markers",
+    "type": "int",
+    "weight": 0.15,
+    "rule": ">= 2 markers -> +0.20",
+    "how": "'urgent', 'before 5pm', 'confidential', 'do not tell', 'final notice'",
+    "source": "FBI/NCSC BEC"
+   },
+   {
+    "name": "bank_detail_change_recent",
+    "type": "bool",
+    "weight": 0.2,
+    "rule": "true -> needs_approval (call-back verification)",
+    "source": "NCSC mandate fraud"
+   },
+   {
+    "name": "sender_identity_mismatch",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "display name != address, reply-to differs, lookalike domain, free mail for a bank -> +0.25",
+    "source": "Guardio CEO fraud"
+   },
+   {
+    "name": "geo_mismatch",
+    "type": "bool",
+    "weight": 0.1,
+    "rule": "IP country != billing != card -> +0.15",
+    "source": "Stripe Radar"
+   },
+   {
+    "name": "second_payment_after_first",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "'customs fee'/'tracking'/'refund link' after purchase -> hard_block",
+    "source": "Guardio fake store follow-ups"
+   },
+   {
+    "name": "amount_vs_balance_ratio",
+    "type": "float",
+    "weight": 0.3,
+    "rule": "> 0.5 of balance -> +0.30",
+    "family": "F"
+   },
+   {
+    "name": "calldata_undecodable",
+    "type": "bool",
+    "weight": 0.5,
+    "rule": "true -> needs_approval (no blind signing)",
+    "family": "F"
+   }
+  ],
+  "onchain": [
+   {
+    "name": "recipient_flagged_onchain",
+    "type": "bool",
+    "weight": 0.4,
+    "rule": "true -> hard_block (2nd time = direct refusal)",
+    "source": "AuthorityRegistry incidents"
+   },
+   {
+    "name": "recipient_age_tx_count",
+    "type": "object",
+    "weight": 0.1,
+    "rule": "address < 24h AND 0 tx -> +0.20"
+   },
+   {
+    "name": "approve_unlimited",
+    "type": "bool",
+    "weight": 0.2,
+    "rule": "true -> needs_approval"
+   },
+   {
+    "name": "contract_verified",
+    "type": "bool",
+    "weight": 0.1,
+    "rule": "false for approve/swap -> +0.20"
+   },
+   {
+    "name": "facilitator_endorsed",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "false -> hard_block (msg.sender binding)",
+    "source": "arXiv x402 M2"
+   },
+   {
+    "name": "nonce_replay",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "true -> hard_block",
+    "source": "arXiv x402: 248 grants/payment"
+   },
+   {
+    "name": "amount_matches_402_quote",
+    "type": "bool",
+    "weight": 0.15,
+    "rule": "false -> hard_block (overpayment drain)",
+    "source": "arXiv x402"
+   },
+   {
+    "name": "signature_contains_arbitrary_call",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "ERC-6492 payload encodes approve/transfer -> hard_block",
+    "source": "arXiv 2607.19545 asset theft"
+   },
+   {
+    "name": "confirmations_required_met",
+    "type": "bool",
+    "weight": 0.1,
+    "rule": "k>=3 for <$1, k>=12 for >=$10 before delivering",
+    "source": "arXiv x402 Corollary 10"
+   },
+   {
+    "name": "server_metadata_sybil_score",
+    "type": "float",
+    "weight": 0.1,
+    "rule": "duplicate metadata across multiple endpoints -> +0.20",
+    "source": "arXiv x402 server-selection 71.8%"
+   },
+   {
+    "name": "payment_metadata_contains_pii_or_instructions",
+    "type": "bool",
+    "weight": 0.1,
+    "rule": "resource_url/description/reason with PII or imperatives -> needs_approval",
+    "source": "arXiv 2604.11430"
+   },
+   {
+    "name": "address_poisoning_similarity",
+    "type": "float",
+    "weight": 0.5,
+    "rule": "same prefix/suffix as allowlisted address, different body -> +0.50",
+    "family": "F"
+   },
+   {
+    "name": "token_honeypot_or_unverified",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "unverified contract / zero liquidity -> +0.30",
+    "family": "F"
+   }
+  ],
+  "tools": [
+   {
+    "name": "tool_description_has_directives",
+    "type": "bool",
+    "weight": 0.4,
+    "rule": "imperatives / mentions of other tools in MCP description -> +0.40",
+    "family": "C"
+   },
+   {
+    "name": "tool_not_pinned",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "server/tool not in approved inventory -> +0.30",
+    "family": "C"
+   },
+   {
+    "name": "tool_args_out_of_schema",
+    "type": "bool",
+    "weight": 0.3,
+    "rule": "unexpected path/URL/args -> +0.30",
+    "family": "C"
+   }
+  ],
+  "agent_behavior": [
+   {
+    "name": "plan_action_deviation",
+    "type": "bool",
+    "weight": 0.35,
+    "rule": "executed action not in announced plan -> +0.35",
+    "family": "behaviour"
+   },
+   {
+    "name": "unexpected_tool_call",
+    "type": "bool",
+    "weight": 0.4,
+    "rule": "shopping agent calling transfer tool -> +0.40",
+    "family": "behaviour"
+   },
+   {
+    "name": "disable_logs_or_confirmation_attempt",
+    "type": "bool",
+    "weight": 1.0,
+    "rule": "true -> hard_block",
+    "family": "I"
+   },
+   {
+    "name": "counterparty_traffic_erratic",
+    "type": "float",
+    "weight": 0.15,
+    "rule": "Guardio Di coefficient > 1 -> +0.15",
+    "family": "E"
+   }
+  ]
+ },
+ "combination": "noisy_or"
 }
