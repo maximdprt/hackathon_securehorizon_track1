@@ -100,4 +100,5 @@ Donner de la **crypto en récompense** quand un utilisateur fait une transaction
 - `.env` **jamais commité** (déjà dans `.gitignore`). Creds AWS temporaires = rafraîchir depuis la page event quand ça expire.
 - Données synthétiques + canary flags (`FLAG{team2-canary}`), jamais de vraie donnée.
 - Noter les adresses de contrat déployées ici.
+- Avant de rendre le repo public : `scripts/scrub_check.sh` (scan historique + working tree, exit 1 si secret), checklist dans `docs/scrub-report.md` (rafraîchir les creds AWS, supprimer `mcp_server.log`, activer Secret scanning sur GitHub). Audit du 2026-10-10 : aucun secret dans l'historique.
 - Livrables : PoC détection+réponse, response playbook, defense sheet (1 page), compliance slide (DORA/MiCA/AML/AI Act), pitch 4 min + vidéo démo, repo public (après scrub des secrets).
