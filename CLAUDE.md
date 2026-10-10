@@ -119,10 +119,10 @@ Donner de la **crypto en récompense** quand un utilisateur fait une transaction
 - **Backfill de l'historique** (l'indexer ne prend que les nouveaux blocs) : `cd /root/erol-backend && npx ts-node backfill.ts`.
 
 ### 11.6 Ops — services & récap (tout sur l'EC2 `i-086e4f697fb388d91`, piloté par SSM)
-Services systemd (`Restart=always`) : `sentinel-api` (API authorize uvicorn:8080) · `sentinel-tunnel` (cloudflared named tunnel) · `erol-api` (:3002) · `erol-indexer` · `erol-frontend` (:3005) · Docker `mongo`. L'`avalanchego` tourne en nohup (`/root/ago.log`, data `/root/.avalanchego`).
-- Named tunnel `sentinel` (`/root/.cloudflared/config.yml`) route : `rpc.petroi.fr`→:8080 (API+RPC), `explorer.petroi.fr`→:3005 (explorer).
+Services systemd (`Restart=always`) : `sentinel-api` (API authorize uvicorn:8080) · `sentinel-tunnel` (cloudflared named tunnel) · `erol-api` (:3002) · `erol-indexer` · `erol-frontend` (:3005) · `sentinel-city` (UI 3D Next.js, `next start` :3006, dossier `/root/city`) · Docker `mongo`. L'`avalanchego` tourne en nohup (`/root/ago.log`, data `/root/.avalanchego`).
+- Named tunnel `sentinel` (`/root/.cloudflared/config.yml`) route : `rpc.petroi.fr`→:8080 (API+RPC), `explorer.petroi.fr`→:3005 (explorer), `city.petroi.fr`→:3006 (UI 3D).
 - Redémarrer un service : `systemctl restart <nom>` via SSM. Relire l'URL tunnel : `journalctl -u sentinel-tunnel`.
-- **URLs publiques** : API/RPC `https://rpc.petroi.fr` · Explorer `https://explorer.petroi.fr`.
+- **URLs publiques** : API/RPC `https://rpc.petroi.fr` · Explorer `https://explorer.petroi.fr` · UI 3D `https://city.petroi.fr` (mode live : `https://city.petroi.fr/?live=1`).
 - ⚠️ les creds AWS du `.env` expirent (rafraîchir depuis la page event) ; l'IP publique EC2 peut changer au reboot mais les 2 URLs petroi.fr sont stables (named tunnel).
 
 ### 11.7 Feed 3D pour Maxime (transactions = voitures)
