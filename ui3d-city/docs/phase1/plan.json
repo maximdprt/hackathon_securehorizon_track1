@@ -1,0 +1,4 @@
+{ "url": "http://localhost:3000/", "out": "docs/phase1", "width": 1920, "height": 1080, "steps": [
+  {"wait": 22000, "shot": "city_fuji"},
+  {"log": "(()=>{let n=0;return new Promise(r=>{const t=performance.now();const f=()=>{n++; if(performance.now()-t<3000) requestAnimationFrame(f); else r(Math.round(n/3))};requestAnimationFrame(f)})})()", "label": "fps"}
+]}

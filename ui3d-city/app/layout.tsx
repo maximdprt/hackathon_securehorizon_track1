@@ -1,0 +1,19 @@
+import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
+import "./global.css";
+
+export const metadata: Metadata = {
+  title: "AvaGuard+ City",
+  description: "Concept AvaGuard+ · simulation. City 3D d'après le code open source Avalanche Builder Hub (BSD-3).",
+};
+
+/* dark by default, as the demo; the City's day palette still works when the class is removed (theme button) */
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="fr" className={`dark ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+      <body className="h-full overflow-hidden font-sans antialiased">{children}</body>
+    </html>
+  );
+}

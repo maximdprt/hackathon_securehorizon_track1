@@ -1,0 +1,3 @@
+{ "url": "https://build.avax.network/explorer/fuji/chains", "out": "docs/phase1", "width": 1920, "height": 1080, "steps": [
+  {"wait": 30000, "shot": "reference_fuji"}
+]}

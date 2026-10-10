@@ -1,0 +1,1 @@
+{"url":"https://build.avax.network/api/pchain/fuji/stats","method":"GET","status":200,"contentType":"application/json","takenAt":"2026-10-10T18:29:34.312Z","body":"{\"tipHeight\":300807,\"tipTimestamp\":1791656584,\"txCount24h\":180,\"validatorCount\":60,\"delegatorCount\":31,\"l1ValidatorCount\":209,\"currentSupply\":\"387548808336031907\",\"snapshotTimestamp\":1791656496}\n"}

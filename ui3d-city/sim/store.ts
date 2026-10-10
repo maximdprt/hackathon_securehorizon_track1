@@ -1,0 +1,117 @@
+import { useSyncExternalStore } from "react";
+import type { Tone, TxEvent } from "./types";
+
+/* The simulation's state for the UI (cards, figures, alerts). It changes at step boundaries only; the per-frame
+   values (positions, sweeps, gauges) live in `motion`, which GSAP tweens and the scene reads in useFrame. */
+
+export type Phase = "idle" | "approach" | "analysis" | "allow" | "block" | "human" | "home";
+export type Leg = "approach" | "toCChain" | "uTurn" | "toScrapyard" | "toParking" | "fromParking" | "none";
+export type Panel = null | "detail" | "journal" | "registry" | "audit";
+
+export type JournalEntry = { tx_id: string; outcome: "ALLOW" | "BLOCK" | "PENDING"; via: "AvaGuard" | "humain" | "registre"; amount: number; token: string; to: string; at: string; block?: number };
+
+export type SimState = {
+  tx: TxEvent | null;
+  phase: Phase;
+  /** analysis step reached: -1 before the scan, STEPS.length once the verdict is out */
+  step: number;
+  queue: string[];
+  paused: boolean;
+  human: { tx_id: string; deadline: number } | null;
+  registry: string[];
+  blocks: { n: number; tone: Tone; tx_id: string }[];
+  journal: JournalEntry[];
+  kpi: { transactions: number; visas: number; blocked: number; protectedUsd: number; decisionMs: number; decisions: number };
+  toasts: { id: number; text: string; tone: Tone }[];
+  panel: Panel;
+  search: string;
+  mode: "demo" | "live";
+  liveStatus: string;
+  /** our street lit in green while a visa drives it to the C-Chain */
+  routeLit: boolean;
+};
+
+const initial = (): SimState => ({
+  tx: null,
+  phase: "idle",
+  step: -1,
+  queue: [],
+  paused: false,
+  human: null,
+  registry: [],
+  blocks: [],
+  journal: [],
+  kpi: { transactions: 0, visas: 0, blocked: 0, protectedUsd: 0, decisionMs: 0, decisions: 0 },
+  toasts: [],
+  panel: null,
+  search: "",
+  mode: typeof window !== "undefined" && new URLSearchParams(window.location.search).get("live") === "1" ? "live" : "demo",
+  liveStatus: "",
+  routeLit: false,
+});
+
+let state = initial();
+const subs = new Set<() => void>();
+export const sim = {
+  get: () => state,
+  set(patch: Partial<SimState> | ((s: SimState) => Partial<SimState>)) {
+    state = { ...state, ...(typeof patch === "function" ? patch(state) : patch) };
+    subs.forEach((f) => f());
+  },
+  subscribe(f: () => void) {
+    subs.add(f);
+    return () => subs.delete(f);
+  },
+  reset() {
+    const keep = { mode: state.mode, liveStatus: state.liveStatus };
+    state = { ...initial(), ...keep };
+    subs.forEach((f) => f());
+  },
+};
+
+let toastId = 0;
+export function toast(text: string, tone: Tone) {
+  const id = ++toastId;
+  sim.set((s) => ({ toasts: [...s.toasts.slice(-2), { id, text, tone }] }));
+  window.setTimeout(() => sim.set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 6500);
+}
+
+export function useSim<T>(pick: (s: SimState) => T): T {
+  return useSyncExternalStore(sim.subscribe, () => pick(state), () => pick(state));
+}
+
+/** Per-frame values, tweened by the Director and read by the scene (never React state). */
+export const motion = {
+  leg: "none" as Leg,
+  /** progress along the current leg, 0..1 */
+  u: 0,
+  visible: false,
+  tone: "verify" as Tone,
+  /** 0..1 look effects on the car */
+  xray: 0,
+  frost: 0,
+  cube: false,
+  /** the press and the dumped cube */
+  press: 0,
+  dump: 0,
+  /** toll: barrier lift 0..1, its red blink, the scanner sweep 0..1 */
+  barrier: 0,
+  blink: false,
+  scan: 0,
+  /** analysis sub-progress: 0..1 within the authority thread, the snowball waves, the registry ping, the gauge */
+  authority: 0,
+  snow: 0,
+  ping: 0,
+  gauge: 0,
+  /** decision crystals 0..1 */
+  crystals: 0,
+  registryFlash: 0,
+  /** the green route glow 0..1 */
+  glow: 0,
+  shield: 0,
+  /** parking slot taken (0..5) */
+  slot: 2,
+};
+export function resetMotion() {
+  Object.assign(motion, { leg: "none", u: 0, visible: false, tone: "verify", xray: 0, frost: 0, cube: false, press: 0, dump: 0, barrier: 0, blink: false, scan: 0, authority: 0, snow: 0, ping: 0, gauge: 0, crystals: 0, registryFlash: 0, glow: 0, shield: 0 });
+}
