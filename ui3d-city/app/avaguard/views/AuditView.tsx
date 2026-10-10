@@ -3,13 +3,13 @@
 import { useMemo } from "react";
 import { ClipboardCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAudit } from "@/data/source";
+import { LIVE_CONFIGURED, protectedOf, useAudit } from "@/data/source";
 import { openView } from "@/sim/nav";
 import { CHECK_LABEL, CHECK_ORDER, STATE, fmtAmount, type AuditTx, type CheckKey } from "@/sim/types";
 import { CARD, Kpi, LABEL, secs } from "./TransactionsView";
 import { SourceBadge } from "./ViewHost";
 
-/* The AvaGuard tower's door: the audit, for the people who answer for the guard (risk, compliance, the KPMG reviewer):
+/* The Sentinel tower's door: the audit, for the people who answer for the guard (risk, compliance, the KPMG reviewer):
    how well it detects, how fast it decides, what it protected, which check catches what, the thresholds it runs on and
    how each decision maps to DORA, MiCA, the AI Act and the NIST CSF. All computed from data/source.ts. */
 
@@ -30,7 +30,7 @@ export function AuditView() {
     const firstSeen = stopped.filter((t) => t.via !== "registre");
     const immune = stopped.filter((t) => t.via === "registre");
     const incidents = final.filter((t) => t.dora_incident);
-    const usd = stopped.filter((t) => t.amount.token === "USDC").reduce((a, t) => a + t.amount.value, 0);
+    const prot = protectedOf(final);
     const avg = (xs: AuditTx[]) => (xs.length ? xs.reduce((a, t) => a + t.timings_ms.decide, 0) / xs.length : 0);
     const byCheck = Object.fromEntries(CHECK_ORDER.map((k) => [k, firstSeen.filter((t) => lead(t) === k).length])) as Record<CheckKey, number>;
     // decisions a day, oldest first
@@ -43,7 +43,7 @@ export function AuditView() {
       else e.block++;
       days.set(d, e);
     }
-    return { final, attacks, stopped, escalated, escalatedOk, immune, incidents, usd, avgAll: avg(final), avgFirst: avg(firstSeen), avgImmune: avg(immune), byCheck, days: [...days.entries()] };
+    return { final, attacks, stopped, escalated, escalatedOk, immune, incidents, prot, avgAll: avg(final), avgFirst: avg(firstSeen), avgImmune: avg(immune), byCheck, days: [...days.entries()] };
   }, [txs, banned]);
 
   const detection = m.attacks.length ? Math.round((m.stopped.length / m.attacks.length) * 100) : 100;
@@ -58,7 +58,7 @@ export function AuditView() {
             <ClipboardCheck className="h-5 w-5" />
           </span>
           <div>
-            <h1 className="text-[20px] font-semibold text-zinc-900 dark:text-zinc-50">Audit · AvaGuard L1</h1>
+            <h1 className="text-[20px] font-semibold text-zinc-900 dark:text-zinc-50">Audit · Sentinel L1</h1>
             <p className="text-[12.5px] text-zinc-500 dark:text-zinc-400">Chaque décision a sa preuve : ce que le garde a détecté, en combien de temps, sur quels seuils, et sous quel cadre réglementaire</p>
           </div>
         </div>
@@ -68,10 +68,10 @@ export function AuditView() {
       <div className="grid grid-cols-6 gap-3">
         <Kpi label="Taux de détection" value={`${detection} %`} sub={`${m.stopped.length} attaques stoppées sur ${m.attacks.length}`} tone={STATE.allow.hex} />
         <Kpi label="Escalades humaines" value={m.escalated.length} sub={`${m.escalatedOk.length} approuvées ensuite (faux positifs probables)`} tone={STATE.human.hex} />
-        <Kpi label="Délai de décision" value={secs(m.avgAll)} sub={`1re fois ${secs(m.avgFirst)} · immunité ${secs(m.avgImmune)}`} />
+        <Kpi label="Délai de décision" value={m.avgAll ? secs(m.avgAll) : "n.p."} sub={m.avgAll ? `1re fois ${secs(m.avgFirst)} · immunité ${secs(m.avgImmune)}` : "non publié on-chain"} />
         <Kpi label="Incidents DORA" value={m.incidents.length} sub="ouverts à chaque refus" tone={STATE.block.hex} />
-        <Kpi label="Montant protégé" value={fmtAmount(m.usd)} sub="USDC refusés" />
-        <Kpi label="Preuves on-chain" value={m.final.length} sub="décisions ancrées sur AvaGuard L1" />
+        <Kpi label="Montant protégé" value={fmtAmount(m.prot.value)} sub={`${m.prot.token} refusés`} />
+        <Kpi label="Preuves on-chain" value={m.final.filter((t) => t.source === "live").length || m.final.length} sub={LIVE_CONFIGURED ? "décisions lues sur Sentinel L1" : "décisions ancrées (simulé)"} />
       </div>
 
       <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4">

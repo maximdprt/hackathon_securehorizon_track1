@@ -24,11 +24,11 @@ async function knock(page: Page, door: string) {
 
 const DOORS: { door: string; view: string; filter?: string; heading: RegExp }[] = [
   { door: "hub", view: "transactions", heading: /Transactions · C-Chain/ },
-  { door: "registry", view: "registry", heading: /Registre des hackers · AvaGuard L1/ },
+  { door: "registry", view: "registry", heading: /Registre des hackers · Sentinel L1/ },
   { door: "parking", view: "parking", heading: /Validation humaine/ },
   { door: "scrapyard", view: "transactions", filter: "BLOCK", heading: /Transactions · C-Chain/ },
   { door: "proof", view: "transactions", filter: "proof", heading: /Transactions · C-Chain/ },
-  { door: "hq", view: "audit", heading: /Audit · AvaGuard L1/ },
+  { door: "hq", view: "audit", heading: /Audit · Sentinel L1/ },
 ];
 
 test("each building opens its screen, Escape returns to the city", async ({ page }) => {

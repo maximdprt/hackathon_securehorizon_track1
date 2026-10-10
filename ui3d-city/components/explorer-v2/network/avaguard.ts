@@ -2,11 +2,14 @@
 // its id, name, logo and validators, its route to the C-Chain, and the flows we simulate when the network has none.
 import type { MapChain } from "@/components/explorer-v2/network/city-data";
 
-/** demo id until Walid's L1 has its chain ID; set NEXT_PUBLIC_AVAGUARD_CHAIN_ID to the real one */
-export const AVAGUARD_ID = process.env.NEXT_PUBLIC_AVAGUARD_CHAIN_ID || "avaguard-l1";
-export const AVAGUARD_NAME = "AvaGuard L1";
-/** a hackathon L1's validator set */
-export const AVAGUARD_VALIDATORS = 5;
+/** SentinelL1, live on Fuji (CLAUDE.md 11.1): its blockchain and its subnet, as the P-Chain and the L1 registry know them.
+    The registry's own row for it (a Frontier guest) gives way to our HQ in the Security ward (city-data.ts). */
+export const AVAGUARD_ID = process.env.NEXT_PUBLIC_AVAGUARD_CHAIN_ID || "2PqooUD2u82cQVbEHUfSnK5GTnRfUg17d8RUuccc97y27NkZhd";
+export const SENTINEL_SUBNET = "jUCDvuYEuP16TFpxjanBQt6JiedTDUBanrYTBjThmdmfw8PxH";
+export const SENTINEL_EVM_CHAIN_ID = 99999;
+export const AVAGUARD_NAME = "Sentinel L1";
+/** its validator set today: one node (NodeID-5dd7CBhH8UDU3QCUbSWBFSckXZrC4mHi9) */
+export const AVAGUARD_VALIDATORS = 1;
 /** our HQ is a skyline landmark whatever its validator count, so it reads from the home view */
 export const AVAGUARD_MIN_H = 104;
 /** the room our ward claims on the circle, in lots' worth: the toll, the parking and the scrapyard stand on it */

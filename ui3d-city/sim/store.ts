@@ -11,7 +11,7 @@ export type Panel = null | "detail" | "journal" | "registry" | "audit";
 export type View = null | "transactions" | "registry" | "parking" | "audit";
 export type ViewFilter = "all" | "ALLOW" | "BLOCK" | "HUMAN" | "PENDING" | "proof";
 
-export type JournalEntry = { tx_id: string; outcome: "ALLOW" | "BLOCK" | "PENDING"; via: "AvaGuard" | "humain" | "registre"; amount: number; token: string; to: string; at: string; block?: number };
+export type JournalEntry = { tx_id: string; outcome: "ALLOW" | "BLOCK" | "PENDING"; via: "Sentinel" | "humain" | "registre"; amount: number; token: string; to: string; at: string; block?: number };
 
 export type SimState = {
   tx: TxEvent | null;

@@ -36,7 +36,7 @@ export function AnalysisCard() {
   const tone = tx ? (done || step >= 6 ? STATE[toneOf(tx.decision)].hex : STATE.verify.hex) : STATE.verify.hex;
   return (
     <aside
-      aria-label="Analyse AvaGuard"
+      aria-label="Analyse Sentinel"
       inert={!open || undefined}
       className={cn(PANE, "right-(--frame) border-l-4", open ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-6 opacity-0")}
       style={{ width: PANEL_W, borderLeftColor: tone }}
@@ -45,7 +45,7 @@ export function AnalysisCard() {
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="flex items-start justify-between gap-3 border-b border-zinc-100 px-4 py-3 dark:border-zinc-900">
             <div>
-              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">AvaGuard · Analyse</div>
+              <div className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500">Sentinel · Analyse</div>
               <div className="font-mono text-[15px] font-semibold text-zinc-900 dark:text-zinc-50">{tx.tx_id}</div>
             </div>
             <div className="flex flex-col items-end gap-1">

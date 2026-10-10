@@ -28,7 +28,7 @@ import { RegistryView } from "./views/RegistryView";
 import { ParkingView } from "./views/ParkingView";
 import { AuditView } from "./views/AuditView";
 import { ChainSheet } from "./ui/ChainSheet";
-import { useAudit } from "@/data/source";
+import { LIVE_CONFIGURED, protectedOf, useAudit } from "@/data/source";
 import { StateIcon } from "./ui/charts";
 
 /* The page around the City, rebuilt after builders-hub's NetworkChains.tsx, city-app.tsx and city-frame.tsx (their
@@ -76,7 +76,7 @@ const CARD = "absolute inset-0 -z-10 rounded-2xl border border-zinc-200/90 bg-wh
 const SEG_ON = "flex items-center rounded-xl bg-zinc-100 px-3 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50";
 const SEG_OFF = "flex items-center rounded-xl px-3 text-zinc-400 dark:text-zinc-600";
 
-/** the site's navbar replaced by ours: the shield and AvaGuard+, our tabs, the search, the theme, the badge */
+/** the site's navbar replaced by ours: the shield and Sentinel, our tabs, the search, the theme, the badge */
 function TopBar({ view, onSearch }: { view: View; onSearch: () => void }) {
   const [dark, setDark] = useState(true);
   useEffect(() => setDark(document.documentElement.classList.contains("dark")), []);
@@ -94,7 +94,7 @@ function TopBar({ view, onSearch }: { view: View; onSearch: () => void }) {
           <path d="M13 2 L23 6 V13 C23 18.5 18.8 22.6 13 24 C7.2 22.6 3 18.5 3 13 V6 Z" fill="none" stroke="#3FD08F" strokeWidth="2.2" strokeLinejoin="round" />
           <path d="M8.5 13.2 L11.8 16.4 L17.6 10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
-        <span className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-50">AvaGuard+</span>
+        <span className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-50">Sentinel</span>
       </div>
       <nav aria-label="Sections" className="absolute left-1/2 flex -translate-x-1/2 items-center gap-6">
         {tabs.map((t) => {
@@ -124,7 +124,7 @@ function TopBar({ view, onSearch }: { view: View; onSearch: () => void }) {
         >
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
-        <span className="rounded-md border border-[#F2B33D]/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[#F2B33D]">Concept AvaGuard+ · simulation</span>
+        <span className="rounded-md border border-[#F2B33D]/50 px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-[#F2B33D]">Concept Sentinel · simulation</span>
       </div>
     </header>
   );
@@ -162,7 +162,7 @@ export default function CityShell() {
   const mode = useSim((s) => s.mode);
   const liveStatus = useSim((s) => s.liveStatus);
 
-  // the C-Chain's tower opens the transactions it settles, AvaGuard's tower the audit; any other tower stays the City's
+  // the C-Chain's tower opens the transactions it settles, Sentinel's tower the audit; any other tower stays the City's
   const hubId = data.hubId;
   const onSelect = useCallback(
     (id: string | null) => {
@@ -211,7 +211,7 @@ export default function CityShell() {
     return { chains: sets.length, validators: sets.reduce((a, n) => a + (n.validators ?? 0), 0), icm: realIcm };
   }, [data]);
   const day = takenAt ? new Date(takenAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "…";
-  // the strip's AvaGuard figures and the risk chip, from the same source as the screens (history plus this session)
+  // the strip's Sentinel figures and the risk chip, from the same source as the screens (history plus this session)
   const audit = useAudit();
   const avgRisk = useMemo(() => (audit.txs.length ? Math.round(audit.txs.reduce((a, t) => a + t.score, 0) / audit.txs.length) : null), [audit.txs]);
   const pending = human ? 1 : 0;
@@ -222,7 +222,7 @@ export default function CityShell() {
       total: t.length,
       visas: t.filter((x) => x.status === "ALLOW").length,
       blocked: t.filter((x) => x.status === "BLOCK").length,
-      usd: t.filter((x) => x.status === "BLOCK" && x.amount.token === "USDC").reduce((a, x) => a + x.amount.value, 0),
+      prot: protectedOf(t),
       avg: final.length ? final.reduce((a, x) => a + x.timings_ms.decide, 0) / final.length : 0,
     };
   }, [audit.txs]);
@@ -402,7 +402,7 @@ export default function CityShell() {
         {/* the key in the bottom left corner (city-key.tsx), and ours above it */}
         <div data-city-hud className="absolute bottom-[calc(var(--frame)+1.4rem)] left-(--frame) z-30 hidden flex-col gap-2 xl:flex" style={{ width: KEY_W }}>
           <div className={cn("rounded-2xl px-4 py-3", GLASS)}>
-            <div className="mb-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">AvaGuard</div>
+            <div className="mb-1.5 font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">Sentinel</div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               {(["verify", "allow", "block", "human"] as const).map((t) => (
                 <span key={t} className="flex items-center gap-1.5 text-[11.5px] text-zinc-700 dark:text-zinc-300">
@@ -442,13 +442,13 @@ export default function CityShell() {
             <Figure label="Chains" value={figures.chains.toLocaleString("fr-FR")} sub={`Fuji · instantané ${day}`} />
             <Figure label="Validators" value={fmtCompact(figures.validators)} sub="réels" />
             <Figure label="ICM · 24H" value={fmtCompact(figures.icm)} sub={data.icmSimulated ? "rues : trafic simulé" : "réels"} />
-            <Figure label="Transactions" value={stats.total} sub={kpi.transactions ? `dont ${kpi.transactions} ici · simulé` : "simulé"} />
+            <Figure label="Transactions" value={stats.total} sub={LIVE_CONFIGURED ? (audit.source.connected ? "Sentinel L1 · on-chain" : "Sentinel L1 injoignable") : kpi.transactions ? `dont ${kpi.transactions} ici · simulé` : "simulé"} />
             <Figure label="Visas" value={stats.visas} sub="émis" tone={STATE.allow.hex} />
             <Figure label="Bloquées" value={stats.blocked} sub="refusées" tone={STATE.block.hex} />
             <Figure label="En attente" value={pending} sub="humain" tone={STATE.human.hex} />
             <Figure label="Registre" value={audit.banned.length} sub="adresses" />
-            <Figure label="Protégé" value={fmtAmount(stats.usd)} sub="USDC" />
-            <Figure label="Décision" value={stats.avg ? `${(stats.avg / 1000).toFixed(1).replace(".", ",")} s` : "0 s"} sub="moyenne" />
+            <Figure label="Protégé" value={fmtAmount(stats.prot.value)} sub={stats.prot.token} />
+            <Figure label="Décision" value={stats.avg ? `${(stats.avg / 1000).toFixed(1).replace(".", ",")} s` : "n.p."} sub={stats.avg ? "moyenne" : "non publié on-chain"} />
           </FigureStrip>
         </div>
 
@@ -464,7 +464,7 @@ export default function CityShell() {
         </button>}
 
         {/* the licence's mention, as the prompt asks */}
-        <p className="pointer-events-none absolute inset-x-0 bottom-1 z-10 text-center font-mono text-[9.5px] text-zinc-500 dark:text-zinc-500">City 3D d&apos;après le code open source Avalanche Builder Hub (BSD-3) · Concept AvaGuard+ · simulation</p>
+        <p className="pointer-events-none absolute inset-x-0 bottom-1 z-10 text-center font-mono text-[9.5px] text-zinc-500 dark:text-zinc-500">City 3D d&apos;après le code open source Avalanche Builder Hub (BSD-3) · Concept Sentinel · simulation</p>
       </div>
     </div>
   );

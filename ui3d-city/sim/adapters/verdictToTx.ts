@@ -46,12 +46,15 @@ export function verdictToTx(v: AgenticPaymentVerdict, ctx: VerdictContext = {}):
   const authorized = auth.authorized !== false;
   const within = auth.within_limit !== false;
   const flagged = !!v.onchain_flagged;
-  const token: "USDC" | "AVAX" = (v.currency ?? "USDC").toUpperCase() === "AVAX" ? "AVAX" : "USDC";
+  const cur = (v.currency ?? "USDC").toUpperCase();
+  const token: TxEvent["amount"]["token"] = cur === "AVAX" ? "AVAX" : cur === "SEC" ? "SEC" : "USDC";
   const evidence = Array.isArray(poison.evidence) ? poison.evidence : poison.evidence ? [String(poison.evidence)] : [];
-  const id = String(v.instruction_id ?? "").replace(/[^0-9a-z]/gi, "").slice(-4) || String(Date.now() % 10000);
+  // a payment id from SentinelL1 (0x + 64 hex) names the row as the chain's read does (data/sentinel.ts idOfPayment)
+  const pid = String(v.instruction_id ?? "");
+  const id = /^0x[0-9a-f]{64}$/i.test(pid) ? null : pid.replace(/[^0-9a-z]/gi, "").slice(-4) || String(Date.now() % 10000);
   const line = `${v.action}(${v.recipient ?? "?"}, ${v.amount} ${token})`;
   return {
-    tx_id: `tx_${id}`,
+    tx_id: id === null ? pid.slice(0, 10) : `tx_${id}`,
     created_at: v.timestamp ?? new Date().toISOString(),
     use_case: ctx.use_case ?? (v.action === "swap" ? "agent_to_agent" : "shopping"),
     from: { agent_id: ctx.issuer_label ?? v.issuer, address: v.issuer },

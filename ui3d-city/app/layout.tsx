@@ -5,8 +5,8 @@ import { GeistMono } from "geist/font/mono";
 import "./global.css";
 
 export const metadata: Metadata = {
-  title: "AvaGuard+ City",
-  description: "Concept AvaGuard+ · simulation. City 3D d'après le code open source Avalanche Builder Hub (BSD-3).",
+  title: "Sentinel City",
+  description: "Concept Sentinel · simulation. City 3D d'après le code open source Avalanche Builder Hub (BSD-3).",
 };
 
 /* dark by default, as the demo; the City's day palette still works when the class is removed (theme button) */

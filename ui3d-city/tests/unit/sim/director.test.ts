@@ -36,7 +36,7 @@ describe('the Director', () => {
   it('gives the legitimate payment its visa', async () => {
     playScene('legit');
     await until(() => entry('tx_0043')?.outcome === 'ALLOW');
-    expect(entry('tx_0043')?.via).toBe('AvaGuard');
+    expect(entry('tx_0043')?.via).toBe('Sentinel');
   });
 
   it('parks the doubtful one until a human approves it', async () => {

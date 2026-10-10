@@ -3,13 +3,13 @@
 import { useMemo, useState } from "react";
 import { Download, Search, ShieldBan, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAudit, type BannedEntry } from "@/data/source";
+import { LIVE_CONFIGURED, useAudit, type BannedEntry } from "@/data/source";
 import { openView } from "@/sim/nav";
 import { STATE, fmtAmount, shortAddr } from "@/sim/types";
-import { CARD, CopyButton, Kpi, LABEL, StatusPill, when } from "./TransactionsView";
+import { CARD, CopyButton, ExplorerLink, Kpi, LABEL, StatusPill, when } from "./TransactionsView";
 import { SourceBadge } from "./ViewHost";
 
-/* The red container's door: the hackers' registry on AvaGuard L1. Every address a refusal banned, its key's
+/* The red container's door: the hackers' registry on Sentinel L1. Every address a refusal banned, its key's
    fingerprint, why, what was tried against it and how often, and the on-chain record. A payment to any of them is
    refused at once, without analysis: the immunity the second agent gets. Derived from the refusals (data/source.ts). */
 
@@ -25,7 +25,7 @@ function csvOf(rows: BannedEntry[]) {
 export function RegistryView() {
   const { banned, txs } = useAudit();
   const [q, setQ] = useState("");
-  const [by, setBy] = useState<"all" | "AvaGuard" | "humain">("all");
+  const [by, setBy] = useState<"all" | "Sentinel" | "humain">("all");
   const [open, setOpen] = useState<string | null>(null);
 
   const rows = useMemo(() => {
@@ -34,6 +34,7 @@ export function RegistryView() {
   }, [banned, q, by]);
   const immune = banned.reduce((a, b) => a + b.hits - 1, 0);
   const tried = banned.filter((b) => b.attempted.token === "USDC").reduce((a, b) => a + b.attempted.value, 0);
+  const onChain = LIVE_CONFIGURED && banned.some((b) => b.attempted.value === 0);
   const current = open ? banned.find((b) => b.address === open) ?? null : null;
   const now = Date.now();
 
@@ -53,7 +54,7 @@ export function RegistryView() {
               <ShieldBan className="h-5 w-5" />
             </span>
             <div>
-              <h1 className="text-[20px] font-semibold text-zinc-900 dark:text-zinc-50">Registre des hackers · AvaGuard L1</h1>
+              <h1 className="text-[20px] font-semibold text-zinc-900 dark:text-zinc-50">Registre des hackers · Sentinel L1</h1>
               <p className="text-[12.5px] text-zinc-500 dark:text-zinc-400">Adresses et clés bannies : tout paiement vers elles est refusé sans analyse (immunité)</p>
             </div>
           </div>
@@ -63,7 +64,7 @@ export function RegistryView() {
         <div className="grid grid-cols-4 gap-3">
           <Kpi label="Adresses bannies" value={banned.length} sub={`${banned.filter((b) => b.by === "humain").length} par un humain`} tone={STATE.block.hex} />
           <Kpi label="Refus par immunité" value={immune} sub="tentatives répétées, refusées en 0,3 s" />
-          <Kpi label="Montant tenté" value={fmtAmount(tried)} sub="USDC, toutes tentatives" />
+          <Kpi label="Montant tenté" value={tried || !onChain ? fmtAmount(tried) : "n.p."} sub={tried || !onChain ? "USDC, toutes tentatives" : "non publié par ThreatFlagged"} />
           <Kpi label="Dernière entrée" value={banned[0] ? shortAddr(banned[0].address) : "…"} sub={banned[0] ? when(banned[0].last_at) : "aucune"} />
         </div>
 
@@ -77,7 +78,7 @@ export function RegistryView() {
             {(
               [
                 ["all", "Tous"],
-                ["AvaGuard", "Par AvaGuard"],
+                ["Sentinel", "Par Sentinel"],
                 ["humain", "Par un humain"],
               ] as const
             ).map(([k, label]) => (
@@ -129,14 +130,24 @@ export function RegistryView() {
                     </td>
                     <td className="max-w-[18rem] truncate px-3 text-zinc-600 dark:text-zinc-400">{b.reason}</td>
                     <td className="px-3 text-right font-mono tabular-nums text-zinc-900 dark:text-zinc-100">
-                      {fmtAmount(b.attempted.value)} <span className="text-zinc-500">{b.attempted.token}</span>
+                      {b.attempted.value ? (
+                        <>
+                          {fmtAmount(b.attempted.value)} <span className="text-zinc-500">{b.attempted.token}</span>
+                        </>
+                      ) : (
+                        <span className="text-zinc-400">…</span>
+                      )}
                     </td>
                     <td className="px-3 text-right font-mono tabular-nums" style={{ color: b.hits > 1 ? STATE.block.hex : undefined }}>
                       {b.hits}
                     </td>
                     <td className="px-3 font-mono text-[11.5px] text-zinc-500">{when(b.banned_at)}</td>
                     <td className="px-3 text-zinc-600 dark:text-zinc-400">{b.by}</td>
-                    <td className="px-3 font-mono text-[11.5px] text-zinc-500">#{b.onchain.block.toLocaleString("fr-FR")}</td>
+                    <td className="px-3 text-[11.5px] text-zinc-500">
+                      <ExplorerLink kind="tx" id={b.onchain.tx_hash} live={LIVE_CONFIGURED && b.attempted.value === 0}>
+                        #{b.onchain.block.toLocaleString("fr-FR")}
+                      </ExplorerLink>
+                    </td>
                   </tr>
                 );
               })}
@@ -144,7 +155,7 @@ export function RegistryView() {
           </table>
           {rows.length === 0 && <p className="py-16 text-center font-mono text-[12px] text-zinc-400">Aucune adresse ne correspond</p>}
         </div>
-        <p className="font-mono text-[10.5px] text-zinc-400">{rows.length} adresses · les empreintes de clé et les adresses sont fictives · Données synthétiques</p>
+        <p className="font-mono text-[10.5px] text-zinc-400">{rows.length} adresses · {LIVE_CONFIGURED ? "lues sur Sentinel L1 (AuthorityRegistry.ThreatFlagged), lignes de démo simulées" : "les empreintes de clé et les adresses sont fictives · Données synthétiques"}</p>
       </div>
 
       {current && (

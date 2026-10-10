@@ -7,7 +7,7 @@
 import { useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { Color, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial, Vector3 } from "three";
+import { Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial, Vector3 } from "three";
 import { cn } from "@/lib/utils";
 import { motion, useSim } from "@/sim/store";
 import { HALO } from "./Labels";
@@ -57,10 +57,11 @@ export function Block({ w, h, d, x = 0, y0 = 0, z = 0, mat }: { w: number; h: nu
 export function Toll({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const { p, yaw, span } = geo.toll;
   const S = geo.S;
-  const H = Math.max(S * 0.85, geo.carW * 2.6);
-  const post = Math.max(1, S * 0.07);
+  // SENTINEL (from the deployed sentinel-city-3d): a bigger gantry, the car stopped centred under it
+  const H = Math.max(S * 1.25, geo.carW * 3.2);
+  const post = Math.max(1.4, S * 0.09);
   const mats = useMemo(
-    () => ({ frame: lambert(AVAGUARD3.gate[theme]), wall: lambert(MASS3.wall[theme]), band: basic(AVAGUARD3.band[theme]), red: lambert(AVAGUARD3.barrier[theme]), white: lambert("#F4F6F9"), scan: new MeshBasicMaterial({ color: AVAGUARD3.verify[theme], transparent: true, opacity: 0.35, depthWrite: false, toneMapped: false }), floor: new MeshBasicMaterial({ color: AVAGUARD3.verify[theme], transparent: true, opacity: 0.25, depthWrite: false, toneMapped: false }) }),
+    () => ({ frame: lambert(AVAGUARD3.gate[theme]), wall: lambert(MASS3.wall[theme]), band: basic(AVAGUARD3.band[theme]), red: lambert(AVAGUARD3.barrier[theme]), white: lambert("#F4F6F9"), scan: new MeshBasicMaterial({ color: AVAGUARD3.verify[theme], transparent: true, opacity: 0.6, depthWrite: false, toneMapped: false, side: DoubleSide }), floor: new MeshBasicMaterial({ color: AVAGUARD3.verify[theme], transparent: true, opacity: 0.25, depthWrite: false, toneMapped: false, side: DoubleSide }) }),
     [theme],
   );
   const arm = useRef<Group>(null);
@@ -76,7 +77,8 @@ export function Toll({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
     const on = motion.scan > 0 && motion.scan < 1;
     if (curtain.current) {
       curtain.current.visible = on;
-      curtain.current.position.x = -span * 0.35 + (0.5 - motion.scan) * geo.carL * 1.3 - geo.carL * 0.9;
+      // the light curtain sweeps the car from nose to tail, the car stopped centred under the gantry
+      curtain.current.position.x = (0.5 - motion.scan) * geo.carL * 1.15;
     }
     if (floor.current) (floor.current.material as MeshBasicMaterial).opacity = on ? 0.45 + 0.2 * Math.sin(clock.elapsedTime * 20) : 0.18;
   });
@@ -97,14 +99,14 @@ export function Toll({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
         ))}
       </group>
       {/* the floor scanner, and its light curtain */}
-      <mesh ref={floor} position={[-geo.carL * 0.9, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.floor}>
+      <mesh ref={floor} position={[0, 0.08, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.floor}>
         <planeGeometry args={[geo.carL * 1.4, span * 0.8]} />
       </mesh>
-      <mesh ref={curtain} position={[0, H * 0.45, 0]} rotation={[0, Math.PI / 2, 0]} material={mats.scan} visible={false}>
-        <planeGeometry args={[span * 0.85, H * 0.9]} />
+      <mesh ref={curtain} position={[0, H * 0.48, 0]} material={mats.scan} visible={false}>
+        <boxGeometry args={[Math.max(0.5, geo.carL * 0.1), H * 0.92, span * 0.95]} />
       </mesh>
       <Word at={[0, H + post * 3.4, 0]} tone={AVAGUARD3.band[theme]} small>
-        Contrôle AvaGuard+
+        Contrôle Sentinel
       </Word>
     </group>
   );

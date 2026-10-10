@@ -1,10 +1,10 @@
-# AvaGuard+ City
+# Sentinel City
 
 La City 3D de l'explorer Avalanche Builder Hub (code open source, BSD-3), reprise telle quelle, avec un quartier
-**Security** où vit **AvaGuard L1** : un péage qui analyse chaque paiement d'agent IA, un parking de validation humaine,
+**Security** où vit **Sentinel L1** : un péage qui analyse chaque paiement d'agent IA, un parking de validation humaine,
 une déchetterie avec le registre des hackers, et une colonne de preuves on-chain.
 
-> City 3D d'après le code open source Avalanche Builder Hub (BSD-3) · Concept AvaGuard+ · simulation.
+> City 3D d'après le code open source Avalanche Builder Hub (BSD-3) · Concept Sentinel · simulation.
 > Ce projet n'est ni affilié ni approuvé par Ava Labs. Licence d'origine : `LICENSES/builders-hub-LICENSE`.
 
 ## Lancer
@@ -46,38 +46,35 @@ l'URL suit (`?view=transactions&tx=tx_0042`), `Échap` ou Précédent ramène à
 | Péage | Transactions, ouvert sur la transaction en cours |
 | Déchetterie | Transactions filtrées « Bloquées » |
 | Colonne de preuves | Transactions filtrées « Preuve on-chain » |
-| Tour AvaGuard L1 | **Audit** : détection, escalades, délais, incidents DORA, contrôle décisif, seuils, conformité |
+| Tour Sentinel L1 | **Audit** : détection, escalades, délais, incidents DORA, contrôle décisif, seuils, conformité |
 | La voiture | Transactions, ouvert sur sa transaction |
 | Toute autre tour | Vol caméra de la City et fiche de la chaîne |
 
 Les écrans lisent une seule source (`data/source.ts`) : historique synthétique plus transactions jouées. Pour le MCP
 agent : `NEXT_PUBLIC_AVAGUARD_MCP_URL` dans `.env.local` (`GET /transactions` au format `verdict.schema.json`).
 
-## Mode live
+## Branché sur SentinelL1 (le modèle de main)
 
-Copier les variables dans `.env.local` (jamais commité), puis ouvrir `http://localhost:3000/?live=1`.
+La ville lit la vraie chaîne de l'équipe via l'API de `main` (`api/server.py`, voir CLAUDE.md 11.3 à 11.7) :
 
-```
-NEXT_PUBLIC_AVAGUARD_SSE_URL=http://localhost:8787/events     # verdicts de l'API (ou _WS_URL)
-NEXT_PUBLIC_AVAGUARD_RPC_URL=...                               # RPC de la L1 (lecture seule)
-NEXT_PUBLIC_AVAGUARD_REGISTRY_ADDRESS=0x...                    # contrat DecisionRecorded(...)
-NEXT_PUBLIC_AVAGUARD_CHAIN_ID=avaguard-l1
-```
+- **Écrans** (Transactions, Registre, Validation, Audit) : `GET /cars` (chaque `DecisionRecorded` de
+  `AuthorityRegistry`, avec le destinataire et le montant du `VisaGranted`) et `eth_getLogs ThreatFlagged` via
+  `POST /rpc` (le registre des hackers on-chain). Mise à jour toutes les 3 s, liens vers l'explorer SentinelScan.
+- **Tour du quartier Security** : la vraie SentinelL1 de Fuji (blockchainId `2Pqoo…NkZhd`, 1 validateur).
+- **Voitures en direct** (`?live=1`) : le flux `GET /avaguard/events` (`{verdict, context, proof}`) fait jouer chaque
+  décision dans la ville ; l'événement `DecisionRecorded(bytes32 paymentId, address issuer, string verdict, string reason)`
+  donne la preuve. Un verdict reçu et sa ligne on-chain sont réunis par leur `paymentId`.
+- La chaîne publie le verdict, la raison et la preuve, pas les scores des 5 contrôles : l'écran le dit
+  (« verdict seul ») au lieu d'inventer des scores. Les touches 1 à 4 restent des démos, marquées « démo ».
 
-En attendant l'API de l'équipe, `tools/live_bridge.py` fait tourner le vrai `detection/scorer.py` et diffuse ses
-verdicts en SSE :
-
-```bash
-python tools/live_bridge.py --repo ..      # puis GET /demo?case=poisoned ou POST /score
-```
-
-Aucune clé privée côté front ; les identifiants AWS restent dans le `.env` du repo, lu par le bridge seulement.
+Configuration : copier `.env.example` en `.env.local` (jamais commité) et y mettre les URLs du CLAUDE.md.
+Sans `NEXT_PUBLIC_SENTINEL_API`, tout tourne sur la simulation locale.
 
 ## Structure
 
 - `components/explorer-v2/**`, `lib/**`, `types/**` : code extrait de builders-hub (liste dans `VENDORED.md`). Chaque
   modification locale est marquée `// AVAGUARD:`.
-- `components/explorer-v2/network/avaguard.ts` : la chaîne AvaGuard L1, son district, ses flux ICM simulés.
+- `components/explorer-v2/network/avaguard.ts` : la chaîne Sentinel L1, son district, ses flux ICM simulés.
 - `components/explorer-v2/network/city3d/guardGeo.ts`, `Parcel.tsx`, `HumanLot.tsx`, `GuardCar.tsx`, `Door.tsx`,
   `AvaGuardRun.tsx` : la parcelle (péage, parking clos, déchetterie, registre, preuves), la voiture (le module de la
   flotte builders-hub), les portes cliquables, l'analyse au péage.
@@ -100,4 +97,4 @@ node tools/capture.mjs <plan.json>   # captures et images pour GIF via Chrome he
 
 Les chiffres Chains, Validators et ICM·24H sont réels et datés (instantané Fuji). Le flux ICM de Fuji étant vide au
 moment de l'instantané, le trafic des rues est simulé et signalé comme tel (« ICM traffic · 24H · simulé »). Tout ce qui
-concerne AvaGuard (transactions, visas, registre, montants) est simulé.
+concerne Sentinel (transactions, visas, registre, montants) est simulé.

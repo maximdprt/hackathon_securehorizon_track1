@@ -1,13 +1,13 @@
 import { useSyncExternalStore } from "react";
-import { verdictToTx, isVerdict } from "@/sim/adapters/verdictToTx";
 import { sim } from "@/sim/store";
 import type { AuditTx } from "@/sim/types";
 import { HISTORY } from "./history";
+import { createSentinelFeed, sentinelConfig } from "./sentinel";
 
-/* The one data layer the audit screens read (Transactions, Registre, Validation humaine, Audit). Today it is the local
-   simulation: the synthetic history plus every transaction played in the city. Tomorrow it is the MCP agent: set
-   NEXT_PUBLIC_AVAGUARD_MCP_URL and mcpSource reads its /transactions (verdicts in the team's schema), nothing else in
-   the UI changes. */
+/* The one data layer the audit screens read (Transactions, Registre, Validation humaine, Audit). With the team's API
+   configured (NEXT_PUBLIC_SENTINEL_API, main's api/server.py) it is SentinelL1 itself: the decisions the brain sent to
+   /authorize, as AuthorityRegistry recorded them, and its ThreatFlagged registry (data/sentinel.ts). Without it, the
+   local simulation: a synthetic history plus every transaction played in the city. Nothing else in the UI changes. */
 
 export type BannedEntry = {
   address: string;
@@ -21,7 +21,7 @@ export type BannedEntry = {
   attempted: { value: number; token: string };
   hits: number;
   banned_at: string;
-  by: "AvaGuard" | "humain";
+  by: "Sentinel" | "humain";
   onchain: { block: number; tx_hash: string };
   /** the latest attempt, to flash a fresh entry */
   last_at: string;
@@ -29,9 +29,20 @@ export type BannedEntry = {
 
 export interface AuditSource {
   name: string;
+  /** the chain itself, not the simulation */
+  live?: boolean;
   connected: boolean;
   transactions(): AuditTx[];
+  /** the registry, when the source holds its own (the chain's ThreatFlagged); else it is derived from the refusals */
+  banned?(): BannedEntry[];
   subscribe(f: () => void): () => void;
+}
+
+/** what the refusals kept from leaving: in USDC for the demo's agents, in SEC (SentinelL1's token) for the chain's */
+export function protectedOf(txs: AuditTx[]): { value: number; token: string } {
+  const sum = (token: string) => txs.filter((t) => t.status === "BLOCK" && t.amount.token === token).reduce((a, t) => a + t.amount.value, 0);
+  const usdc = sum("USDC");
+  return usdc > 0 || !LIVE_CONFIGURED ? { value: usdc, token: "USDC" } : { value: sum("SEC"), token: "SEC" };
 }
 
 /** the registry, derived from the refusals: one entry an address, its first refusal bans it, each later one is a hit */
@@ -58,7 +69,7 @@ export function bannedOf(txs: AuditTx[]): BannedEntry[] {
       attempted: { ...t.amount },
       hits: 1,
       banned_at: t.decided_at ?? t.created_at,
-      by: t.via === "humain" ? "humain" : "AvaGuard",
+      by: t.via === "humain" ? "humain" : "Sentinel",
       onchain: { block: t.onchain?.block ?? 0, tx_hash: t.onchain?.tx_hash ?? "0x" },
       last_at: t.decided_at ?? t.created_at,
     });
@@ -80,56 +91,69 @@ export const simSource: AuditSource = {
   subscribe: (f) => sim.subscribe(f),
 };
 
-/** the MCP agent's feed, polled every 4 s once its URL is set; inert without it */
-function mcpSourceOf(url: string): AuditSource {
-  let txs: AuditTx[] = [];
-  let ok = false;
+/** SentinelL1 live (data/sentinel.ts): the chain's decisions and flags, with the city's own plays (the verdict stream's
+    and the demo's) in front, whole; a decision the city played and the chain recorded shows once, with the chain's proof */
+function sentinelSourceOf(): AuditSource {
   const subs = new Set<() => void>();
-  let timer: number | null = null;
-  const pull = async () => {
-    try {
-      const res = await fetch(`${url.replace(/\/$/, "")}/transactions`);
-      const body: unknown = await res.json();
-      const list = Array.isArray(body) ? body : [];
-      txs = list.flatMap((v: unknown) => {
-        if (!isVerdict(v)) return [];
-        const t = verdictToTx(v);
-        return [{ ...t, status: t.decision === "HUMAN" ? "HUMAN" : t.decision, via: "AvaGuard", decided_at: t.created_at } as AuditTx];
-      });
-      ok = true;
-    } catch {
-      ok = false;
-    }
+  let version = 0;
+  const bump = () => {
+    version++;
     subs.forEach((f) => f());
   };
+  const feed = createSentinelFeed(bump);
+  if (typeof window !== "undefined") (window as unknown as { __sentinel?: unknown }).__sentinel = feed;
+  let cache: { v: number; ledger: AuditTx[]; txs: AuditTx[]; banned: BannedEntry[] } | null = null;
+  const build = () => {
+    const ledger = sim.get().ledger;
+    if (cache && cache.v === version && cache.ledger === ledger) return cache;
+    const chain = feed.transactions();
+    const byId = new Map(chain.map((t) => [t.tx_id, t]));
+    const played = ledger.map((l) => {
+      const c = byId.get(l.tx_id);
+      return c ? { ...l, onchain: c.onchain, partial: false } : l;
+    });
+    const seen = new Set(played.map((t) => t.tx_id));
+    const txs = [...played, ...chain.filter((t) => !seen.has(t.tx_id))];
+    const onChain = feed.banned();
+    const flagged = new Set(onChain.map((b) => b.address.toLowerCase()));
+    const banned = [...onChain, ...bannedOf(played).filter((b) => !flagged.has(b.address.toLowerCase()))];
+    cache = { v: version, ledger, txs, banned };
+    return cache;
+  };
   return {
-    name: "MCP agent",
+    name: "Sentinel L1 (on-chain)",
+    live: true,
     get connected() {
-      return ok;
+      return feed.ok;
     },
-    transactions: () => txs,
+    transactions: () => build().txs,
+    banned: () => build().banned,
     subscribe(f) {
       subs.add(f);
-      if (subs.size === 1) {
-        void pull();
-        timer = window.setInterval(pull, 4000);
-      }
+      const off = sim.subscribe(f);
+      if (subs.size === 1) feed.start();
       return () => {
+        off();
         subs.delete(f);
-        if (!subs.size && timer !== null) window.clearInterval(timer);
+        if (!subs.size) feed.stop();
       };
     },
   };
 }
 
-const MCP_URL = process.env.NEXT_PUBLIC_AVAGUARD_MCP_URL;
-export const source: AuditSource = MCP_URL ? mcpSourceOf(MCP_URL) : simSource;
-export const MCP_CONFIGURED = !!MCP_URL;
+/** live as soon as the team's API is configured (.env.local), else the local simulation */
+export const LIVE_CONFIGURED = !!sentinelConfig.api;
+export const source: AuditSource = LIVE_CONFIGURED ? sentinelSourceOf() : simSource;
 
-/** the screens' hook: the transactions, newest first, and the registry derived from them */
+/** the screens' hook: the transactions, newest first, and the hackers' registry (the chain's flags when live) */
 let bannedCache: { txs: AuditTx[]; out: BannedEntry[] } | null = null;
 export function useAudit() {
   const txs = useSyncExternalStore(source.subscribe, source.transactions, source.transactions);
-  if (bannedCache?.txs !== txs) bannedCache = { txs, out: bannedOf(txs) };
-  return { txs, banned: bannedCache.out, source };
+  let banned: BannedEntry[];
+  if (source.banned) banned = source.banned();
+  else {
+    if (bannedCache?.txs !== txs) bannedCache = { txs, out: bannedOf(txs) };
+    banned = bannedCache.out;
+  }
+  return { txs, banned, source };
 }

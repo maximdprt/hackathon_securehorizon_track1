@@ -41,11 +41,11 @@ export function setViewFilter(filter: ViewFilter) {
 
 export function closeView() {
   if (!sim.get().view) return;
-  if (window.history.state?.agView) window.history.back();
-  else {
-    sim.set({ view: null, viewTx: null, viewFilter: "all" });
-    window.history.replaceState(null, "", urlOf(null, null, "all"));
-  }
+  // closed at once, so a second Escape before the browser's popstate cannot step back out of the app
+  const pushed = window.history.state?.agView;
+  sim.set({ view: null, viewTx: null, viewFilter: "all" });
+  if (pushed) window.history.back();
+  else window.history.replaceState(null, "", urlOf(null, null, "all"));
 }
 
 /** read the URL into the state: on load (a shared link) and on Back / Forward */

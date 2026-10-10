@@ -16,8 +16,8 @@ async function open(page: Page) {
 
 test("home: the city, its Security ward, the figures and the licence's mention", async ({ page }) => {
   await open(page);
-  await expect(page.getByText("City 3D d'après le code open source Avalanche Builder Hub (BSD-3) · Concept AvaGuard+ · simulation")).toBeVisible();
-  await expect(page.getByText("Concept AvaGuard+ · simulation").first()).toBeVisible();
+  await expect(page.getByText("City 3D d'après le code open source Avalanche Builder Hub (BSD-3) · Concept Sentinel · simulation")).toBeVisible();
+  await expect(page.getByText("Concept Sentinel · simulation").first()).toBeVisible();
   await expect(page.getByText("SECURITY", { exact: false }).first()).toBeVisible();
   await expect(page.getByPlaceholder("Rechercher une transaction, une adresse, un agent…")).toBeVisible();
   await page.screenshot({ path: "docs/captures/home.jpg", quality: 85, type: "jpeg" });
@@ -31,7 +31,7 @@ test("toll: the fraud's contract with its risky line framed", async ({ page }) =
     return s.phase === "analysis" && s.step >= 3;
   }, null, { timeout: 30_000 });
   await expect(page.getByText("RISQUE", { exact: true })).toBeVisible();
-  await expect(page.getByText("AvaGuard · Analyse", { exact: false }).first()).toBeVisible();
+  await expect(page.getByText("Sentinel · Analyse", { exact: false }).first()).toBeVisible();
   await page.waitForTimeout(600);
   await page.screenshot({ path: "docs/captures/toll.jpg", quality: 85, type: "jpeg" });
 });

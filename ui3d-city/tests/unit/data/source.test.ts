@@ -20,10 +20,10 @@ describe("audit data", () => {
     }
   });
 
-  it("bans each refused address once, AvaGuard's six among them, with repeat hits", () => {
+  it("bans each refused address once, Sentinel's six among them, with repeat hits", () => {
     const banned = bannedOf(HISTORY);
     expect(new Set(banned.map((b) => b.address.toLowerCase())).size).toBe(banned.length);
-    expect(banned.filter((b) => b.by === "AvaGuard")).toHaveLength(6);
+    expect(banned.filter((b) => b.by === "Sentinel")).toHaveLength(6);
     expect(banned.some((b) => b.hits > 1)).toBe(true);
   });
 
@@ -32,7 +32,7 @@ describe("audit data", () => {
   });
 
   it("puts a transaction played in the city at the top", () => {
-    sim.set({ ledger: [{ ...SCENARIO.fraud, status: "BLOCK", via: "AvaGuard" }] });
+    sim.set({ ledger: [{ ...SCENARIO.fraud, status: "BLOCK", via: "Sentinel" }] });
     const txs = simSource.transactions();
     expect(txs).toHaveLength(37);
     expect(txs[0].tx_id).toBe("tx_0042");

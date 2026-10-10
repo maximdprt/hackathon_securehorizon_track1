@@ -97,8 +97,8 @@ async function play(tx: TxEvent) {
   if (seen) tx.tx_id = `${tx.tx_id}-${seen + 1}`;
   const known = sim.get().registry.includes(tx.to.address.toLowerCase());
   const immune = !!tx.registry_hit && known;
-  const entry: JournalEntry = { tx_id: tx.tx_id, outcome: "PENDING", via: "AvaGuard", amount: tx.amount.value, token: tx.amount.token, to: tx.to.address, at: new Date().toISOString() };
-  sim.set((s) => ({ tx, phase: "approach", step: -1, journal: [entry, ...s.journal].slice(0, 40), ledger: [{ ...tx, status: "PENDING" as const, via: "AvaGuard" as const }, ...s.ledger] }));
+  const entry: JournalEntry = { tx_id: tx.tx_id, outcome: "PENDING", via: "Sentinel", amount: tx.amount.value, token: tx.amount.token, to: tx.to.address, at: new Date().toISOString() };
+  sim.set((s) => ({ tx, phase: "approach", step: -1, journal: [entry, ...s.journal].slice(0, 40), ledger: [{ ...tx, status: "PENDING" as const, via: "Sentinel" as const }, ...s.ledger] }));
   motion.visible = true;
   motion.tone = "verify";
   fly("follow");
@@ -140,8 +140,8 @@ async function play(tx: TxEvent) {
   sim.set((s) => ({ kpi: { ...s.kpi, transactions: s.kpi.transactions + 1, decisionMs: s.kpi.decisionMs + tx.timings_ms.decide, decisions: s.kpi.decisions + 1 } }));
 
   // 3. the outcome
-  if (tx.decision === "ALLOW") await allow(tx, "AvaGuard", "toCChain");
-  else if (tx.decision === "BLOCK") await block(tx, immune ? "registre" : "AvaGuard", true);
+  if (tx.decision === "ALLOW") await allow(tx, "Sentinel", "toCChain");
+  else if (tx.decision === "BLOCK") await block(tx, immune ? "registre" : "Sentinel", true);
   else await human(tx);
   if (!busy) return;
 
@@ -152,20 +152,20 @@ async function play(tx: TxEvent) {
   sim.set({ phase: "idle" });
 }
 
-function finish(tx: TxEvent, outcome: "ALLOW" | "BLOCK", via: "AvaGuard" | "humain" | "registre") {
+function finish(tx: TxEvent, outcome: "ALLOW" | "BLOCK", via: "Sentinel" | "humain" | "registre") {
   const s = sim.get();
   const n = Math.max(18342, (s.blocks.at(-1)?.n ?? 18341) + 1, tx.onchain?.block ?? 0);
   sim.set((st) => ({
     blocks: [...st.blocks.slice(-15), { n, tone: outcome === "ALLOW" ? "allow" : "block", tx_id: tx.tx_id }],
     journal: st.journal.map((j) => (j.tx_id === tx.tx_id && j.outcome === "PENDING" ? { ...j, outcome, via, block: n } : j)),
     kpi: { ...st.kpi, visas: st.kpi.visas + (outcome === "ALLOW" ? 1 : 0), blocked: st.kpi.blocked + (outcome === "BLOCK" ? 1 : 0), protectedUsd: st.kpi.protectedUsd + (outcome === "BLOCK" ? tx.amount.value : 0) },
-    ledger: st.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: outcome, via, decided_at: new Date().toISOString(), onchain: { chain: tx.onchain?.chain ?? "AvaGuard L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n } } : l)),
-    tx: st.tx && st.tx.tx_id === tx.tx_id ? { ...st.tx, onchain: { chain: tx.onchain?.chain ?? "AvaGuard L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n } } : st.tx,
+    ledger: st.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: outcome, via, decided_at: new Date().toISOString(), onchain: { chain: tx.onchain?.chain ?? "Sentinel L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n } } : l)),
+    tx: st.tx && st.tx.tx_id === tx.tx_id ? { ...st.tx, onchain: { chain: tx.onchain?.chain ?? "Sentinel L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n } } : st.tx,
   }));
   return n;
 }
 
-async function allow(tx: TxEvent, via: "AvaGuard" | "humain", from: "toCChain") {
+async function allow(tx: TxEvent, via: "Sentinel" | "humain", from: "toCChain") {
   motion.tone = "allow";
   await run((t) => {
     t.to(motion, { crystals: 1, duration: 1.1, ease: "power2.out" });
@@ -180,7 +180,7 @@ async function allow(tx: TxEvent, via: "AvaGuard" | "humain", from: "toCChain") 
     t.to(motion, { shield: 1, duration: 0.5, ease: "back.out(2)" });
     t.call(() => {
       finish(tx, "ALLOW", via);
-      toast("Accepté et protégé par AvaGuard+", "allow");
+      toast("Accepté et protégé par Sentinel", "allow");
     });
     t.to({}, { duration: TIMINGS.arrivalHold });
     t.to(motion, { glow: 0, barrier: 0, duration: 0.6 });
@@ -188,7 +188,7 @@ async function allow(tx: TxEvent, via: "AvaGuard" | "humain", from: "toCChain") 
   });
 }
 
-async function block(tx: TxEvent, via: "AvaGuard" | "humain" | "registre", fromToll: boolean) {
+async function block(tx: TxEvent, via: "Sentinel" | "humain" | "registre", fromToll: boolean) {
   motion.tone = "block";
   await run((t) => {
     if (fromToll) {

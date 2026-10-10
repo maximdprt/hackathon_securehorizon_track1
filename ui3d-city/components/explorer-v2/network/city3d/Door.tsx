@@ -7,7 +7,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useThree, type ThreeEvent } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { TipPlate } from "@/components/explorer-v2/staking/bits";
-import { useAudit } from "@/data/source";
+import { protectedOf, useAudit } from "@/data/source";
 import { openView } from "@/sim/nav";
 import { sim, useSim } from "@/sim/store";
 import { STATE, fmtAmount, shortAddr, type TxEvent } from "@/sim/types";
@@ -80,7 +80,7 @@ export function TollTip() {
   const busy = !!tx && phase !== "idle";
   return (
     <>
-      <Head tone={STATE.verify.hex}>Contrôle AvaGuard+</Head>
+      <Head tone={STATE.verify.hex}>Contrôle Sentinel</Head>
       <TipRow label="En cours" value={busy ? tx.tx_id : "aucune transaction"} />
       {busy && <TipRow label="Étape" value={phase === "analysis" ? (STEP_WORD[step] ?? "verdict") : PHASE_WORD[phase] ?? phase} />}
       <TipRow label="Seuils" value="visa < 40 · refus ≥ 70" />
@@ -121,12 +121,12 @@ export function ParkingTip() {
 export function ScrapTip() {
   const { txs } = useAudit();
   const blocked = txs.filter((t) => t.status === "BLOCK");
-  const usd = blocked.filter((t) => t.amount.token === "USDC").reduce((a, t) => a + t.amount.value, 0);
+  const prot = protectedOf(txs);
   return (
     <>
       <Head tone={STATE.block.hex}>Déchetterie</Head>
       <TipRow label="Transactions détruites" value={String(blocked.length)} />
-      <TipRow label="Montant protégé" value={`${fmtAmount(usd)} USDC`} />
+      <TipRow label="Montant protégé" value={`${fmtAmount(prot.value)} ${prot.token}`} />
       <Hint>Cliquer pour voir les transactions bloquées</Hint>
     </>
   );
@@ -137,7 +137,7 @@ export function ProofTip() {
   const proved = txs.filter((t) => t.onchain && (t.status === "ALLOW" || t.status === "BLOCK"));
   return (
     <>
-      <Head tone={STATE.allow.hex}>Preuves on-chain · AvaGuard L1</Head>
+      <Head tone={STATE.allow.hex}>Preuves on-chain · Sentinel L1</Head>
       <TipRow label="Décisions ancrées" value={String(proved.length)} />
       {proved[0]?.onchain && <TipRow label="Dernier bloc" value={`#${proved[0].onchain.block.toLocaleString("fr-FR")}`} />}
       <Hint>Cliquer pour voir les preuves</Hint>

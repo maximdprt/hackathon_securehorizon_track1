@@ -3,14 +3,15 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowDownUp, Check, Copy, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAudit } from "@/data/source";
+import { LIVE_CONFIGURED, protectedOf, useAudit } from "@/data/source";
+import { explorerUrl } from "@/data/sentinel";
 import { setViewFilter, setViewTx } from "@/sim/nav";
 import { sim, useSim, type ViewFilter } from "@/sim/store";
 import { CHECK_LABEL, CHECK_ORDER, STATE, fmtAmount, shortAddr, type AuditTx } from "@/sim/types";
 import { Gauge, Radar, StateIcon, iconOf, zoneHex } from "../ui/charts";
 import { SourceBadge } from "./ViewHost";
 
-/* The C-Chain's door: every agent payment AvaGuard+ checked before it settled, as an explorer lists transactions, and
+/* The C-Chain's door: every agent payment Sentinel checked before it settled, as an explorer lists transactions, and
    for each its audit: the score and its five checks against the KPMG thresholds, the authority chain, the contract,
    the on-chain proof, the frameworks. The rows come from data/source.ts (the simulation now, the MCP agent next). */
 
@@ -62,6 +63,17 @@ export function ScoreBar({ tx }: { tx: AuditTx }) {
         {tx.score}
       </span>
     </span>
+  );
+}
+
+/** a hash, a block or an address, opened on SentinelScan when the explorer is configured and the row is the chain's */
+export function ExplorerLink({ kind, id, live, children }: { kind: "tx" | "block" | "address"; id: string | number; live: boolean; children: ReactNode }) {
+  const url = live ? explorerUrl(kind, id) : null;
+  if (!url) return <span className="font-mono">{children}</span>;
+  return (
+    <a href={url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="font-mono text-[#3D7FE0] underline-offset-2 hover:underline dark:text-[#6FA8FF]">
+      {children}
+    </a>
   );
 }
 
@@ -120,13 +132,13 @@ export function TransactionsView() {
 
   const kpi = useMemo(() => {
     const done = txs.filter((t) => t.status === "ALLOW" || t.status === "BLOCK");
-    const usdc = txs.filter((t) => t.status === "BLOCK" && t.amount.token === "USDC").reduce((a, t) => a + t.amount.value, 0);
+    const prot = protectedOf(txs);
     return {
       total: txs.length,
       visas: txs.filter((t) => t.status === "ALLOW").length,
       blocked: txs.filter((t) => t.status === "BLOCK").length,
       waiting: txs.filter((t) => t.status === "HUMAN").length,
-      usdc,
+      prot,
       avg: done.length ? done.reduce((a, t) => a + t.timings_ms.decide, 0) / done.length : 0,
     };
   }, [txs]);
@@ -138,11 +150,6 @@ export function TransactionsView() {
     const on = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       if (el.tagName === "INPUT") return;
-      if (e.key === "Escape" && picked) {
-        e.preventDefault();
-        setViewTx(null);
-        return;
-      }
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
       e.preventDefault();
       const i = rows.findIndex((r) => r.tx_id === picked);
@@ -170,7 +177,7 @@ export function TransactionsView() {
             </span>
             <div>
               <h1 className="text-[20px] font-semibold text-zinc-900 dark:text-zinc-50">Transactions · C-Chain</h1>
-              <p className="text-[12.5px] text-zinc-500 dark:text-zinc-400">Paiements d&apos;agents IA vérifiés par AvaGuard+ avant règlement, chacun avec la preuve de sa décision</p>
+              <p className="text-[12.5px] text-zinc-500 dark:text-zinc-400">Paiements d&apos;agents IA vérifiés par Sentinel avant règlement, chacun avec la preuve de sa décision</p>
             </div>
           </div>
           <SourceBadge />
@@ -178,12 +185,12 @@ export function TransactionsView() {
 
         {/* the figures */}
         <div className="grid grid-cols-6 gap-3">
-          <Kpi label="Transactions" value={kpi.total} sub="vérifiées (simulé)" />
+          <Kpi label="Transactions" value={kpi.total} sub={LIVE_CONFIGURED ? "décisions sur Sentinel L1" : "vérifiées (simulé)"} />
           <Kpi label="Visas émis" value={kpi.visas} sub={`${kpi.total ? Math.round((kpi.visas / kpi.total) * 100) : 0} % des demandes`} tone={STATE.allow.hex} />
           <Kpi label="Bloquées" value={kpi.blocked} sub="adresses au registre" tone={STATE.block.hex} />
           <Kpi label="En attente" value={kpi.waiting} sub="validation humaine" tone={STATE.human.hex} />
-          <Kpi label="Montant protégé" value={fmtAmount(kpi.usdc)} sub="USDC refusés" />
-          <Kpi label="Décision moyenne" value={kpi.avg ? secs(kpi.avg) : "0 s"} sub="du dépôt au verdict" />
+          <Kpi label="Montant protégé" value={kpi.prot.value || !LIVE_CONFIGURED ? fmtAmount(kpi.prot.value) : "n.p."} sub={kpi.prot.value || !LIVE_CONFIGURED ? `${kpi.prot.token} refusés` : "montant non publié par un refus"} />
+          <Kpi label="Décision moyenne" value={kpi.avg ? secs(kpi.avg) : "n.p."} sub={kpi.avg ? "du dépôt au verdict" : "non publié on-chain"} />
         </div>
 
         {/* the tools */}
@@ -269,18 +276,25 @@ export function TransactionsView() {
                   <td className="px-3">
                     <StatusPill status={t.status} />
                   </td>
-                  <td className="px-3 font-mono text-zinc-900 dark:text-zinc-100">{t.tx_id}</td>
+                  <td className="px-3 font-mono text-zinc-900 dark:text-zinc-100">
+                    {t.tx_id}
+                    {LIVE_CONFIGURED && t.source === "scenario" && <span className="ml-1.5 rounded bg-zinc-100 px-1 text-[9.5px] text-zinc-500 dark:bg-zinc-800">démo</span>}
+                  </td>
                   <td className="px-3 text-zinc-700 dark:text-zinc-300">{t.from.agent_id}</td>
                   <td className="max-w-[16rem] px-3">
                     <span className="block truncate text-zinc-900 dark:text-zinc-100">{t.to.label}</span>
                     <span className="block font-mono text-[10.5px] text-zinc-500">{shortAddr(t.to.address)}</span>
                   </td>
                   <td className="px-3 text-right font-mono tabular-nums text-zinc-900 dark:text-zinc-100">
-                    {fmtAmount(t.amount.value)} <span className="text-zinc-500">{t.amount.token}</span>
+                    {t.partial && !t.amount.value ? (
+                      <span className="text-zinc-400">…</span>
+                    ) : (
+                      <>
+                        {fmtAmount(t.amount.value)} <span className="text-zinc-500">{t.amount.token}</span>
+                      </>
+                    )}
                   </td>
-                  <td className="px-3">
-                    <ScoreBar tx={t} />
-                  </td>
+                  <td className="px-3">{t.partial ? <span className="font-mono text-[11px] text-zinc-400" title="Score non publié on-chain">verdict seul</span> : <ScoreBar tx={t} />}</td>
                   <td className="px-3 text-zinc-600 dark:text-zinc-400">{t.status === "PENDING" ? "…" : t.status === "HUMAN" ? "en attente" : t.via}</td>
                   <td className="px-3 font-mono text-[11.5px] text-zinc-500">{t.onchain && t.status !== "PENDING" && t.status !== "HUMAN" ? `#${t.onchain.block.toLocaleString("fr-FR")}` : "…"}</td>
                   <td className="px-3 font-mono text-[11.5px] text-zinc-500">{when(t.created_at)}</td>
@@ -291,7 +305,7 @@ export function TransactionsView() {
           {rows.length === 0 && <p className="py-16 text-center font-mono text-[12px] text-zinc-400">{txs.length ? "Aucune transaction ne correspond" : "Aucune transaction pour l'instant"}</p>}
         </div>
         <p className="font-mono text-[10.5px] text-zinc-400">
-          {rows.length} sur {txs.length} · ↑ ↓ ou clic pour ouvrir l&apos;audit · Données synthétiques
+          {rows.length} sur {txs.length} · ↑ ↓ ou clic pour ouvrir l&apos;audit · {LIVE_CONFIGURED ? "Données on-chain (Sentinel L1), lignes « démo » simulées" : "Données synthétiques"}
         </p>
       </div>
 
@@ -333,13 +347,13 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
     <aside aria-label={`Audit de ${tx.tx_id}`} className="flex w-[500px] shrink-0 flex-col border-l border-zinc-200 bg-white animate-in slide-in-from-right-4 fade-in-0 duration-200 motion-reduce:animate-none dark:border-zinc-800 dark:bg-zinc-950">
       <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-4">
         <div className="min-w-0">
-          <div className={LABEL}>AvaGuard · Audit de la décision</div>
+          <div className={LABEL}>Sentinel · Audit de la décision</div>
           <div className="mt-1 flex items-center gap-2">
             <span className="font-mono text-[18px] font-semibold text-zinc-900 dark:text-zinc-50">{tx.tx_id}</span>
             <StatusPill status={tx.status} />
           </div>
           <div className="mt-0.5 font-mono text-[10.5px] text-zinc-500">
-            {final ? `décidé en ${secs(tx.timings_ms.decide)} par ${tx.via}` : tx.status === "HUMAN" ? "en attente d'un humain" : "analyse en cours"} · {when(tx.created_at)}
+            {final ? (tx.partial ? `décidé on-chain au bloc #${tx.onchain?.block ?? "…"}` : `décidé en ${secs(tx.timings_ms.decide)} par ${tx.via}`) : tx.status === "HUMAN" ? "en attente d'un humain" : "analyse en cours"} · {when(tx.created_at)}
           </div>
         </div>
         <button type="button" aria-label="Fermer l'audit" onClick={onClose} className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-900 dark:hover:text-zinc-100">
@@ -385,15 +399,26 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
                   {tx.domain_age_days !== undefined && <span className="text-zinc-500"> · {tx.domain_age_days} j</span>}
                 </Field>
                 <Field label="Montant">
-                  <span className="font-mono">
-                    {fmtAmount(tx.amount.value)} {tx.amount.token}
-                  </span>
+                  <span className="font-mono">{tx.partial && !tx.amount.value ? "non publié" : `${fmtAmount(tx.amount.value)} ${tx.amount.token}`}</span>
                 </Field>
-                <Field label="Cas d'usage">{tx.use_case === "shopping" ? "Agentic shopping" : "Agent à agent (x402)"}</Field>
+                <Field label="Cas d'usage">{tx.partial ? "non publié" : tx.use_case === "shopping" ? "Agentic shopping" : "Agent à agent (x402)"}</Field>
               </div>
             </Section>
 
             <Section title="Scoring d'audit" aside={<span className="font-mono text-[10px] text-zinc-400">seuils KPMG : visa &lt; {t.allow_below} · humain {t.allow_below} à {t.block_from - 1} · refus ≥ {t.block_from}</span>}>
+              {tx.partial ? (
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-[12px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
+                  <div className="mb-1 flex items-center gap-2">
+                    <StatusPill status={tx.status} />
+                    <span className="font-mono text-[11px] text-zinc-500">verdict on-chain : {(tx.raw as { verdict?: string })?.verdict ?? tx.decision}</span>
+                  </div>
+                  <p className="mt-1.5">{tx.reasons[0] ?? "Sans raison publiée."}</p>
+                  <p className="mt-2 text-[11px] text-zinc-500">
+                    La chaîne publie le verdict, sa raison et sa preuve. Les scores des 5 contrôles arrivent avec le verdict complet du cerveau (flux /avaguard/events) : ils s&apos;afficheront ici pour les décisions reçues en direct.
+                  </p>
+                </div>
+              ) : (
+              <>
               <div className="flex items-center justify-between">
                 <Gauge tx={tx} live={false} />
                 <Radar tx={tx} lit={() => true} />
@@ -427,9 +452,11 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
                   ))}
                 </ul>
               )}
+              </>
+              )}
             </Section>
 
-            <Section title="Chaîne d'autorité">
+            {tx.authority_chain.length > 0 && <Section title="Chaîne d'autorité">
               <div className="flex flex-wrap items-center gap-1.5">
                 {tx.authority_chain.map((n, i) => (
                   <span key={i} className="flex items-center gap-1.5">
@@ -441,7 +468,7 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
                 ))}
               </div>
               {tx.break_note && <p className="mt-2 font-mono text-[11px] text-[#FF5D57]">{tx.break_note}</p>}
-            </Section>
+            </Section>}
 
             <Section title={`Contrat · ${tx.contract.method}`}>
               <pre className="overflow-x-auto rounded-xl bg-zinc-50 p-3 font-mono text-[11px] leading-relaxed text-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
@@ -468,17 +495,22 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2.5">
                   <Field label="Chaîne">{tx.onchain.chain}</Field>
                   <Field label="Bloc">
-                    <span className="font-mono">#{tx.onchain.block.toLocaleString("fr-FR")}</span>
+                    <ExplorerLink kind="block" id={tx.onchain.block} live={tx.source === "live"}>
+                      #{tx.onchain.block.toLocaleString("fr-FR")}
+                    </ExplorerLink>
                   </Field>
                   <Field label="Hash">
                     <span className="inline-flex items-center gap-1 font-mono text-[11.5px]">
-                      {shortAddr(tx.onchain.tx_hash)} <CopyButton text={tx.onchain.tx_hash} />
+                      <ExplorerLink kind="tx" id={tx.onchain.tx_hash} live={tx.source === "live"}>
+                        {shortAddr(tx.onchain.tx_hash)}
+                      </ExplorerLink>
+                      <CopyButton text={tx.onchain.tx_hash} />
                     </span>
                   </Field>
                   <Field label="Visa">{tx.onchain.visa_id ?? (tx.status === "BLOCK" ? "refusé, adresse au registre" : "…")}</Field>
                 </div>
               ) : (
-                <p className="text-[12px] text-zinc-500">La preuve est écrite sur AvaGuard L1 dès la décision.</p>
+                <p className="text-[12px] text-zinc-500">La preuve est écrite sur Sentinel L1 dès la décision.</p>
               )}
             </Section>
 
@@ -494,7 +526,7 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
             </Section>
 
             <div className="border-t border-zinc-200 px-5 py-3 font-mono text-[10.5px] text-zinc-400 dark:border-zinc-800">
-              {tx.source === "live" ? "Verdict reçu du garde AvaGuard (live)" : "Branchement MCP agent : à venir · cette ligne est simulée"}
+              {tx.source === "live" ? (tx.partial ? "Lu sur Sentinel L1 (AuthorityRegistry.DecisionRecorded)" : "Verdict complet reçu du cerveau, preuve sur Sentinel L1") : "Ligne simulée (démo) · les décisions réelles viennent de Sentinel L1"}
             </div>
           </>
         )}

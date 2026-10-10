@@ -153,14 +153,14 @@ function build(): AuditTx[] {
       reasons: repeat ? ["Adresse déjà au registre des hackers : refus immédiat (immunité)."] : [checks.intent_ai.reason + ".", checks.beneficiary.reason + "."],
       frameworks: d === "BLOCK" ? [`DORA INC-2026-${String(n).padStart(4, "0")}`, "OWASP ASI03", "ASI07", "MITRE ATLAS", "NIST CSF"] : d === "HUMAN" ? ["DORA art. 17", "AI Act art. 14"] : ["MiCA", "DORA"],
       timings_ms: { decide: ms },
-      onchain: { chain: "AvaGuard L1", block, tx_hash: `0x${hex(r, 64)}`, visa_id: d === "ALLOW" ? `VISA-${7000 + n * 17}` : undefined },
+      onchain: { chain: "Sentinel L1", block, tx_hash: `0x${hex(r, 64)}`, visa_id: d === "ALLOW" ? `VISA-${7000 + n * 17}` : undefined },
       registry_hit: repeat,
       dora_incident: d === "BLOCK" ? `INC-2026-${String(n).padStart(4, "0")}` : undefined,
       domain_age_days: d === "ALLOW" ? 400 + Math.floor(r() * 900) : d === "HUMAN" ? 5 + Math.floor(r() * 20) : 1 + Math.floor(r() * 4),
       source: "scenario",
       // the human cases were settled by a reviewer: most approved
       status: d === "HUMAN" ? (r() < 0.67 ? "ALLOW" : "BLOCK") : d,
-      via: d === "HUMAN" ? "humain" : repeat ? "registre" : "AvaGuard",
+      via: d === "HUMAN" ? "humain" : repeat ? "registre" : "Sentinel",
     });
   });
   return out.reverse();

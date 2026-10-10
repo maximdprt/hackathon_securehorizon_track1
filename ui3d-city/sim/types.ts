@@ -11,7 +11,7 @@ export type TxEvent = {
   use_case: "shopping" | "agent_to_agent";
   from: { agent_id: string; address: string };
   to: { label: string; address: string; domain?: string };
-  amount: { value: number; token: "USDC" | "AVAX" };
+  amount: { value: number; token: "USDC" | "AVAX" | "SEC" };
   contract: { method: string; line: string; risky: boolean };
   authority_chain: { step: string; ok: boolean }[];
   checks: Record<CheckKey, Check>;
@@ -35,12 +35,18 @@ export type TxEvent = {
 
 /** a transaction as the audit screens read it: the event, where it stands, who decided it and when */
 export type AuditStatus = "ALLOW" | "BLOCK" | "HUMAN" | "PENDING";
-export type AuditTx = TxEvent & { status: AuditStatus; via: "AvaGuard" | "humain" | "registre"; decided_at?: string };
+export type AuditTx = TxEvent & {
+  status: AuditStatus;
+  via: "Sentinel" | "humain" | "registre";
+  decided_at?: string;
+  /** read from the chain alone: the verdict, its reason and its proof, not the five checks' scores */
+  partial?: boolean;
+};
 
 export const CHECK_ORDER: CheckKey[] = ["authority", "beneficiary", "mandate", "intent_ai", "contract"];
 export const CHECK_LABEL: Record<CheckKey, string> = { authority: "Autorité", beneficiary: "Bénéficiaire", mandate: "Mandat", intent_ai: "Intention IA", contract: "Contrat" };
 
-/** the four AvaGuard states, with the colours the prompt fixes */
+/** the four Sentinel states, with the colours the prompt fixes */
 export const STATE = {
   verify: { hex: "#6FA8FF", label: "en vérification" },
   allow: { hex: "#3FD08F", label: "visa émis" },

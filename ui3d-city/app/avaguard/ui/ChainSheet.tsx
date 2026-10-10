@@ -9,7 +9,7 @@ import { Logo, type Node } from "@/components/explorer-v2/network/icm-map";
 import { openView } from "@/sim/nav";
 
 /* Any other tower's door: the City flies to it (its own behaviour), and this sheet tells what it is, from the
-   snapshot's real figures, and what AvaGuard sees of it (nothing yet: the guard's payments settle on the C-Chain). */
+   snapshot's real figures, and what Sentinel sees of it (nothing yet: the guard's payments settle on the C-Chain). */
 
 export function ChainSheet({ node, partner, onClose, simulated }: { node: Node; partner: string | null; onClose: () => void; simulated: boolean }) {
   const district = DISTRICTS.find((d) => d.key === node.district);
@@ -34,7 +34,7 @@ export function ChainSheet({ node, partner, onClose, simulated }: { node: Node; 
             ["Validators", node.validators.toLocaleString("fr-FR")],
             [simulated ? "Messages ICM (simulés)" : "Messages ICM · 24 h", node.out + node.in > 0 ? `${fmtCompact(node.out)} out · ${fmtCompact(node.in)} in` : "aucun sur 24 h"],
             ["Partenaire principal", partner ?? "…"],
-            ["Paiements AvaGuard", "0 (simulé)"],
+            ["Paiements Sentinel", "0 (simulé)"],
           ] as const
         ).map(([k, v]) => (
           <div key={k} className="min-w-0">
@@ -43,9 +43,9 @@ export function ChainSheet({ node, partner, onClose, simulated }: { node: Node; 
           </div>
         ))}
       </dl>
-      <p className="mt-3 text-[11.5px] text-zinc-500">Les paiements d&apos;agents vérifiés par AvaGuard+ se règlent sur la C-Chain : la tour rouge ouvre leur liste.</p>
+      <p className="mt-3 text-[11.5px] text-zinc-500">Les paiements d&apos;agents vérifiés par Sentinel se règlent sur la C-Chain : la tour rouge ouvre leur liste.</p>
       <button type="button" onClick={() => openView("transactions")} className="mt-3 w-full rounded-xl border border-zinc-200 py-1.5 text-[12.5px] text-zinc-700 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:text-zinc-50">
-        Voir les transactions AvaGuard
+        Voir les transactions Sentinel
       </button>
     </aside>
   );

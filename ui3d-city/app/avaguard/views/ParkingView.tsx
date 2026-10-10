@@ -98,7 +98,7 @@ export function ParkingView() {
                 </div>
               </div>
               <div className="mt-3 flex items-center gap-3">
-                <ScoreBar tx={{ ...waiting, status: "HUMAN", via: "AvaGuard" }} />
+                <ScoreBar tx={{ ...waiting, status: "HUMAN", via: "Sentinel" }} />
                 <span className="text-[12px] text-zinc-600 dark:text-zinc-400">{waiting.reasons[0]}</span>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2">

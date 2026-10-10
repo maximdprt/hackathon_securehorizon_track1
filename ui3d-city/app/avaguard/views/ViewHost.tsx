@@ -3,9 +3,9 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { ArrowLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MCP_CONFIGURED, useAudit } from "@/data/source";
-import { closeView, openView } from "@/sim/nav";
-import { useSim, type View } from "@/sim/store";
+import { LIVE_CONFIGURED, useAudit } from "@/data/source";
+import { closeView, openView, setViewTx } from "@/sim/nav";
+import { sim, useSim, type View } from "@/sim/store";
 
 /* The screens a building opens, over the city: the scene stays mounted under them (nothing is rebuilt), the URL follows
    (sim/nav.ts), Escape and Back return to the city. Each screen is its own file in this folder. */
@@ -13,14 +13,15 @@ import { useSim, type View } from "@/sim/store";
 export const VIEW_LABEL: Record<Exclude<View, null>, string> = { transactions: "Transactions", registry: "Registre des hackers", parking: "Validation humaine", audit: "Audit" };
 const ORDER: Exclude<View, null>[] = ["transactions", "registry", "parking", "audit"];
 
-/** where the data comes from, said plainly: the local simulation now, the MCP agent once its URL is set */
+/** where the data comes from, said plainly: SentinelL1 on-chain through the team's API, or the local simulation */
 export function SourceBadge() {
-  const { source } = useAudit();
-  const live = MCP_CONFIGURED && source.connected;
+  const { source, txs } = useAudit();
+  const live = LIVE_CONFIGURED;
+  const up = live && source.connected;
   return (
     <span className="inline-flex items-center gap-1.5 rounded-md border border-zinc-200 px-2 py-1 font-mono text-[10px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-      <span className={cn("h-1.5 w-1.5 rounded-full", live ? "bg-[#3FD08F]" : MCP_CONFIGURED ? "bg-[#FF5D57]" : "bg-[#F2B33D]")} />
-      Source : {source.name.toLowerCase()} · MCP agent : {MCP_CONFIGURED ? (live ? "connecté" : "injoignable") : "non connecté"}
+      <span className={cn("h-1.5 w-1.5 rounded-full", up ? "bg-[#3FD08F]" : live ? "bg-[#FF5D57]" : "bg-[#F2B33D]")} />
+      {live ? `Source : ${source.name} · ${up ? `connecté · ${txs.length} décisions` : "API injoignable"}` : "Source : simulation locale · Sentinel L1 : non branché (.env.local)"}
     </span>
   );
 }
@@ -35,7 +36,10 @@ export function ViewHost({ screens }: { screens: Partial<Record<Exclude<View, nu
     if (!view) return;
     box.current?.focus({ preventScroll: true });
     const on = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !e.defaultPrevented) closeView();
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      // an open audit closes first, then the screen
+      if (sim.get().viewTx) setViewTx(null);
+      else closeView();
     };
     window.addEventListener("keydown", on);
     return () => window.removeEventListener("keydown", on);

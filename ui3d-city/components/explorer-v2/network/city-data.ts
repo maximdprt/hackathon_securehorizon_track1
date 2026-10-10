@@ -15,7 +15,7 @@ import { C_CHAIN_ID, MAINNET_COUNTERPART, catalogBySubnet, catalogOf, resolveCat
 import type { PchainNetwork } from "@/lib/pchain-explorer";
 import { PRIMARY_SUBNET_ID } from "@/lib/pchain-node";
 import type { L1Chain } from "@/types/stats";
-import { AVAGUARD_CHAIN, AVAGUARD_FLOW, AVAGUARD_ID, AVAGUARD_MIN_H, simulatedFlows } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD
+import { AVAGUARD_CHAIN, AVAGUARD_FLOW, AVAGUARD_ID, SENTINEL_SUBNET, AVAGUARD_MIN_H, simulatedFlows } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD
 
 /* The city's data, apart from the map that draws it (icm-map.tsx): the
    feeds, the catalog that names the chains, and the plan of lots and
@@ -312,7 +312,8 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
         blockchainId: r.blockchainId,
       });
     }
-    const base = [...listed.map((c) => (freshAt.has(c.id) ? { ...c, newAt: freshAt.get(c.id)! } : c)), ...guests];
+    // AVAGUARD: SentinelL1's own registry row (a guest on the Frontier) gives way to our HQ, so it stands once
+    const base = [...listed.map((c) => (freshAt.has(c.id) ? { ...c, newAt: freshAt.get(c.id)! } : c)), ...guests.filter((g) => g.subnetId !== SENTINEL_SUBNET && g.blockchainId !== AVAGUARD_ID)];
 
     const metric = (c: (typeof base)[number]) => (byMessages ? c.out + c.in : c.validators);
     const top = Math.max(byMessages ? 1 : H_TOP_MIN, ...base.map(metric));
