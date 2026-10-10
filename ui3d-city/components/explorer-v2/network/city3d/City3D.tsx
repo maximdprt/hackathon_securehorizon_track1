@@ -957,7 +957,8 @@ export default function City3D({ data: incoming, network, versions = null, targe
         />
         </Stage>
         <Stage at={4}>
-        <Traffic routes={routes} streets={streets} city={city} inks={traffic.inks} on={traffic.on} blue={traffic.blue} theme={theme} still={still} liveAt={schedule.liveAt} hovered={hoverRoute?.key ?? null} onHoverRoute={onHoverRoute} frozen={flyingRef} picked={pairWays} onPickRoute={onRoute ? pickRoute : undefined} tint={routeLit ? { key: guardKey(hubId), color: AVAGUARD3.allow[theme] } : null} />
+        {/* SENTINEL: ambient ICM fleet off. The demo shows a single hero car (AvaGuardRun) that stops at the toll and is scanned. */}
+        {false && <Traffic routes={routes} streets={streets} city={city} inks={traffic.inks} on={traffic.on} blue={traffic.blue} theme={theme} still={still} liveAt={schedule.liveAt} hovered={hoverRoute?.key ?? null} onHoverRoute={onHoverRoute} frozen={flyingRef} picked={pairWays} onPickRoute={onRoute ? pickRoute : undefined} tint={routeLit ? { key: guardKey(hubId), color: AVAGUARD3.allow[theme] } : null} />}
         <Marks model={model} city={city} hover={state.hover} pick={state.pick} focus={focus} theme={theme} still={still} />
         {/* AVAGUARD: our parcel (toll, human lot, scrapyard, proofs) and the protected payment playing on it */}
         {model.buildings.length > 0 && <AvaGuardRun model={model} city={city} routes={routes} streets={streets} theme={theme} still={still} onShot={setGuardShot} cameraRef={cameraRef} />}
