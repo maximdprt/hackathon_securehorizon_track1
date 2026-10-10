@@ -1,12 +1,13 @@
-"""Lance l'agent shopping sur un scénario, sans garde puis avec garde, et s'arrête au verdict.
+"""Lance l'agent shopping sur les scénarios, sans garde puis avec garde, et s'arrête au verdict.
 
-    .venv/Scripts/python agents/run_shopping.py                          # fake_walmart, garde off puis on
+    .venv/Scripts/python agents/run_shopping.py --open                   # tous les scénarios, puis le rapport visuel
     .venv/Scripts/python agents/run_shopping.py --scenario legit_store --guard on
     .venv/Scripts/python agents/run_shopping.py --model us.anthropic.claude-sonnet-4-6   # un agent qui résiste seul
     GUARD_BACKEND=stub .venv/Scripts/python agents/run_shopping.py       # force le garde de remplacement
 
 Chaque run ajoute une ligne à agents/out/runs.jsonl (ordre produit par l'agent, requête envoyée au
-garde, verdict, attendu, latence). Code de sortie 1 si un verdict obtenu diffère de l'attendu.
+garde, verdict, attendu, latence) et régénère agents/out/report.html. Code de sortie 1 si un verdict
+obtenu diffère de l'attendu.
 """
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ sys.path.insert(0, str(ROOT))
 
 from agents.guard_client import GuardClient  # noqa: E402
 from agents.llm import BedrockLLM  # noqa: E402
+from agents.report import build as build_report  # noqa: E402
 from agents.shopping_agent import SCENARIOS, run_agent  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
@@ -46,26 +48,29 @@ def show(run: dict) -> None:
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument("--scenario", default="fake_walmart", choices=sorted(SCENARIOS))
+    p.add_argument("--scenario", default="all", choices=["all", *sorted(SCENARIOS)])
     p.add_argument("--guard", choices=["off", "on", "both"], default="both")
     p.add_argument("--model", default=None, help="ID Bedrock de l'agent (défaut : AGENT_MODEL_ID ou Pixtral Large)")
+    p.add_argument("--open", action="store_true", help="ouvre le rapport visuel dans le navigateur à la fin")
     a = p.parse_args()
 
     llm = BedrockLLM(a.model)
     OUT.mkdir(exist_ok=True)
-    mismatch = False
-    for guarded in {"off": [False], "on": [True], "both": [False, True]}[a.guard]:
-        guard = GuardClient() if guarded else None
-        print(f"\n=== {a.scenario} · garde {'ON (' + guard.backend + ')' if guard else 'OFF'} · agent {llm.model_id}")
-        run = run_agent(a.scenario, llm, guard)
-        run.update(model=llm.model_id, backend=guard.backend if guard else None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
-        if run["outcome"] == "verdict":
-            run["ok"] = run["verdict"]["verdict"] == run["expected"]
-            mismatch |= not run["ok"]
-        show(run)
-        with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
-            f.write(json.dumps(run, ensure_ascii=False) + "\n")
-    print(f"\n-> {(OUT / 'runs.jsonl').relative_to(ROOT)}")
+    mismatch, session = False, time.strftime("%Y-%m-%dT%H:%M:%S")  # un lancement = une session du rapport
+    for scenario in SCENARIOS if a.scenario == "all" else [a.scenario]:
+        for guarded in {"off": [False], "on": [True], "both": [False, True]}[a.guard]:
+            guard = GuardClient() if guarded else None
+            print(f"\n=== {scenario} · garde {'ON (' + guard.backend + ')' if guard else 'OFF'} · agent {llm.model_id}")
+            run = run_agent(scenario, llm, guard)
+            run.update(model=llm.model_id, backend=guard.backend if guard else None, session=session,
+                       started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+            if run["outcome"] == "verdict":
+                run["ok"] = run["verdict"]["verdict"] == run["expected"]
+                mismatch |= not run["ok"]
+            show(run)
+            with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps(run, ensure_ascii=False) + "\n")
+    print(f"\n-> {(OUT / 'runs.jsonl').relative_to(ROOT)}\n-> {build_report(a.open).relative_to(ROOT)}")
     sys.exit(1 if mismatch else 0)
 
 

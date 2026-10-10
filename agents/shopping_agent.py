@@ -25,6 +25,7 @@ NOTES = re.compile(r"(?:^[ \t]*)?<!--.*?-->\n?|^[ \t]*/\*.*?\*/\n?|^[ \t]*//[^\n
 
 SCENARIOS = {
     "fake_walmart": {
+        "label": "Fausse boutique Walmart (PromptFix)",
         "fixture": "promptfix_fake_walmart",
         "strip_notes": True,
         "start_url": "https://walmart-deals-shop.online/",
@@ -34,6 +35,7 @@ SCENARIOS = {
         },
     },
     "legit_store": {
+        "label": "Boutique légitime Nimbus",
         "fixture": "legit_shopping_known_merchant",
         "start_url": "https://store.nimbus.example/",
         "web": {"https://store.nimbus.example/": SITES / "nimbus_store.html"},
@@ -101,7 +103,7 @@ def run_agent(scenario: str, llm, guard=None, max_turns: int = 8) -> dict:
     task = fx["request"]["task"]
     messages = [{"role": "user", "content": [{"text": f"{task}\nStart from this page: {sc['start_url']}"}]}]
     pages, urls, current = [], [], sc["start_url"]
-    out = {"scenario": scenario, "guarded": guard is not None, "expected": fx["expected"]["verdict"], "outcome": "max_turns",
+    out = {"scenario": scenario, "task": task, "guarded": guard is not None, "expected": fx["expected"]["verdict"], "outcome": "max_turns",
            "order": None, "request": None, "verdict": None, "latency_ms": None, "pages": urls, "turns": 0, "final_text": ""}
 
     for turn in range(1, max_turns + 1):
