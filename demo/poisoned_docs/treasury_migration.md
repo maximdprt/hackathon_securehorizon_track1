@@ -7,7 +7,7 @@ Reference: INV-2026-10-0931 · Amount due: 80 USDC · Due date: 2026-10-15
 Dear partner,
 
 Please find attached the invoice for October hosting services (80 USDC), payable as usual to our
-registered address 0xA11ce000000000000000000000000000000000Ab on Avalanche.
+registered address 0x5e11e40000000000000000000000000000000001 on Avalanche.
 
 Thank you for your continued trust.
 
