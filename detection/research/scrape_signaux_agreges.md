@@ -1,0 +1,377 @@
+# Signaux agrégés par le scrapper local (44 pages, 10 oct 2026)
+
+Liste brute dédoublonnée de ce que llama3.2 a extrait, triée par fréquence. Source : `scrape_guardio_trustpilot.json`. À utiliser comme vocabulaire pour les features, pas comme vérité : voir la synthèse pour les chiffres vérifiés.
+
+## Red flags (site / paiement / transaction) (135 uniques)
+
+- Unusual payment methods (x2)
+- Fake reviews (x2)
+- Lack of security guardrails
+- Inconsistent security measures
+- AI's tendency to act without full context
+- Trust too easily
+- Execute instructions without skepticism
+- Prompt injection
+- Data poisoning
+- Image OCR
+- Malicious instructions
+- False or misleading information
+- Phishing
+- Scam
+- Malvertising campaigns
+- Unusual website behavior
+- Suspicious downloads
+- Remote access tools are being used for malicious activity
+- Scammers are using legitimate software to gain access to victims' computers
+- Victims are being asked to provide sensitive information or grant access to systems
+- Strange or Misleading URLs
+- Too-Good-To-Be-True Prices or Flash Sales
+- Missing or Fake Contact Information
+- No HTTPS or Insecure Checkout Pages
+- Lack of Authentic Social Media Presence or Reviews
+- Poor design
+- Overly attractive deals
+- Missing contact information
+- Fake tracking links
+- Customs fees
+- Refund links
+- Small fees for delivery
+- Follow-up messages that try to collect more money or data
+- The website came from an ad, not a search
+- Influencer impersonation
+- Brand closeout sale templates
+- Countdown timer pressure
+- Only accepts wire transfer, crypto, or gift cards
+- Cards temporarily unavailable at checkout
+- 10% off for Zelle/Venmo payment
+- Directs to unfamiliar payment platform
+- Personal Venmo/Cash App instead of business account
+- Not a legitimate business
+- Pressure to pay immediately
+- Legitimate sellers let you think
+- Timing is everything
+- Hackers can target any business, big or small
+- The CEO phishing scam is when an employee gets a fake email from their CEO, asking them for something 'urgent'
+- The email may be sent late at night or early in the morning
+- The email may use the 'urgent' card to make it seem more legitimate
+- Suspicious login alerts
+- Password reset messages you didn't request
+- Locked accounts or access issues
+- Unusual charges or account activity
+- Urgency and pressure are common scam tactics
+- Verify the sender and URL by using official channels
+- Never share passwords or one-time codes through messages
+- If you clicked, change passwords and review account activity
+- Real-time warnings can help stop lookalike sites before you enter details
+- Misconfigured cloud storage
+- Human error
+- AI models themselves
+- Check the Domain Names and URL's
+- Don't trust the email design
+- Verify the sender's identity
+- Be cautious of urgent or threatening messages
+- Look for spelling or grammar mistakes
+- Be wary of unsolicited emails or messages
+- Check the sender's IP address
+- Be cautious of emails or messages that ask for personal or financial information
+- Check the sender’s email address
+- Lookout for "urgent" bank emails
+- Don’t login to your bank from public Wifi
+- Hover over a link to see the actual URL it leads to
+- Keep a strong password and change it often
+- Beware of fake PayPal emails
+- Look out for spelling mistakes
+- Browse with protection
+- Keep track of your bank statements
+- Unfamiliar network traffic directed to Binance-controlled servers
+- Malicious code hosted on a blockchain
+- Smart contract used to serve malicious code
+- Code updated and changed without being blocked
+- Malicious websites impersonating popular Metaverse platforms
+- Phishing campaigns targeting MetaMask users
+- Use of malvertising techniques to trick users into visiting malicious websites
+- Wallet takeovers and financial losses
+- Lack of awareness and education among Metaverse users
+- phishing
+- scams
+- abuse
+- Thousands of hijacked domains
+- Compromised domains from esteemed brands and institutions
+- Malicious activity using trust associated with domains
+- Spam and phishing emails sent daily
+- Use of SPF, DKIM, and DMARC policies for malicious purposes
+- Unnatural language
+- Review spikes
+- Anomalies
+- Misuse of the platform
+- Lack of transparency
+- Agent Control Standard (ACS)
+- GenAI Security Industry Framework Crosswalk
+- OWASP GenAI LLM Top 10 2026
+- Access to your private data
+- Exposure to untrusted content
+- The ability to externally communicate in a way that could be used to steal your data
+- Paiements à risque très élevé
+- Paiements à risque élevé
+- Paiements à risque normal
+- Paiements à risque inconnu
+- Non évalué
+- Unusual login activity
+- Suspicious transactions
+- Unverified or fake accounts
+- Unusual geographic locations
+- Hacked account
+- Infected device
+- Ransomware attack
+- Suspicious messages
+- Saved card without approval step
+- Auto-filled payment details
+- Phishing emails
+- Booby-trapped CAPTCHAs
+- Fake storefronts
+- Tool Poisoning Attacks
+- Sensitive data exfiltration
+- Unauthorized actions by AI models
+- MCP vulnerability
+- Critical security issue
+- Unfurling of hyperlinks
+- Data exfiltration
+- LLM (large language model) powered Chatbots
+- Slack Apps
+- Prompt injection attack
+
+## Techniques des escrocs (123 uniques)
+
+- Phishing (x4)
+- Prompt injection (x3)
+- Social engineering (x2)
+- Using AI to create fake reviews (x2)
+- ClickFix scam
+- Drive-by download
+- Phishing emails
+- Fake shops
+- Prompt injection via Unicode shenanigans
+- Prompt injection via image OCR
+- Data poisoning
+- Manipulating AI models to produce false or misleading information
+- Using client-side deep learning models to detect visual elements in fraudulent websites
+- Utilizing real-time and bulk data pipelines with dynamic heuristics
+- Mapping, storing, and indexing the entirety of the Chrome Extension ecosystem
+- Probing and mapping the visible internet to gather metadata and fingerprints
+- Using novel approaches to detect
+- Abusing free-tiers and SaaS free trials to gain access to corporate-grade software
+- Using automated scripting to quickly run commands that re-configure services on the victim's computer
+- Manipulating victims into divulging sensitive information or granting access to systems
+- AI-Generated Product Photos and Catalogs
+- AI-Written Reviews and Testimonials
+- Deepfake Customer Support Chats
+- AI Bots Responding to Shoppers in Real Time
+- Creating fake ads
+- Sending phishing emails
+- Sending smishing texts
+- Making phone calls
+- Fake tracking links
+- Customs fees
+- Refund links
+- Small fees for delivery
+- Automated follow-up scams
+- Influencer impersonation
+- Brand closeout sale templates
+- Countdown timer pressure
+- Using gift cards
+- Using cryptocurrency
+- Requesting wire transfers
+- Using Zelle, Venmo, or Cash App
+- Creating lookalike brand sites
+- Using phishing checkout pages
+- Saving card information on untrusted sites
+- Creating pressure to pay immediately
+- Using the 'urgent' card to make the email seem more legitimate
+- Sending the email late at night or early in the morning
+- Using a fake email address that looks similar to the CEO's actual email address
+- Using a phishing kit to send the email
+- Phishing and scam links
+- Credential stuffing attacks
+- Malware and keyloggers
+- SIM swap and man-in-the-middle attacks
+- Weak or missing two-factor authentication
+- Spoofed domains
+- Polished branding
+- Urgency tricks
+- AI-generated emails with perfect grammar and design
+- Exploiting email infrastructure at a level human scammers never could
+- Phishing scams
+- Identity theft tricks
+- Emerging online threats
+- Spoofing
+- Urgency tactics
+- Emotional manipulation
+- Fake websites or domains
+- Malware or viruses
+- Phishing scams via text messages or social media
+- Using urgency to try and get you to act fast
+- Puting a link as text in the email but hyperlinking the text somewhere else
+- Using fake email addresses
+- Using spelling mistakes
+- Using phishing sites pretending to be banks
+- Using a smart contract to host malicious code
+- Utilizing the Binance Smart Chain (BSC) to host code
+- Embedding concealed JS code in article pages
+- Retrieving a second-stage payload from a server controlled by the attackers
+- Malvertising
+- Wallet takeover
+- Impersonation of popular Metaverse platforms
+- Use of advanced technologies to trick users
+- phishing
+- scams
+- impersonation
+- Subdomain hijacking
+- CNAME takeover
+- SPF takeover
+- Use of abandoned domains and IP addresses
+- Exploitation of DNS records and SPF policies
+- Manipulating trust ratings
+- Using generative AI for moderation and policy enforcement
+- Buying fake reviews
+- Manipulating reviews
+- LLM Top 10 for 2025
+- LLM Top 10 for 2023/24
+- Cheat Sheets
+- Whitepapers
+- Tools
+- Learning Videos
+- Solutions Directory
+- Roadmap
+- Newsletter
+- Project Initiatives
+- Exfiltration
+- Jailbreaking
+- Utilisation de modèles d'IA pour évaluer le niveau de risque
+- Utilisation de règles pour autoriser ou bloquer les paiements
+- Utilisation de paramètres de risque pour définir le niveau de risque
+- Utilisation de contrôles de risque pour prévenir les abus des clients
+- Spear phishing
+- Malware and ransomware
+- Fake reviews and ratings
+- Ransomware attacks
+- Suspicious messages
+- Hidden text on a page as instructions
+- Speed, trust, and convenience
+- Tool Poisoning Attacks
+- Shadowing Tool Descriptions
+- Rug Pulls
+- Indirect Prompt Injections
+- Malicious tool descriptions
+- Unfurling of hyperlinks
+- Data exfiltration
+- ASCII Smuggling
+
+## Façons de piéger un agent IA / LLM (107 uniques)
+
+- Data poisoning (x2)
+- Attacking AI Agents directly
+- Stealing personal and payment details
+- Granting access to systems
+- Encrypting files
+- Exfiltrating data
+- Prompt injection
+- Image OCR
+- Manipulating AI models to produce false or misleading information
+- Tricking AI agents with deep learning models to detect visual elements in fraudulent websites
+- Using real-time and bulk data pipelines with dynamic heuristics to evade AI detection
+- Utilizing autonomous threat discovery and prevention to stay one step ahead of AI agents
+- Scammers are using AI-powered tools to create sophisticated phishing campaigns
+- AI-powered tools are being used to analyze and exploit vulnerabilities in software
+- AI-powered tools are being used to create personalized phishing campaigns
+- AI-Generated Product Photos and Catalogs
+- AI-Written Reviews and Testimonials
+- Deepfake Customer Support Chats
+- AI Bots Responding to Shoppers in Real Time
+- Tricking AI agents with fake websites
+- Using AI to create sophisticated phishing emails
+- Fake tracking links
+- Customs fees
+- Refund links
+- Small fees for delivery
+- Automated follow-up scams
+- Influencer impersonation
+- Brand closeout sale templates
+- Countdown timer pressure
+- Tricking AI agents with phishing sites
+- Using AI-generated content to create fake websites
+- Exploiting vulnerabilities in AI-powered security systems
+- Using AI to analyze and predict user behavior
+- Creating AI-powered chatbots to impersonate legitimate businesses
+- AI agents can be tricked into sending phishing emails
+- AI agents can be used to analyze and predict phishing emails
+- AI agents can be used to detect and block phishing emails
+- Tricked into revealing sensitive information
+- Used to steal login credentials or sensitive data
+- Used to hijack browser sessions or intercept data during transmission
+- AI agents can be weaponized against you
+- AI agents can navigate to fake e-commerce sites and complete fraudulent purchases
+- AI agents can be used to download malware or transmit sensitive data
+- AI agents can be used to exploit security gaps in your accounts
+- Data exfiltration
+- Corporate credentials exposure
+- AI-powered phishing scams
+- AI-generated fake websites or domains
+- AI-driven social engineering attacks
+- AI-powered urgency tactics
+- AI-generated emotional manipulation
+- AI-driven malware or virus attacks
+- AI-powered phishing scams via text messages or social media
+- AI agents can be tricked into thinking a link is safe if it is hyperlinked elsewhere
+- AI agents can be tricked into thinking a password is strong if it is changed often
+- AI agents can be tricked into thinking a PayPal email is legitimate if it is from a fake email address
+- Trick AI agents into downloading malicious fake browser updates
+- Trick AI agents into interacting with malicious smart contracts
+- Trick AI agents into evaluating and executing malicious code
+- Tricking AI agents into performing malicious actions
+- Using AI-powered tools to create realistic phishing campaigns
+- Exploiting vulnerabilities in AI systems to launch attacks
+- phishing
+- scams
+- abuse
+- Tricking AI agents with verbose reasoning
+- Using AI browsers to test and refine scamming tactics
+- Exploiting AI-powered security measures
+- Creating sophisticated phishing campaigns using AI-generated content
+- Tricking AI systems with fake data
+- Exploiting biases in AI models
+- AI-powered detection systems
+- Generative AI to identify policy violations
+- Machine learning to moderate content
+- Tricking AI agents with LLM Top 10 for 2025
+- Tricking AI agents with LLM Top 10 for 2023/24
+- Using Cheat Sheets to manipulate AI agents
+- Using Whitepapers to manipulate AI agents
+- Using Tools to manipulate AI agents
+- Using Learning Videos to manipulate AI agents
+- Using Solutions Directory to manipulate AI agents
+- Using Roadmap to manipulate AI agents
+- Using Newsletter to manipulate AI agents
+- Using Project Initiatives to manipulate AI agents
+- Prompt injection attacks
+- Exfiltration attacks
+- Jailbreaking attacks
+- Utilisation de modèles d'IA pour évaluer le niveau de risque
+- Utilisation de règles pour autoriser ou bloquer les paiements
+- Utilisation de paramètres de risque pour définir le niveau de risque
+- Utilisation de contrôles de risque pour prévenir les abus des clients
+- Model evasion
+- Adversarial examples
+- Data tampering
+- Model hijacking
+- AI-powered phishing attacks
+- AI-driven ransomware attacks
+- Money sent to scammers on autopilot
+- Credentials on phishing pages
+- No human checkpoint at all
+- Exfiltrating sensitive data
+- Unauthorized actions
+- Hijacking agent behavior
+- Overriding instructions
+- Shadowing tool descriptions
+- Prompt injection attack
+- ASCII Smuggling
