@@ -3,7 +3,7 @@ export const TIMINGS = {
   /** HQ to the toll */
   approach: 5.5,
   /** the analysis steps (section 5.1), at the fraud's pace; a clean transaction runs them at `healthy` */
-  scan: 0.9,
+  scan: 2.4,
   holo: 1.6,
   authority: 2.4,
   snowball: 2.2,
