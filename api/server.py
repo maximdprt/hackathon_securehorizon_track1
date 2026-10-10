@@ -48,6 +48,21 @@ class AuthorizeReq(BaseModel):
     verdict: str            # allow | block | needs_human (the brain's decision)
     reason: str = ""
     ttl: int = 300
+    full: Optional[dict] = None     # optional: the complete AgenticPaymentVerdict (detection/verdict.schema.json)
+    context: Optional[dict] = None  # optional: UI labels (issuer_label, recipient_label, source_excerpt, ...)
+
+
+# ---- in-memory event bus: every decision is re-broadcast to the 3D city (SSE) ----
+_events: list[str] = []
+_EVENTS_MAX = 500
+# verdict naming: our API uses needs_human, the shared schema uses needs_approval
+_SCHEMA_VERDICT = {"allow": "allow", "block": "block", "needs_human": "needs_approval"}
+
+
+def _publish(message: dict):
+    _events.append(json.dumps(message, default=str))
+    if len(_events) > _EVENTS_MAX:
+        del _events[: len(_events) - _EVENTS_MAX]
 
 
 @app.get("/health")
@@ -69,9 +84,24 @@ def do_authorize(req: AuthorizeReq):
     payment = {"issuer": req.payment.issuer, "recipient": req.payment.recipient, "amount": req.payment.amount}
     try:
         out = az.authorize(payment, req.verdict, reason=req.reason, ttl=req.ttl, nonce=req.payment.nonce)
-        return {"status": "ok", **out}
     except Exception as e:
         raise HTTPException(500, f"{type(e).__name__}: {e}")
+    # re-broadcast to the 3D city (SSE): full AgenticPaymentVerdict if the brain sent one, else a minimal one
+    verdict_obj = req.full or {
+        "instruction_id": out.get("payment_id"),
+        "issuer": req.payment.issuer,
+        "action": "pay",
+        "amount": req.payment.amount / 1e18,
+        "currency": "SEC",
+        "recipient": req.payment.recipient,
+        "verdict": _SCHEMA_VERDICT[req.verdict],
+        "risk_score": 0.08 if req.verdict == "allow" else (0.55 if req.verdict == "needs_human" else 0.9),
+        "reasons": [req.reason] if req.reason else [],
+        "owasp": [],
+        "onchain_flagged": req.verdict == "block",
+    }
+    _publish({"verdict": verdict_obj, "context": req.context or {}, "proof": out})
+    return {"status": "ok", **out}
 
 
 @app.get("/visa/{payment_id}")
@@ -148,6 +178,21 @@ async def feed():
             except Exception as e:  # keep the stream alive on transient RPC errors
                 yield f": err {type(e).__name__}\n\n"
             await asyncio.sleep(2)
+    return StreamingResponse(gen(), media_type="text/event-stream")
+
+
+@app.get("/avaguard/events")
+async def avaguard_events():
+    """SSE verdict stream for the 3D city (sim/liveFeed.ts). Emits `{verdict, context, proof}`
+    in the shared detection/verdict.schema.json shape, one per decision POSTed to /authorize."""
+    async def gen():
+        idx = len(_events)  # only new decisions from now on
+        yield "retry: 2000\n\n: connected\n\n"
+        while True:
+            while idx < len(_events):
+                yield f"data: {_events[idx]}\n\n"
+                idx += 1
+            await asyncio.sleep(1)
     return StreamingResponse(gen(), media_type="text/event-stream")
 
 
