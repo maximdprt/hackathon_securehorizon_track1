@@ -29,26 +29,31 @@ export function AgentEditor({ agent, models, defaultModel, canDelete, onSave, on
   }
 
   return (
-    <form onSubmit={submit} onKeyDown={(e) => e.key === 'Escape' && onCancel()}>
-      <h2>{agent ? "Modifier l'agent" : 'Nouvel agent'}</h2>
-      <p className="lede">Les consignes sont ce que l'agent suit à chaque demande, comme un prompt système.</p>
-      <label className="field">
-        <span className="k">Nom</span>
-        <input ref={nameInput} value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} required />
+    <form className="editor" onSubmit={submit} onKeyDown={(e) => e.key === 'Escape' && onCancel()}>
+      <h2 className="panel__title">{agent ? "Modifier l'agent" : 'Nouvel agent'}</h2>
+      <label className="editor__field">
+        Nom
+        <input className="editor__input" ref={nameInput} value={name} maxLength={NAME_MAX} onChange={(e) => setName(e.target.value)} required />
       </label>
-      <label className="field">
-        <span className="k">Consignes</span>
-        <textarea value={instructions} maxLength={INSTRUCTIONS_MAX} onChange={(e) => setInstructions(e.target.value)} required />
+      <label className="editor__field">
+        Consignes
+        <textarea
+          className="editor__input editor__input--area"
+          value={instructions}
+          maxLength={INSTRUCTIONS_MAX}
+          onChange={(e) => setInstructions(e.target.value)}
+          required
+        />
       </label>
-      <p className="hint">
-        <span>Exemple : « Trouve le meilleur produit. Compare toutes les boutiques sur le prix, la livraison et la garantie. »</span>
-        <span className="count">
+      <p className="editor__hint">
+        <span>Ce que l'agent suit à chaque demande. Exemple : « Trouve le meilleur produit. Compare toutes les boutiques. »</span>
+        <span className="editor__count">
           {instructions.length} / {INSTRUCTIONS_MAX}
         </span>
       </p>
-      <label className="field">
-        <span className="k">Modèle</span>
-        <select value={model} onChange={(e) => setModel(e.target.value)}>
+      <label className="editor__field">
+        Modèle
+        <select className="editor__input" value={model} onChange={(e) => setModel(e.target.value)}>
           {Object.entries(models).map(([id, label]) => (
             <option key={id} value={id}>
               {label}
@@ -56,15 +61,15 @@ export function AgentEditor({ agent, models, defaultModel, canDelete, onSave, on
           ))}
         </select>
       </label>
-      <div className="row">
-        <button type="submit" className="btn" disabled={!valid}>
+      <div className="panel__actions">
+        <button type="submit" className="button button--primary" disabled={!valid}>
           Enregistrer
         </button>
-        <button type="button" className="btn ghost" onClick={onCancel}>
+        <button type="button" className="button" onClick={onCancel}>
           Annuler
         </button>
         {agent && canDelete && (
-          <button type="button" className="btn quiet" onClick={() => (confirming ? onDelete() : setConfirming(true))}>
+          <button type="button" className="button" onClick={() => (confirming ? onDelete() : setConfirming(true))}>
             {confirming ? 'Confirmer la suppression' : 'Supprimer'}
           </button>
         )}
