@@ -149,17 +149,29 @@ class Engine:
         out = v.to_dict()
         out["mandate"] = {"role": mandate.role, "max_amount": mandate.max_amount, "allowed_actions": mandate.allowed_actions} if mandate else None
         out["thresholds"] = list(res.thresholds)
+        out["x402"] = req.context.get("x402") or None
         out["trust_thresholds"] = {"allow_at_or_above": scoring.trust_from_risk(res.thresholds[0]), "block_below": scoring.trust_from_risk(res.thresholds[1])}
         self._effects(out)
         return out
 
+    # hard blocks that say nothing against the recipient itself: protocol or issuer-side failures
+    PROTOCOL_BLOCKS = {"nonce_replay", "amount_matches_402_quote", "facilitator_endorsed", "issuer_in_registry",
+                       "inter_agent_message_signed", "issuer_signature_invalid", "canary_in_outbound", "amount_within_mandate",
+                       "disable_logs_or_confirmation_attempt"}
+
     def _effects(self, out: dict) -> None:
         if out["verdict"] == "block":
             reason = out["reasons"][0][:120] if out["reasons"] else "blocked by guard"
+            hard_ids = {s["id"] for s in out.get("signals", []) if s.get("hard")}
+            recipient_to_blame = bool(hard_ids - self.PROTOCOL_BLOCKS) or not hard_ids  # soft-score block: the whole picture pointed at this counterparty
             try:
-                if out["recipient"]:
-                    self.source.mark_threat(out["recipient"], 3, reason)
                 self.source.mark_threat(out["instruction_id"], 3, reason)
+                if out["recipient"]:
+                    # severity 3 = direct refusal next time; severity 1 = a trace in the registry, informational next time
+                    self.source.mark_threat(out["recipient"], 3 if recipient_to_blame else 1, reason)
+                fac = (out.get("x402") or {}).get("facilitator")
+                if "facilitator_endorsed" in hard_ids and fac:
+                    self.source.mark_threat(fac, 3, "non-endorsed facilitator: " + reason)
                 if not out["authority_check"]["authorized"]:
                     self.source.mark_threat(out["issuer"], 2, "issued an unauthorized order: " + reason)
             except Exception as e:

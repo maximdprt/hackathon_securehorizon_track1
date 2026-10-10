@@ -65,6 +65,8 @@ def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource
         endorsed = [f.lower() for f in data.get("facilitators", [])]
         if fac and endorsed and fac not in endorsed:
             sig.append(Signal("facilitator_endorsed", LAYER, 1.0, f"settlement submitted by non-endorsed facilitator {fac}", hard=True))
+        elif fac and source.is_flagged(fac)[0]:
+            sig.append(Signal("facilitator_endorsed", LAYER, 1.0, f"facilitator {fac} is flagged in the incident registry", hard=True))
         if x.get("sybil_score", 0) > 0.5:
             sig.append(Signal("server_metadata_sybil_score", LAYER, 0.30, f"service metadata duplicated across endpoints (sybil score {x['sybil_score']})"))
         if x.get("confirmations_met") is False:

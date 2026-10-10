@@ -12,7 +12,7 @@ DEFAULT_THRESHOLDS = {"allow_below": 0.30, "block_at_or_above": 0.70,
 
 FLOOR_NEEDS_APPROVAL = {"calldata_undecodable", "authority_source_unavailable", "order_from_memory_not_current_turn"}
 # context, not evidence: they raise the score but never justify an escalation by themselves
-INFORMATIONAL = {"order_origin", "hidden_text_ratio", "amount_just_under_threshold", "tld_risk", "source_is_ad", "tls_missing", "legal_pages_missing", "geo_mismatch"}
+INFORMATIONAL = {"order_origin", "hidden_text_ratio", "recipient_prior_incident_info", "amount_just_under_threshold", "tld_risk", "source_is_ad", "tls_missing", "legal_pages_missing", "geo_mismatch"}
 
 
 def load_thresholds(path: str | Path | None) -> dict:

@@ -81,3 +81,25 @@ def test_verdict_carries_trust_and_deductions(engine):
     a = engine.verify(legit())
     assert a["trust_score"] == 100 and a["deductions"] == []
     assert a["trust_thresholds"]["allow_at_or_above"] in (70, 80)
+
+
+def test_protocol_block_does_not_condemn_the_legit_service(engine):
+    X = "0xa11ce00000000000000000000000000000000004"
+    SERVICE = "0x5e12e40000000000000000000000000000000001"
+    FAC = "0xfac1000000000000000000000000000000000001"
+    over = engine.verify({"order": {"issuer": X, "action": "pay", "amount": 4.9, "recipient": SERVICE, "nonce": "n1"},
+                          "source_context": "402: 0.01 USDC", "context": {"origin": "tool_output", "x402": {"quote_amount": 0.01, "facilitator": FAC}}})
+    assert over["verdict"] == "block"
+    honest = engine.verify({"order": {"issuer": X, "action": "pay", "amount": 0.5, "recipient": SERVICE, "nonce": "n2"},
+                            "source_context": "402: 0.5 USDC", "context": {"origin": "tool_output", "x402": {"quote_amount": 0.5, "facilitator": FAC}}})
+    assert honest["verdict"] == "allow" and honest["trust_score"] >= 65  # origin + info trace only
+    assert any(s["id"] == "recipient_prior_incident_info" for s in honest["signals"])  # the trace stays in the registry
+
+
+def test_unendorsed_facilitator_gets_flagged_not_the_service(engine):
+    X = "0xa11ce00000000000000000000000000000000004"
+    SERVICE = "0x5e12e40000000000000000000000000000000001"
+    ROGUE = "0xfac9999999999999999999999999999999999999"
+    engine.verify({"order": {"issuer": X, "action": "pay", "amount": 0.5, "recipient": SERVICE, "nonce": "n3"},
+                   "source_context": "402", "context": {"origin": "tool_output", "x402": {"quote_amount": 0.5, "facilitator": ROGUE}}})
+    assert engine.source.is_flagged(ROGUE)[1] == 3 and engine.source.is_flagged(SERVICE)[1] == 1

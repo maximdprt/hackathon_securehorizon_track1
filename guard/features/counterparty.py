@@ -71,8 +71,10 @@ def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource
         flagged, sev, reason = source.is_flagged(o.recipient)
         if flagged and sev >= 3:
             sig.append(Signal("recipient_flagged_onchain", LAYER, 1.0, f"recipient already flagged in incident registry (severity {sev}): {reason}", hard=True))
-        elif flagged:
+        elif flagged and sev == 2:
             sig.append(Signal("recipient_flagged_onchain", LAYER, 0.50, f"recipient has a prior incident (severity {sev}): {reason}"))
+        elif flagged:
+            sig.append(Signal("recipient_prior_incident_info", LAYER, 0.15, f"recipient appears in a prior protocol-level incident (severity 1): {reason}"))
 
         known = list((mandate.allowed_recipients if mandate else []) + list(data.get("allowlist", [])))
         sim = address_similarity(o.recipient, known)
