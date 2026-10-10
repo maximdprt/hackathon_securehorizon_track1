@@ -132,7 +132,7 @@ def _tool_result(use: dict, text: str, error: bool = False) -> dict:
 
 
 def _run(out: dict, user_text: str, system: str, tools: list, web: dict, llm, guard, context_for, max_turns: int, emit,
-         unguarded: str = "executed") -> dict:
+         unguarded: str = "executed", catalog=world) -> dict:
     """Boucle de l'agent. `context_for(order, urls, pages)` renvoie (bloc context de verify_payment, verdict
     attendu, pages à transmettre au garde comme contexte source).
 
@@ -160,7 +160,7 @@ def _run(out: dict, user_text: str, system: str, tools: list, web: dict, llm, gu
         for use in uses:
             args, why = use["input"], str(use["input"].get("why", ""))
             if use["name"] == "search" and any(t["name"] == "search" for t in tools):
-                found = world.search(str(args.get("query", "")))
+                found = catalog.search(str(args.get("query", "")))
                 emit({"type": "search", "query": str(args.get("query", "")), "results": found, "why": why})
                 results.append(_tool_result(use, json.dumps(found, ensure_ascii=False)))
             elif use["name"] == "open_page":
@@ -192,7 +192,7 @@ def _run(out: dict, user_text: str, system: str, tools: list, web: dict, llm, gu
                 considered = args.get("considered") if isinstance(args.get("considered"), list) else []
                 out.update(order=order, item=str(args.get("item", "")), why=why, chosen=str(args.get("chosen_merchant", "")),
                            considered=[{"merchant": str(c.get("merchant", "")), "price": c.get("price"), "assessment": str(c.get("assessment", "")),
-                                        "site": world.site_by_name(str(c.get("merchant", "")))}
+                                        "site": catalog.site_by_name(str(c.get("merchant", "")))}
                                        for c in considered[:10] if isinstance(c, dict)])
                 emit({"type": "pay", "order": order, "item": out["item"], "why": why, "chosen": out["chosen"],
                       "site": out.get("site"), "considered": out["considered"]})
@@ -236,11 +236,11 @@ def run_agent(scenario: str, llm, guard=None, max_turns: int = 8, emit=lambda ev
                 llm, guard, context_for, max_turns, emit)
 
 
-def run_open(prompt: str, llm, guard=None, instructions: str = "", max_turns: int = 14, emit=lambda ev: None) -> dict:
-    """Demande libre sur les 5 boutiques. L'agent suit `instructions` (les consignes de son opérateur), cherche,
-    compare, choisit, et s'arrête juste avant le paiement : sans garde l'ordre est prêt mais n'est pas envoyé.
+def run_open(prompt: str, llm, guard=None, instructions: str = "", max_turns: int = 14, emit=lambda ev: None, catalog=world) -> dict:
+    """Demande libre. L'agent suit `instructions` (les consignes de son opérateur), cherche parmi les sites du
+    `catalog` (world = boutiques de démo, market = banc de test produits), compare, choisit, et prépare l'ordre.
 
-    Le jour où le vrai garde existe, il suffit de le passer en `guard` : la même requête lui est envoyée.
+    `guard=None` : l'ordre est prêt mais pas envoyé. Sinon la requête verify_payment part au garde.
     """
     out = _blank("chat", prompt, guard, site=None, instructions=instructions.strip() or DEFAULT_INSTRUCTIONS)
 
@@ -248,12 +248,13 @@ def run_open(prompt: str, llm, guard=None, instructions: str = "", max_turns: in
         # la boutique payée est celle dont une page lue affiche l'adresse du destinataire, pas la dernière page ouverte :
         # l'agent compare plusieurs boutiques avant de payer. Aucune page ne l'affiche : adresse inventée.
         shown = [url for url, html in zip(urls, pages) if order["recipient"].lower() in html.lower()]
-        out["site"] = world.site_of(shown[-1]) if shown else None
-        context = world.merchant_context(out["site"], order) if out["site"] else {}
+        out["site"] = catalog.site_of(shown[-1]) if shown else None
+        context = catalog.merchant_context(out["site"], order) if out["site"] else {}
         # contexte source de l'ordre : les pages des boutiques qui affichent l'adresse payée, pas tout ce que l'agent a lu
-        sites = {world.site_of(url) for url in shown}
-        source = [html for url, html in zip(urls, pages) if world.site_of(url) in sites] or pages
-        return context, world.expected_verdict(out["site"], order), source
+        sites = {catalog.site_of(url) for url in shown}
+        source = [html for url, html in zip(urls, pages) if catalog.site_of(url) in sites] or pages
+        return context, catalog.expected_verdict(out["site"], order), source
 
     system = SYSTEM_OPEN.format(wallet=SHOPPER, instructions=out["instructions"])
-    return _run(out, prompt, system, OPEN_TOOLS, world.web_for(world.SITES), llm, guard, context_for, max_turns, emit, unguarded="ready")
+    return _run(out, prompt, system, OPEN_TOOLS, catalog.web_for(catalog.SITES), llm, guard, context_for, max_turns, emit,
+                unguarded="ready", catalog=catalog)
