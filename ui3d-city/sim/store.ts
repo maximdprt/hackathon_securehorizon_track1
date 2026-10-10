@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { AuditTx, Tone, TxEvent } from "./types";
+import type { GuardVerdict } from "@/components/guard-yard/types";
 
 /* The simulation's state for the UI (cards, figures, alerts). It changes at step boundaries only; the per-frame
    values (positions, sweeps, gauges) live in `motion`, which GSAP tweens and the scene reads in useFrame. */
@@ -38,6 +39,8 @@ export type SimState = {
   view: View;
   viewTx: string | null;
   viewFilter: ViewFilter;
+  /** the Guard Yard open over the city, on this verdict (components/guard-yard/GuardYardModal.tsx) */
+  guard: GuardVerdict | null;
 };
 
 const initial = (): SimState => ({
@@ -61,6 +64,7 @@ const initial = (): SimState => ({
   view: null,
   viewTx: null,
   viewFilter: "all",
+  guard: null,
 });
 
 let state = initial();

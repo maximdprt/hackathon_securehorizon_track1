@@ -53,6 +53,12 @@ l'URL suit (`?view=transactions&tx=tx_0042`), `Échap` ou Précédent ramène à
 Les écrans lisent une seule source (`data/source.ts`) : historique synthétique plus transactions jouées. Pour le MCP
 agent : `NEXT_PUBLIC_AVAGUARD_MCP_URL` dans `.env.local` (`GET /transactions` au format `verdict.schema.json`).
 
+## Guard Yard : scanner et broyeur
+
+Sur une transaction refusée, « Voir le contrôle » (carte d'analyse, audit d'une transaction) ouvre une cinématique 3D :
+portique de radiographie, verdict, grue, presse à épaves, benne du registre des hackers. Aussi seule sur `/guard`.
+Code, timings, branchement d'un verdict et captures : `docs/guard-yard.md`.
+
 ## Branché sur SentinelL1 (le modèle de main)
 
 La ville lit la vraie chaîne de l'équipe via l'API de `main` (`api/server.py`, voir CLAUDE.md 11.3 à 11.7) :
