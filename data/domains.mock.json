@@ -1,0 +1,7 @@
+{
+  "amazon.com": {"age_days": 10000, "tls": true, "legal_pages": true},
+  "walmart.com": {"age_days": 9000, "tls": true, "legal_pages": true},
+  "walmart-deals.lovable.app": {"age_days": 3, "tls": true, "legal_pages": false, "payment_methods": ["crypto", "wire"]},
+  "secure-wellsfargo-login.com": {"age_days": 2, "tls": true, "legal_pages": false, "safe_browsing_flag": false},
+  "api.weather-pro.example": {"age_days": 400, "tls": true, "legal_pages": true}
+}

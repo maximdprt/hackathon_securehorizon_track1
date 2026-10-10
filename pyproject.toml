@@ -1,0 +1,21 @@
+[project]
+name = "guard"
+version = "0.1.0"
+description = "Authority-chain firewall for agentic payments: MCP server + multi-layer scoring engine"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp>=2.0",
+    "beautifulsoup4>=4.12",
+    "boto3>=1.34",
+    "pycryptodome>=3.20",
+]
+
+[project.optional-dependencies]
+chain = ["web3>=6.0"]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["guard", "guard.features"]

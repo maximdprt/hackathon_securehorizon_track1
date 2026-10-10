@@ -82,9 +82,15 @@ Donner de la **crypto en récompense** quand un utilisateur fait une transaction
 - `detection/verdict.schema.json` : le format de verdict partagé. ✅
 - `contracts/AuthorityRegistry.sol` : le contrat "visa" + registre incidents + `assess()`. ✅ (à déployer)
 - Accès AWS OK, Bedrock + Claude OK, Fuji configuré. ✅
+- `guard/` + `mcp_server.py` : **le cerveau** (Corentin/Bruno). Serveur MCP avec 3 outils (`verify_payment`, `list_pending`, `approve_pending`). Pipeline : sanitisation (HTML caché, Unicode invisible, base64) → 7 couches de signaux (contenu, mandat, autorité, contrepartie, transaction, outils, comportement) → blocs durs → Claude Bedrock → noisy-OR + seuils KPMG → sévérité → file humaine + log JSONL + registre menaces. Le mandat est résolu côté serveur (`data/mandates.json`), jamais déclaré par l'agent. ✅
+- `redteam/` : 21 scénarios (S1..S7, M1..M10, A1, I1, contrôles) + `demo/fixtures` (7). `python redteam/run.py` → detection rate 100 %, faux positifs 0 %, latence < 1 ms sans Claude, ~3 s avec. ✅
+- `detection/research/` : taxonomie, 71 features, scénarios, scrap. ✅
+- Spec : `docs/superpowers/specs/2026-10-10-guard-decision-engine-design.md`.
+
+**Lancer le garde** : `uv venv --python 3.12 .venv && uv pip install -e ".[dev]"` puis `set -a; source .env; set +a; .venv/bin/python mcp_server.py` (stdio). `GUARD_LLM=off` pour tourner sans Bedrock. Tests : `.venv/bin/pytest`. Pour brancher Fuji (Walid) : `GUARD_CONTRACT_ADDRESS=0x... AVAX_RPC_URL=... GUARD_OWNER_KEY=...` + `uv pip install -e ".[chain]"`.
 
 ## 12. Prochaines étapes (priorité)
-1. **Walid** : déployer la L1 / le contrat "visa" + coder le `mcp_server.py` (relie le scorer + la lecture on-chain + la décision).
+1. **Walid** : déployer la L1 / le contrat "visa", puis brancher `guard/sources.py:ChainSource` (lecture `authorities`/`threats`, écriture `recordDecision`/`flagThreat`) via les variables d'env. Le `mcp_server.py` est fait côté Corentin/Bruno.
 2. **Corentin + Bruno** : monter les 2 agents sur AWS + les scénarios d'attaque + produire le scoring.
 3. **Maxime** : l'UI 3D + la slide compliance DORA/MiCA + le pitch.
 4. Tous : chemin doré Acte 1 (agent vidé) → Acte 2 (sauvé + visa refusé + log on-chain) → Acte 3 (2e agent immunisé).
