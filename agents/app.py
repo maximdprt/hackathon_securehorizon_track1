@@ -67,7 +67,7 @@ _visitors: dict[str, shops.Session] = {}  # paniers et commandes des humains qui
 
 
 def public_site(key: str) -> dict:
-    s = world.SITES[key]
+    s = world.ALL_SITES[key]
     return {"key": key, "name": s["name"], "domain": s["domain"], "kind": s["kind"], "why": s["why"], "preview": f"/shop/{key}/"}
 
 
@@ -117,7 +117,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"error": "not found"})
         if path == "/api/world":
             buyer = masked(PROFILE)
-            return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID,
+            return self._json(200, {"sites": [public_site(k) for k in world.ALL_SITES], "models": MODELS, "default_model": MODEL_ID,
                                     "profile": {"name": buyer["name"], "city": buyer["city"], "card": buyer["card_number"]},
                                     "guard": _guard.backend if _guard else None, "chain": _chain.base if _chain else None})
         if path == "/search":
@@ -125,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
             page = shops.search_page(query, "/search", lambda key: f"/shop/{key}/").replace('action="/search/"', 'action="/search"')
             return self._send(200, page.encode(), "text/html; charset=utf-8", SHOP_CSP)
         shop = SHOP_PATH.fullmatch(path)
-        if shop and shop.group(1) in world.SITES:
+        if shop and shop.group(1) in world.ALL_SITES:
             return self._shop("GET", shop.group(1), shop.group(2) or "/", {})
         self._json(404, {"error": "not found"})
 
@@ -134,7 +134,7 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(403, {"error": "local only"})
         length = int(self.headers.get("Content-Length", 0))
         shop = SHOP_PATH.fullmatch(self.path.split("?", 1)[0])
-        if shop and shop.group(1) in world.SITES and length <= 20_000:
+        if shop and shop.group(1) in world.ALL_SITES and length <= 20_000:
             fields = parse_qs(self.rfile.read(length).decode("utf-8", "replace"), keep_blank_values=True)
             return self._shop("POST", shop.group(1), shop.group(2) or "/", {k: v[0] for k, v in fields.items()})
         # Content-Type JSON exigé : une page web tierce ne peut pas l'envoyer sans préflight CORS, que l'on n'accorde pas

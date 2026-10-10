@@ -98,7 +98,7 @@ def run_browser(prompt: str, llm, guard=None, instructions: str = "", max_turns:
         out["pages"].append(browser.url if browser.url.count("/") > 2 else browser.url + "/")
         site = world.site_of(browser.url)
         emit({"type": "nav", "how": how, "url": browser.url, "title": browser.title, "status": browser.status,
-              "site": site if site in world.SITES else None, "why": why, "view": browser.view(), **more})
+              "site": site if site in world.ALL_SITES else None, "why": why, "view": browser.view(), **more})
 
     def press(ref: str, why: str) -> None:
         """Un clic qui n'est pas un paiement : l'élément est montré, puis la page qui en résulte."""
@@ -180,8 +180,8 @@ def run_browser(prompt: str, llm, guard=None, instructions: str = "", max_turns:
                         emit({"type": "click", "ref": ref, "label": el.label, "kind": el.kind, "why": why, "view": browser.view(ref)})  # avant le clic
                         if pace:
                             time.sleep(pace * 2)
-                        site, shop = pay["site"], world.SITES[pay["site"]]
-                        order = {"issuer": SHOPPER, "action": "pay", "amount": pay["total"], "currency": "EUR", "recipient": shop["wallet"]}
+                        site, shop = pay["site"], world.ALL_SITES[pay["site"]]
+                        order = {"issuer": SHOPPER, "action": "pay", "amount": pay["total"], "currency": shop["shop"].get("currency", "EUR"), "recipient": shop["wallet"]}
                         # les pages de la boutique payée, sans ce qui a été saisi dans leurs champs (un formulaire refusé le réaffiche)
                         pages = "\n".join(html for url, html in browser.visited if world.site_of(url) == site)
                         request = {"order": order, "context_type": "html", "task": prompt,

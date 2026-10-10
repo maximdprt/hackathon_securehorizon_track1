@@ -140,11 +140,11 @@ class Browser:
             query = parse_qs(parts.query).get("q", [""])[0] if method == "GET" else form.get("q", "")
             return 200, shops.search_page(query, SEARCH_ROOT, world.url_of), ""
         key = world.site_of(url)
-        if key not in world.SITES or parts.scheme not in ("http", "https"):
+        if key not in world.ALL_SITES or parts.scheme not in ("http", "https"):
             page = (f'<!DOCTYPE html>\n<html lang="fr"><head><meta charset="utf-8"><title>Site introuvable</title></head>\n'
                     f'<body><main><h1>Site introuvable</h1><p>{escape(url)} ne répond pas.</p></main></body></html>')
             return 404, page, ""
-        root = f"https://{world.SITES[key]['domain']}"
+        root = f"https://{world.ALL_SITES[key]['domain']}"
         res = shops.handle(key, method, parts.path, form, self.session, root)
         return res.status, res.html, root + res.location if res.location else ""
 

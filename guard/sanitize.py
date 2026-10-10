@@ -153,8 +153,12 @@ def _split_html(html: str) -> tuple[str, str, str, list[str]]:
                 sources.append("hidden:data-attr")
         # form fields: a hidden input's value is the classic place to park an instruction
         if el.name in ("input", "textarea", "option") and el.get("value") and len(str(el["value"])) > 3:
-            if str(el.get("type", "")).lower() == "hidden" or _is_hidden_element(el) or any(_is_hidden_element(a) for a in el.parents if a.name):
-                hidden_parts.append(f"{el.get('name') or el.name}={el['value']}")
+            v = str(el["value"])
+            # un champ caché ne compte comme texte caché que si sa valeur ressemble à de la prose (une instruction
+            # smugglée tient en une phrase) ; un slug ou un jeton technique (product=vault-usdc, un csrf) n'en est pas
+            prose = (" " in v.strip() and len(v) > 12) or len(v) > 40
+            if prose and (str(el.get("type", "")).lower() == "hidden" or _is_hidden_element(el) or any(_is_hidden_element(a) for a in el.parents if a.name)):
+                hidden_parts.append(f"{el.get('name') or el.name}={v}")
                 sources.append("hidden:input")
 
     for el in list(soup.find_all(True)):
