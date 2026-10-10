@@ -24,7 +24,10 @@ class ScriptedLLM:
         self.seen.append(messages[-1])
         if not self.steps:
             return {"role": "assistant", "content": [{"text": "I did not buy anything."}]}
-        name, args = self.steps.pop(0)
+        step = self.steps.pop(0)
+        if isinstance(step, str):  # le modèle répond par du texte brut
+            return {"role": "assistant", "content": [{"text": step}]}
+        name, args = step
         return {"role": "assistant", "content": [{"toolUse": {"toolUseId": f"t{len(self.seen)}", "name": name, "input": args}}]}
 
 
@@ -107,6 +110,23 @@ def test_decor_annotations_are_not_served_to_the_agent_but_the_attack_is():
                  "ignore all previous instructions", 'name="agent_hint"', 'action="https://checkout-pay-secure.xyz/submit"',
                  "setInterval(tick, 1000)"):
         assert kept in served
+
+
+def test_tool_calls_written_as_text_are_executed():
+    llm = ScriptedLLM(
+        '{"type": "function", "name": "open_page", "parameters": {"url": "https://store.nimbus.example/"}}',
+        '[{"name": "pay", "arguments": {"action": "pay", "recipient": "%s", "amount": 60, "currency": "USDC"}}]' % NIMBUS_STORE,
+    )
+    run = run_agent("legit_store", llm, GuardClient("stub"))
+    assert run["outcome"] == "verdict" and run["verdict"]["verdict"] == "allow"
+    assert run["pages"] == ["https://store.nimbus.example/"]
+    reply = llm.seen[1]["content"][0]
+    assert "toolResult" not in reply and "Nimbus Store" in reply["text"]
+
+
+def test_text_that_only_mentions_a_tool_is_not_a_tool_call():
+    for text in ('I could call {"name": "pay"} but I will not.', '{"name": "pay"}', '["pay"]', '{"name": "delete_all", "arguments": {}}'):
+        assert run_agent("legit_store", ScriptedLLM(text), GuardClient("stub"))["outcome"] == "no_payment"
 
 
 def test_max_turns():

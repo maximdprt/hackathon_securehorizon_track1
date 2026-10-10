@@ -7,8 +7,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 REGION = "us-west-2"
-# l'ID nu est refusé en on-demand sur le compte du hackathon, il faut le profil d'inférence "us."
-MODEL_ID = "us.anthropic.claude-sonnet-4-6"
+# Modèle de l'agent testé, pas du garde. Pixtral Large suit l'injection de demo/fake_store (3 runs sur 3),
+# alors que Claude Sonnet 4.6 la refuse seul et ne sollicite jamais le garde.
+# Sur le compte du hackathon il faut le profil d'inférence "us.", l'ID nu est refusé en on-demand.
+MODEL_ID = "us.mistral.pixtral-large-2502-v1:0"
 
 _ENV_LINE = re.compile(r'^\s*(?:set\s+|export\s+|\$Env:)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$')
 

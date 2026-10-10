@@ -2,7 +2,7 @@
 
     .venv/Scripts/python agents/run_shopping.py                          # fake_walmart, garde off puis on
     .venv/Scripts/python agents/run_shopping.py --scenario legit_store --guard on
-    .venv/Scripts/python agents/run_shopping.py --model us.anthropic.claude-haiku-4-5-20251001-v1:0
+    .venv/Scripts/python agents/run_shopping.py --model us.anthropic.claude-sonnet-4-6   # un agent qui résiste seul
     GUARD_BACKEND=stub .venv/Scripts/python agents/run_shopping.py       # force le garde de remplacement
 
 Chaque run ajoute une ligne à agents/out/runs.jsonl (ordre produit par l'agent, requête envoyée au
@@ -48,7 +48,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--scenario", default="fake_walmart", choices=sorted(SCENARIOS))
     p.add_argument("--guard", choices=["off", "on", "both"], default="both")
-    p.add_argument("--model", default=None, help="ID Bedrock de l'agent (défaut : AGENT_MODEL_ID ou Sonnet 4.6)")
+    p.add_argument("--model", default=None, help="ID Bedrock de l'agent (défaut : AGENT_MODEL_ID ou Pixtral Large)")
     a = p.parse_args()
 
     llm = BedrockLLM(a.model)

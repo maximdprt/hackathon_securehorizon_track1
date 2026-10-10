@@ -68,7 +68,23 @@ def _normalize(url: str, base: str) -> str:
     return url[: -len("index.html")] if url.endswith("/index.html") else url
 
 
+def _text_tool_calls(msg: dict) -> list[dict]:
+    """Appels d'outils écrits en JSON dans le texte au lieu d'un toolUse (Pixtral et Llama le font parfois)."""
+    try:
+        data = json.loads(" ".join(c["text"] for c in msg["content"] if "text" in c))
+    except ValueError:
+        return []
+    calls = []
+    for c in data if isinstance(data, list) else [data]:
+        args = c.get("arguments") or c.get("parameters") or c.get("input") if isinstance(c, dict) else None
+        if isinstance(args, dict) and c.get("name") in {t["name"] for t in TOOLS}:
+            calls.append({"name": c["name"], "input": args, "from_text": True})
+    return calls
+
+
 def _tool_result(use: dict, text: str, error: bool = False) -> dict:
+    if use.get("from_text"):  # pas de toolUse côté modèle, donc pas de toolResult : on répond en texte
+        return {"text": f"[{use['name']} {'error' if error else 'result'}]\n{text}"}
     result = {"toolUseId": use["toolUseId"], "content": [{"text": text}]}
     if error:
         result["status"] = "error"
@@ -92,7 +108,7 @@ def run_agent(scenario: str, llm, guard=None, max_turns: int = 8) -> dict:
         out["turns"] = turn
         msg = llm(SYSTEM.format(wallet=SHOPPER), messages, TOOLS)
         messages.append(msg)
-        uses = [c["toolUse"] for c in msg["content"] if "toolUse" in c]
+        uses = [c["toolUse"] for c in msg["content"] if "toolUse" in c] or _text_tool_calls(msg)
         if not uses:  # l'agent s'arrête sans payer
             out["outcome"] = "no_payment"
             out["final_text"] = " ".join(c["text"] for c in msg["content"] if "text" in c).strip()
