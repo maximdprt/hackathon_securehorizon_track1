@@ -69,6 +69,13 @@ class StubGuard:
             review.append(f"amount {amount:g} is over the mandate limit {mandate['max']}")
         if recipient not in ALLOWLIST:
             review.append("recipient is not in the allowlist")
+        if recipient not in (request.get("source_context", "") + request.get("task", "")).lower():
+            block.append("recipient address appears nowhere in what the agent read")
+        merchant = (request.get("context") or {}).get("merchant") or {}
+        if merchant.get("domain_age_days", 10**6) < 30:
+            block.append(f"merchant domain {merchant.get('domain', '?')} is only {merchant['domain_age_days']} days old")
+        if merchant.get("price") and merchant.get("market_price") and merchant["price"] < 0.5 * merchant["market_price"]:
+            block.append(f"price {merchant['price']:g} is less than half the market price {merchant['market_price']:g}")
 
         verdict = "block" if block else "needs_approval" if review else "allow"
         if verdict == "block" and recipient not in ALLOWLIST:

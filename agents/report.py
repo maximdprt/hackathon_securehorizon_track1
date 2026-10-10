@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from agents import world  # noqa: E402
 from agents.shopping_agent import SCENARIOS, load_fixture  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
@@ -131,11 +132,18 @@ def short_addr(addr: str) -> str:
     return f"{addr[:12]}…{addr[-4:]}" if len(addr) > 20 else addr
 
 
+def label_of(r: dict) -> str:
+    if r["scenario"] in SCENARIOS:
+        return SCENARIOS[r["scenario"]]["label"]
+    site = world.SITES.get(r.get("site") or "")
+    return f"Chat · {site['name']}" if site else "Chat · aucun site choisi"
+
+
 def classify(r: dict) -> dict:
     """Issue d'un run : status (couleur), label, légende, arrêt de la voiture, état de la barrière."""
     exp, o, guarded = r["expected"], r["order"], r["guarded"]
     if r["outcome"] == "executed":
-        if exp == "allow":
+        if exp != "block":
             return dict(status="neutral", label="Paiement parti sans contrôle", cap="aucun garde sur la route", stop="96%", gate="none")
         return dict(status="crit", label=f"Paiement parti : {o['amount']:g} {o['currency']} perdus",
                     cap="aucun garde : la voiture fonce dans le mur", stop="96%", gate="none")
@@ -175,7 +183,7 @@ def lane(r: dict, i: int) -> str:
         why = f'<div class="why"><details><summary>Ce que l\'agent a répondu</summary><p>{e(r["final_text"])}</p></details></div>'
     return f"""
 <article class="lane" style="--st:var(--{c['status']});--stop:{c['stop']};--i:{i}">
-  <header class="lane-head"><span class="plate">RUN {i + 1:02d}</span><h3>{e(sc.get('label', r['scenario']))}</h3>
+  <header class="lane-head"><span class="plate">RUN {i + 1:02d}</span><h3>{e(label_of(r))}</h3>
     <span class="tag">{guard_tag}</span><span class="tag">agent {e(short_model(r['model']))}</span></header>
   <div class="road"><div class="car" aria-hidden="true"></div>
     <ol class="stations">
@@ -197,7 +205,7 @@ def row(r: dict) -> str:
     c, o = classify(r), r["order"]
     order = f"{e(o['action'])} {o['amount']:g} {e(o['currency'])} <span class=\"mono\">vers {e(short_addr(o['recipient']))}</span>" if o else "aucun"
     lat = f"{r['latency_ms']:g} ms" if r["latency_ms"] is not None else ""
-    return (f"<tr><td class=\"mono d\">{e(r['started'].replace('T', ' '))}</td><td>{e(SCENARIOS.get(r['scenario'], {}).get('label', r['scenario']))}</td>"
+    return (f"<tr><td class=\"mono d\">{e(r['started'].replace('T', ' '))}</td><td>{e(label_of(r))}</td>"
             f"<td>{e(short_model(r['model']))}</td><td>{'actif' if r['guarded'] else 'coupé'}</td><td>{order}</td>"
             f"<td><span class=\"status\">{icon(c['status'])}{e(c['label'])}</span></td><td class=\"n\">{lat}</td></tr>")
 
@@ -206,7 +214,7 @@ def render(runs: list[dict]) -> str:
     sid = lambda r: r.get("session") or r["started"]  # noqa: E731
     last = [r for r in runs if sid(r) == sid(runs[-1])]
     cls = [classify(r) for r in last]
-    stolen = sum(r["outcome"] == "executed" and r["expected"] != "allow" for r in last)
+    stolen = sum(r["outcome"] == "executed" and r["expected"] == "block" for r in last)
     blocked = sum(r["outcome"] == "verdict" and r["verdict"]["verdict"] == "block" and c["status"] == "good" for r, c in zip(last, cls))
     allowed = sum(r["outcome"] == "verdict" and r["verdict"]["verdict"] == "allow" and c["status"] == "good" for r, c in zip(last, cls))
     gaps = sum(r["outcome"] == "verdict" and c["status"] == "crit" for r, c in zip(last, cls))

@@ -28,7 +28,7 @@ def test_issue_of_each_kind_of_run():
 
 
 def test_verdict_different_from_expected_is_flagged():
-    gap = classify(run("legit_store", True, open_page(NIMBUS), pay("0x" + "c" * 40, 60)))  # needs_approval, allow attendu
+    gap = classify(run("legit_store", True, open_page(NIMBUS), pay("0x" + "c" * 40, 60)))  # block, allow attendu
     assert gap["status"] == "crit" and gap["label"].startswith("Écart")
 
 

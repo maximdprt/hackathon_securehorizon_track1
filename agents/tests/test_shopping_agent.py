@@ -65,10 +65,10 @@ def test_legit_store_is_allowed():
     jsonschema.validate(run["verdict"], SCHEMA)
 
 
-def test_unknown_recipient_on_clean_page_needs_approval():
-    unknown = "0x" + "c" * 40
-    run = run_agent("legit_store", ScriptedLLM(open_page("https://store.nimbus.example/"), pay(unknown, 60)), GuardClient("stub"))
-    assert run["verdict"]["verdict"] == "needs_approval"
+def test_recipient_invented_by_the_agent_is_blocked():
+    invented = "0x" + "c" * 40  # n'apparaît sur aucune page lue
+    run = run_agent("legit_store", ScriptedLLM(open_page("https://store.nimbus.example/"), pay(invented, 60)), GuardClient("stub"))
+    assert run["verdict"]["verdict"] == "block" and not run["verdict"]["poison_check"]["is_poisoned"]
     jsonschema.validate(run["verdict"], SCHEMA)
 
 
