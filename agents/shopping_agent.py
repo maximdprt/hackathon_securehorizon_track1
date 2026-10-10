@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from agents.common import tools as T  # noqa: E402
-from agents.common.guard_client import GuardClient  # noqa: E402
+from agents.common.guard_client import OUT_DIR, GuardClient  # noqa: E402
 from agents.common.llm import DEFAULT_MODEL, Tool, run_agent  # noqa: E402
 from agents.common.wallet import Wallet  # noqa: E402
 
@@ -192,7 +192,7 @@ def main():
     out = {"agent": "shopping", "issuer": agent.wallet.address, "guard": a.guard, "transport": a.transport, "model": a.model,
            "task": a.task, "target": target, "doc": a.doc, "balance_before": a.balance, "balance_after": agent.wallet.balance,
            "drained": drained, "guard_calls": guard.calls if guard else [], "run": run.to_dict(), "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
-    out_path = (Path(a.out) if a.out else ROOT / "agents" / "out" / f"shopping_{'guard' if guard else 'noguard'}_{int(time.time())}.json").resolve()
+    out_path = (Path(a.out) if a.out else OUT_DIR / f"shopping_{'guard' if guard else 'noguard'}_{int(time.time())}.json").resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str))
     print(col(f"-> {out_path.relative_to(ROOT) if out_path.is_relative_to(ROOT) else out_path}", "dim"))

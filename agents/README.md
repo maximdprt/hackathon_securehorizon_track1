@@ -61,7 +61,15 @@ L'agent voit la page comme un navigateur agentique : texte rendu (y compris hors
 brute** que la couche outil a gardée de côté (`source_context`), plus les faits que l'agent déclare (`context.merchant`,
 `context.x402`, `context.history`). L'agent ne peut donc ni mentir sur ce qu'il a lu ni cacher le contenu invisible.
 
-## AWS
+## AWS (hébergé)
 
-Les agents tournent partout où Bedrock répond (creds dans `.env`, région us-west-2). Pour l'hébergement sur AWS
-(AgentCore ou conteneur), un `Dockerfile` viendra ici : même code, `AGENT_MODEL_ID` et `GUARD_*` en variables d'env.
+Les deux agents, le garde et le décor tournent dans **une Lambda en image conteneur arm64** derrière une API Gateway
+publique (la Function URL est bloquée par une SCP sur le compte hackathon ; AgentCore est refusé aussi). Voir `deploy/README.md`.
+
+- URL : https://yo6k6eid4h.execute-api.us-west-2.amazonaws.com/ (index HTML avec un lien par scénario)
+- `?agent=shopping&scenario=promptfix&guard=off` rejoue l'acte 1 pour de vrai sur AWS, `guard=on` l'acte 2
+- `?agent=x402&scenario=premium|partner|replay|migrated|weather&guard=on`, `&calls=2` pour le replay
+- `&mode=async` puis `?run=<run_id>` pour les runs de plus de 30 s (limite API Gateway), résultat sur S3
+- `&data=keep` enchaîne les actes sur le même registre dans un conteneur chaud
+
+Redéployer : `set -a; source .env; set +a; .venv/bin/python deploy/deploy_lambda.py` (build, push ECR, update, API).

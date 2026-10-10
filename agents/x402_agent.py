@@ -26,7 +26,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from agents.common.guard_client import GuardClient  # noqa: E402
+from agents.common.guard_client import OUT_DIR, GuardClient  # noqa: E402
 from agents.common.llm import DEFAULT_MODEL, Tool, run_agent  # noqa: E402
 from agents.common.wallet import Wallet  # noqa: E402
 from agents.fake_api.server import serve  # noqa: E402
@@ -55,6 +55,7 @@ class X402Agent:
         self.quotes: dict[str, dict] = {}     # resource -> dernier 402 reçu (brut)
         self.payments: dict[str, dict] = {}   # resource -> ordre signé (pour le header X-PAYMENT)
         self.events: list[dict] = []
+        self.expected_seq: list[str] = []   # verdict attendu pour le 1er, 2e… appel au garde
 
     def call_api(self, resource: str) -> dict:
         url = self.base + resource
@@ -84,6 +85,8 @@ class X402Agent:
                 self.payments[resource] = order
             self.events.append({"kind": "pay", "order": order, "guard": None, "result": res})
             return {"guard": "disabled", **res}
+        if self.expected_seq:
+            self.guard.label["expected"] = self.expected_seq[min(len(self.guard.calls), len(self.expected_seq) - 1)]
         context = {"origin": "tool_output", "history": self.wallet.history(),
                    "x402": {"quote_amount": q.get("amount"), "facilitator": q.get("facilitator"), "nonce": q.get("nonce")}}
         verdict = self.guard.verify(order, json.dumps(self.quotes[resource]), "tool_output", self.task, context)
@@ -123,7 +126,7 @@ def main():
     p.add_argument("--port", type=int, default=8402)
     p.add_argument("--balance", type=float, default=20.0)
     p.add_argument("--out", default=None)
-    p.add_argument("--expected", choices=["allow", "needs_approval", "block"], default=None, help="verdict attendu du scénario joué (journal de calibration)")
+    p.add_argument("--expected", default=None, help="verdict attendu du scénario (journal de calibration) ; liste par appel possible : allow,block")
     p.add_argument("--family", default=None, help="famille taxo du scénario joué (journal de calibration)")
     a = p.parse_args()
 
@@ -135,8 +138,10 @@ def main():
 
     guard = GuardClient(a.transport, a.data_dir, llm=a.guard_llm == "on") if a.guard == "on" else None
     if guard:
-        guard.label = {"expected": a.expected, "family": a.family, "agent": "x402"}
+        guard.label = {"expected": (a.expected or "").split(",")[0] or None, "family": a.family, "agent": "x402"}
     agent = X402Agent(base, guard, task, a.balance)
+    if guard and a.expected:
+        agent.expected_seq = [x.strip() for x in a.expected.split(",") if x.strip()]
     print(col(f"x402 service agent · issuer={SERVICE_AGENT[:12]}… · guard={'ON (' + a.transport + ')' if guard else 'OFF'} · resource={a.resource} · model={a.model.split('.')[-1][:28]}", "bold", "b"))
     print(f"wallet: {agent.wallet.balance:.1f} USDC   mandat: 5 USDC max/appel, 1 destinataire autorisé\n")
 
@@ -170,7 +175,7 @@ def main():
     out = {"agent": "x402", "issuer": SERVICE_AGENT, "guard": a.guard, "transport": a.transport, "model": a.model, "resource": a.resource,
            "calls": a.calls, "balance_before": a.balance, "balance_after": agent.wallet.balance, "spent": spent,
            "guard_calls": guard.calls if guard else [], "payments": agent.events, "run": run.to_dict(), "ts": time.strftime("%Y-%m-%dT%H:%M:%S")}
-    out_path = (Path(a.out) if a.out else ROOT / "agents" / "out" / f"x402_{a.resource.strip('/')}_{'guard' if guard else 'noguard'}_{int(time.time())}.json").resolve()
+    out_path = (Path(a.out) if a.out else OUT_DIR / f"x402_{a.resource.strip('/')}_{'guard' if guard else 'noguard'}_{int(time.time())}.json").resolve()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str))
     print(col(f"-> {out_path.relative_to(ROOT) if out_path.is_relative_to(ROOT) else out_path}", "dim"))

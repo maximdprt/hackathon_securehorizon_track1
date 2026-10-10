@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
+OUT_DIR = Path(os.environ.get("AGENTS_OUT_DIR") or ROOT / "agents" / "out")   # Lambda : AGENTS_OUT_DIR=/tmp/agents_out
 
 
 class GuardClient:
@@ -24,7 +25,7 @@ class GuardClient:
         self.data_dir = self._prepare_data(data_dir, isolate)
         self.calls: list[dict] = []
         self.label: dict = {}            # {"expected": "block", "family": "E"} posé par le scénario joué
-        self.payload_log = ROOT / "agents" / "out" / "payloads.jsonl"
+        self.payload_log = OUT_DIR / "payloads.jsonl"
         if transport == "inproc":
             sys.path.insert(0, str(ROOT))
             from guard.engine import Engine
@@ -42,7 +43,7 @@ class GuardClient:
             return Path(data_dir)
         if not isolate:
             return ROOT / "data"
-        tmp = ROOT / "agents" / "out" / "data"
+        tmp = OUT_DIR / "data"
         if tmp.exists():
             shutil.rmtree(tmp)
         shutil.copytree(ROOT / "data", tmp, ignore=shutil.ignore_patterns("decisions.jsonl", "pending.json", "nonces.json"))
