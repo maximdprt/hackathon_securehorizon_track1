@@ -55,7 +55,7 @@ MODELS = {  # modèles proposés pour un agent
 SHOP_PATH = re.compile(r"/shop/([a-z0-9]+)(/.*)?")
 # Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe.
 SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
-PACE = 0.25  # secondes entre deux champs remplis, pour qu'on les voie à l'écran
+PACE = 0  # le serveur n'attend pas entre deux gestes : c'est l'interface qui les joue à vitesse humaine
 _llms: dict[str, BedrockLLM] = {}
 _visitors: dict[str, shops.Session] = {}  # paniers et commandes des humains qui visitent /shop, par cookie
 

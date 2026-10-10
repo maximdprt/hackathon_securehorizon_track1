@@ -267,7 +267,8 @@ test('applyEvent groups form fields into one step, keeps a frame per page, and p
   const events = run().slice(0, 10);
   const msg = events.reduce((m, ev) => applyEvent(m, ev, name), start);
   expect(msg.frames).toHaveLength(7); // recherche, boutique, clic, panier, deux champs, clic sur Payer
-  expect(msg.frames.map((f) => f.patch)).toEqual([false, false, false, false, true, true, false]);
+  expect(msg.frames.map((f) => f.kind)).toEqual(['nav', 'nav', 'click', 'nav', 'fill', 'fill', 'click']);
+  expect(msg.frames.map((f) => f.how ?? f.ref)).toEqual(['search', 'goto', 'e6', 'click', 'e5', 'e11', 'e14']);
   const form = msg.steps.find((s) => s.kind === 'fill')!;
   expect(form.fields).toEqual([{ label: 'E-mail', value: 'camille.martin@example.com' }, { label: 'Numéro de carte', value: '•••• •••• •••• 4242' }]);
   expect(form.frame).toBe(5); // le geste montre le dernier champ rempli

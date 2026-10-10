@@ -1,7 +1,15 @@
 import type { Considered, EndEvent, RunEvent, View } from './types';
 
 /** Une image du navigateur de l'agent : la page à un instant du run. */
-export type Frame = View & { id: number; patch: boolean };
+export type Frame = View & {
+  id: number;
+  /** nav : une page chargée. click, fill : un geste joué sur la page déjà affichée. */
+  kind: 'nav' | 'click' | 'fill';
+  /** Pour une page chargée : par une recherche, une adresse, ou à la suite d'un clic. */
+  how?: 'search' | 'goto' | 'click';
+  /** Le repère de l'élément cliqué ou rempli. */
+  ref?: string;
+};
 
 /** Un geste de l'agent dans le fil : on peut cliquer dessus pour revoir la page à ce moment-là. */
 export type Step = {
@@ -38,7 +46,12 @@ const pageName = (title: string) => title.split(' | ')[0];
 
 /** Applique un geste reçu du serveur à la réponse de l'agent. Fonction pure : elle rend un nouveau message. */
 export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: string | null) => string | undefined): AgentMessage {
-  const frames = 'view' in ev ? [...msg.frames, { ...ev.view, id: msg.frames.length, patch: ev.type === 'fill' }] : msg.frames;
+  const frames: Frame[] =
+    ev.type === 'nav'
+      ? [...msg.frames, { ...ev.view, id: msg.frames.length, kind: 'nav', how: ev.how }]
+      : ev.type === 'click' || ev.type === 'fill'
+        ? [...msg.frames, { ...ev.view, id: msg.frames.length, kind: ev.type, ref: ev.ref }]
+        : msg.frames;
   const frame = 'view' in ev ? frames.length - 1 : undefined;
   const add = (step: Omit<Step, 'id'>): AgentMessage => ({ ...msg, frames, steps: [...msg.steps, { ...step, id: msg.steps.length, frame }] });
   switch (ev.type) {

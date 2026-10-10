@@ -7,6 +7,7 @@ import { BrowserView } from './components/BrowserView';
 import { Composer } from './components/Composer';
 import { Panel } from './components/Panel';
 import { applyEvent, type AgentMessage, type Message } from './run';
+import { durationOf, sleep } from './timing';
 import type { Agent, World } from './types';
 
 const IDEAS = [
@@ -133,6 +134,7 @@ export default function App() {
         for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model }, abort.signal)) {
           ended ||= ev.type === 'end' || ev.type === 'error';
           patch((m) => applyEvent(m, ev, shopName));
+          await sleep(durationOf(ev), abort.signal); // le geste se joue à l'écran avant le suivant
         }
         if (!ended) patch((m) => ({ ...m, status: 'error', error: 'Le serveur a coupé la réponse avant la fin du run.' }));
       } catch (err) {
@@ -207,6 +209,9 @@ export default function App() {
     <div className="agentic">
       <BrowserView
         frame={frame}
+        frameKey={shown ? `${shown.id}:${shown.frame}:${pin ? 'replay' : 'live'}` : ''}
+        animate={pin === null}
+        agentName={source?.agentName ?? current.name}
         sites={world.sites}
         caption={step?.label ?? (frame ? frame.title : '')}
         why={step?.why}
