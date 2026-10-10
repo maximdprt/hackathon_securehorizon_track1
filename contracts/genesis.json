@@ -1,0 +1,44 @@
+{
+  "config": {
+    "chainId": 99999,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "muirGlacierBlock": 0,
+    "feeConfig": {
+      "gasLimit": 12000000,
+      "minBaseFee": 25000000000,
+      "targetGas": 60000000,
+      "baseFeeChangeDenominator": 36,
+      "minBlockGasCost": 0,
+      "maxBlockGasCost": 1000000,
+      "targetBlockRate": 2,
+      "blockGasCostStep": 200000
+    },
+    "txAllowListConfig": {
+      "blockTimestamp": 0,
+      "adminAddresses": ["0xaF11630142CF1f829B87c586C0a6C980B61A855d"]
+    },
+    "contractDeployerAllowListConfig": {
+      "blockTimestamp": 0,
+      "adminAddresses": ["0xaF11630142CF1f829B87c586C0a6C980B61A855d"]
+    }
+  },
+  "alloc": {
+    "aF11630142CF1f829B87c586C0a6C980B61A855d": {
+      "balance": "0x295BE96E64066972000000"
+    }
+  },
+  "gasLimit": "0xB71B00",
+  "timestamp": "0x0",
+  "difficulty": "0x0",
+  "nonce": "0x0",
+  "extraData": "0x",
+  "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "coinbase": "0x0000000000000000000000000000000000000000"
+}
