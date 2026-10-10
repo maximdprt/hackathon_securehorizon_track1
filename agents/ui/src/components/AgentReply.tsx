@@ -1,16 +1,11 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { initials } from '../agents';
 import { amount, planOf, type AgentMessage, type Step } from '../run';
 import type { EndEvent } from '../types';
-import { Card, Check, Doc, Globe } from './Icons';
+import { Alert, Card, Check, Doc, Globe, Pen, Pointer, Scale } from './Icons';
 
-const STATE: Record<Step['kind'], { label: string; muted?: boolean } | null> = {
-  search: { label: 'Terminé' },
-  shop: { label: 'Terminé' },
-  missing: { label: 'Introuvable', muted: true },
-  invalid: { label: "Renvoyé à l'agent", muted: true },
-  order: { label: 'Prêt, non envoyé', muted: true },
-  thought: null,
+const ICON: Record<Step['kind'], ReactNode> = {
+  search: <Globe />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, invalid: <Alert />, thought: <Doc />,
 };
 
 function Plan({ msg }: { msg: AgentMessage }) {
@@ -29,73 +24,90 @@ function Plan({ msg }: { msg: AgentMessage }) {
   );
 }
 
-function ToolLine({ step }: { step: Step }) {
-  const state = STATE[step.kind];
+function StepLine({ step, selected, onSelect }: { step: Step; selected: boolean; onSelect: (frame: number) => void }) {
+  const body = (
+    <>
+      <span className="tool__icon">{ICON[step.kind]}</span>
+      <span className="tool__name">{step.label}</span>
+      {step.meta && <span className={`tool__meta${step.kind === 'thought' || step.kind === 'invalid' || step.kind === 'pay' ? '' : ' mono'}`}>{step.meta}</span>}
+      {step.why && <span className="tool__note">{step.why}</span>}
+      {step.fields && (
+        <span className="tool__fields">
+          {step.fields.map((f, i) => (
+            <span key={i} className="tool__field">
+              <span className="tool__field-label">{f.label}</span>
+              <span className="mono">{f.value}</span>
+            </span>
+          ))}
+        </span>
+      )}
+      {step.considered && step.considered.length > 0 && (
+        <span className="tool__fields">
+          {step.considered.map((c, i) => (
+            <span key={i} className={`tool__field tool__field--stack${c.site && c.site === step.site ? ' tool__field--picked' : ''}`}>
+              <span className="tool__field-label">
+                {c.merchant}
+                {c.price != null ? ` · ${amount(c.price)} €` : ''}
+              </span>
+              <span>{c.assessment}</span>
+            </span>
+          ))}
+        </span>
+      )}
+    </>
+  );
+  // Un geste qui a une image du navigateur est un bouton : il fait revoir la page à ce moment-là.
   return (
-    <li className="tool">
-      <span className="tool__icon">{step.kind === 'search' ? <Globe /> : step.kind === 'order' ? <Card /> : <Doc />}</span>
-      <span className="tool__name">{step.name}</span>
-      <span className={`tool__meta${step.kind === 'order' || step.kind === 'shop' ? ' mono' : ''}`}>{step.meta}</span>
-      {state && <span className={`tool__state${state.muted ? ' tool__state--muted' : ''}`}>{state.label}</span>}
-      {step.why && <p className="tool__note">{step.why}</p>}
-      {step.found && <p className="tool__note tool__note--found">Relevé : {step.found}</p>}
+    <li>
+      {step.frame === undefined ? (
+        <div className={`tool tool--${step.kind}`}>{body}</div>
+      ) : (
+        <button type="button" className={`tool tool--${step.kind} tool--button`} aria-pressed={selected} onClick={() => onSelect(step.frame!)}>
+          {body}
+        </button>
+      )}
     </li>
   );
 }
 
-function Tools({ msg }: { msg: AgentMessage }) {
-  return (
-    <ul className="tools" aria-label="Actions de l'agent">
-      {msg.steps.map((step) => (
-        <ToolLine key={step.id} step={step} />
-      ))}
-      {msg.status === 'running' && (
-        <li className="tool tool--running">
-          <span className="tool__icon">
-            <Doc />
-          </span>
-          <span className="tool__name">Réflexion</span>
-          <span className="tool__meta">en cours</span>
-          <span className="tool__dots" aria-hidden="true">
-            <span className="tool__dot" />
-            <span className="tool__dot" />
-            <span className="tool__dot" />
-          </span>
-        </li>
-      )}
-    </ul>
-  );
-}
-
-/** La décision de l'agent en texte, puis ce que le bac à sable sait et que l'agent ignore. */
-function Decision({ end }: { end: EndEvent }) {
-  if (end.outcome !== 'ready' || !end.order) {
+/** La fin du run en texte, puis ce que le bac à sable sait et que l'agent ignore. */
+function Outcome({ end }: { end: EndEvent }) {
+  const { site, confirmation } = end;
+  if (end.outcome === 'paid' && confirmation) {
+    const legit = site?.kind === 'legit';
     return (
       <>
-        <p className="chat__text chat__text--strong">{end.outcome === 'no_payment' ? "Je n'ai rien acheté." : `Je n'ai pas réussi à décider en ${end.turns} étapes.`}</p>
+        <p className="chat__text chat__text--strong">Commande passée chez {(site?.name ?? 'une boutique inconnue').replace(/\.$/, '')}.</p>
+        <p className="chat__text">
+          Commande {confirmation.id}, {amount(confirmation.total)} €, payée avec la carte se terminant par {confirmation.card.last4}.
+        </p>
         {end.final_text && <p className="chat__text">{end.final_text}</p>}
+        <section className="plan">
+          <h3 className="plan__title">Bac à sable</h3>
+          <div className="plan__row">
+            <span className={`pill pill--${legit ? 'ok' : 'warn'}`}>Boutique {legit ? 'légitime' : 'frauduleuse'}</span>
+            <p className="plan__text">{site?.why}</p>
+          </div>
+          <p className="plan__text">
+            Cette boutique a reçu le nom, l'e-mail et l'adresse de {confirmation.buyer.name}, ainsi que le numéro complet de sa carte, sa date
+            d'expiration et son cryptogramme.
+          </p>
+          <p className="plan__text">Aucun garde n'était branché : le paiement est parti. Le garde se placera juste avant le clic sur « Payer ».</p>
+        </section>
       </>
     );
   }
-  const { order, site } = end;
-  const name = (site?.name ?? (end.chosen || 'une boutique inconnue')).replace(/\.$/, '');
-  const legit = site?.kind === 'legit';
+  const text = {
+    blocked: 'Le garde a bloqué le paiement.',
+    needs_approval: 'Le garde demande une validation humaine avant de payer.',
+    no_payment: "Je n'ai rien acheté.",
+    max_turns: `Je n'ai pas réussi à finir l'achat en ${end.turns} étapes.`,
+    paid: 'Commande passée.',
+  }[end.outcome];
   return (
     <>
-      <p className="chat__text chat__text--strong">Je choisis {name}.</p>
-      <p className="chat__text">
-        {end.item || 'Article'} à {amount(order.amount)} {order.currency}
-        {site ? `, sur ${site.domain}` : ''}.
-      </p>
-      {end.why && <p className="chat__text">{end.why}</p>}
-      <section className="plan">
-        <h3 className="plan__title">Bac à sable</h3>
-        <div className="plan__row">
-          <span className={`pill pill--${legit ? 'ok' : 'warn'}`}>{site ? `Boutique ${legit ? 'légitime' : 'frauduleuse'}` : 'Adresse inconnue'}</span>
-          <p className="plan__text">{site ? site.why : "L'adresse payée n'apparaît sur aucune page lue : l'agent l'a inventée ou mal recopiée."}</p>
-        </div>
-        <p className="plan__text">Arrêté juste avant le paiement. Le garde n'est pas branché : l'ordre est prêt, il n'est pas envoyé.</p>
-      </section>
+      <p className="chat__text chat__text--strong">{text}</p>
+      {end.final_text && <p className="chat__text">{end.final_text}</p>}
     </>
   );
 }
@@ -118,7 +130,15 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function AgentReply({ msg, onRetry }: { msg: AgentMessage; onRetry: (prompt: string) => void }) {
+type Props = {
+  msg: AgentMessage;
+  /** L'image du navigateur affichée, si elle appartient à ce run. */
+  shownFrame: number | null;
+  onSelect: (frame: number) => void;
+  onRetry: (prompt: string) => void;
+};
+
+export function AgentReply({ msg, shownFrame, onSelect, onRetry }: Props) {
   const request = msg.end?.request ? JSON.stringify(msg.end.request, null, 2) : '';
   return (
     <div className="chat__msg--agent">
@@ -126,14 +146,30 @@ export function AgentReply({ msg, onRetry }: { msg: AgentMessage; onRetry: (prom
         {initials(msg.agentName).slice(0, 1)}
       </span>
       <div className="chat__msg-body">
-        {msg.status === 'running' && (
-          <>
-            <p className="chat__text">{msg.live}</p>
-            <Plan msg={msg} />
-            <Tools msg={msg} />
-          </>
-        )}
-        {msg.status === 'done' && msg.end && <Decision end={msg.end} />}
+        <Plan msg={msg} />
+        <ol className="tools" aria-label="Gestes de l'agent">
+          {msg.steps.map((step) => (
+            <StepLine key={step.id} step={step} selected={step.frame !== undefined && step.frame === shownFrame} onSelect={onSelect} />
+          ))}
+          {msg.status === 'running' && (
+            <li>
+              <div className="tool tool--running">
+                <span className="tool__icon">
+                  <Doc />
+                </span>
+                <span className="tool__name">Réflexion</span>
+                <span className="tool__meta">en cours</span>
+                <span className="tool__dots" aria-hidden="true">
+                  <span className="tool__dot" />
+                  <span className="tool__dot" />
+                  <span className="tool__dot" />
+                </span>
+              </div>
+            </li>
+          )}
+        </ol>
+
+        {msg.status === 'done' && msg.end && <Outcome end={msg.end} />}
         {msg.status === 'stopped' && <p className="chat__text chat__text--strong">Run interrompu.</p>}
         {msg.status === 'error' && (
           <>
@@ -151,19 +187,9 @@ export function AgentReply({ msg, onRetry }: { msg: AgentMessage; onRetry: (prom
             </button>
           </div>
         )}
-
-        {msg.status !== 'running' && msg.steps.length > 0 && (
-          <details className="disclosure">
-            <summary className="disclosure__summary">Détail du run ({msg.steps.length} actions)</summary>
-            <div className="disclosure__body">
-              <Plan msg={msg} />
-              <Tools msg={msg} />
-            </div>
-          </details>
-        )}
         {request && (
           <details className="disclosure">
-            <summary className="disclosure__summary">Requête prête pour le garde (verify_payment)</summary>
+            <summary className="disclosure__summary">Requête que le garde aurait reçue (verify_payment)</summary>
             <div className="disclosure__body">
               <div>
                 <CopyButton text={request} />

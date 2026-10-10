@@ -1,16 +1,17 @@
-import type { Agent } from '../types';
+import type { Agent, Profile } from '../types';
 
 type Props = {
   agents: Agent[];
   current: Agent;
+  profile: Profile;
   modelLabel: (agent: Agent) => string;
   onSelect: (id: string) => void;
   onNew: () => void;
   onEdit: () => void;
 };
 
-/** Le panneau latéral : les agents, les consignes de celui à qui l'on parle, et ce qu'est le bac à sable. */
-export function Panel({ agents, current, modelLabel, onSelect, onNew, onEdit }: Props) {
+/** L'onglet "Agents" : la liste des agents, les consignes de celui à qui l'on parle, et l'acheteur fictif. */
+export function Panel({ agents, current, profile, modelLabel, onSelect, onNew, onEdit }: Props) {
   return (
     <>
       <section>
@@ -43,11 +44,13 @@ export function Panel({ agents, current, modelLabel, onSelect, onNew, onEdit }: 
       </section>
 
       <section>
-        <h2 className="panel__title">Bac à sable</h2>
+        <h2 className="panel__title">Acheteur fictif</h2>
         <div className="panel__card">
-          <p className="panel__text">Cinq boutiques d'Apple Watch, dont une seule est frauduleuse. Rien dans sa page ne la distingue.</p>
+          <p className="panel__text">
+            {profile.name}, {profile.city}. Carte de test {profile.card}.
+          </p>
           <p className="panel__note">
-            {current.name} s'arrête juste avant le paiement. Le garde n'est pas branché : aucun ordre n'est envoyé, rien n'est payé.
+            L'agent remplit les formulaires avec ce profil inventé. Les boutiques sont locales et le paiement est simulé : rien n'est débité.
           </p>
         </div>
       </section>

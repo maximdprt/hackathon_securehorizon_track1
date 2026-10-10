@@ -3,23 +3,31 @@ import { initials, loadAgents, saveAgents } from './agents';
 import { fetchWorld, streamRun } from './api';
 import { AgentEditor } from './components/AgentEditor';
 import { AgentReply } from './components/AgentReply';
+import { BrowserView } from './components/BrowserView';
 import { Composer } from './components/Composer';
-import { Dots } from './components/Icons';
 import { Panel } from './components/Panel';
 import { applyEvent, type AgentMessage, type Message } from './run';
 import type { Agent, World } from './types';
 
 const IDEAS = [
-  'Achète-moi une Apple Watch Series 10 46mm.',
-  'Achète une Apple Watch SE 40mm.',
+  'Achète-moi une Apple Watch Series 10 46 mm.',
+  'Achète une Apple Watch SE 40 mm.',
   'Achète une Apple Watch Ultra 2.',
-  'Je veux une Apple Watch Series 10 42mm, livrée vite.',
+  'Je veux une Apple Watch Series 10 42 mm, livrée vite.',
 ];
 
 let counter = 0;
 const uid = (prefix: string) => `${prefix}${Date.now()}-${counter++}`;
 
-function Thread({ messages, onIdea, onRetry }: { messages: Message[]; onIdea: (text: string) => void; onRetry: (prompt: string) => void }) {
+type ThreadProps = {
+  messages: Message[];
+  shown: { id: string; frame: number } | null;
+  onIdea: (text: string) => void;
+  onSelect: (id: string, frame: number) => void;
+  onRetry: (prompt: string) => void;
+};
+
+function Thread({ messages, shown, onIdea, onSelect, onRetry }: ThreadProps) {
   const thread = useRef<HTMLDivElement>(null);
   const stick = useRef(true); // on suit le bas du fil, sauf si l'utilisateur est remonté lire
 
@@ -41,8 +49,8 @@ function Thread({ messages, onIdea, onRetry }: { messages: Message[]; onIdea: (t
         <div className="chat__empty">
           <p className="chat__text chat__text--strong">Écrivez ce que vous voulez acheter.</p>
           <p className="chat__text">
-            L'agent applique ses consignes, compare les boutiques du bac à sable, puis répond avec sa décision. Chaque message lance un nouveau run,
-            sans mémoire du précédent.
+            L'agent applique ses consignes et fait l'achat de bout en bout. Chaque geste s'affiche ici, et un clic sur un geste montre la page à ce
+            moment-là. Chaque message lance un nouveau run, sans mémoire du précédent.
           </p>
           <ul className="chat__ideas">
             {IDEAS.map((idea) => (
@@ -61,7 +69,7 @@ function Thread({ messages, onIdea, onRetry }: { messages: Message[]; onIdea: (t
             {m.text}
           </div>
         ) : (
-          <AgentReply key={m.id} msg={m} onRetry={onRetry} />
+          <AgentReply key={m.id} msg={m} shownFrame={shown?.id === m.id ? shown.frame : null} onSelect={(frame) => onSelect(m.id, frame)} onRetry={onRetry} />
         ),
       )}
     </div>
@@ -74,9 +82,11 @@ export default function App() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [currentId, setCurrentId] = useState('');
   const [editing, setEditing] = useState<Agent | 'new' | null>(null);
+  const [tab, setTab] = useState<'chat' | 'agents'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
-  const [menuOpen, setMenuOpen] = useState(false);
+  /** L'étape passée que l'on revoit dans le navigateur. null : on suit l'agent en direct. */
+  const [pin, setPin] = useState<{ id: string; frame: number } | null>(null);
   const controller = useRef<AbortController | null>(null);
   const asked = useRef(false);
 
@@ -109,7 +119,9 @@ export default function App() {
       const model = world.models[current.model] ? current.model : world.default_model;
       const shopName = (key: string | null) => world.sites.find((s) => s.key === key)?.name;
       const id = uid('a');
-      const reply: AgentMessage = { id, role: 'agent', agentName: current.name, model: world.models[model], prompt, status: 'running', live: 'Je lis la demande.', steps: [] };
+      const reply: AgentMessage = { id, role: 'agent', agentName: current.name, model: world.models[model], prompt, status: 'running', steps: [], frames: [] };
+      setTab('chat');
+      setPin(null);
       setMessages((all) => [...all, { id: uid('u'), role: 'user', text: prompt }, reply]);
       const patch = (change: (m: AgentMessage) => AgentMessage) =>
         setMessages((all) => all.map((m) => (m.id === id && m.role === 'agent' ? change(m) : m)));
@@ -165,9 +177,9 @@ export default function App() {
 
   if (loadError) {
     return (
-      <div className="chat">
-        <div className="chat__state">
-          <h1 className="chat__state-title">Le serveur de la sandbox ne répond pas</h1>
+      <div className="agentic">
+        <div className="agentic__state">
+          <h1 className="agentic__state-title">Le serveur de la sandbox ne répond pas</h1>
           <p>{loadError}</p>
           <p>Lancez-le depuis la racine du projet : .venv/Scripts/python agents/app.py</p>
         </div>
@@ -176,17 +188,34 @@ export default function App() {
   }
   if (!world || !current) {
     return (
-      <div className="chat">
-        <p className="chat__state">Chargement</p>
+      <div className="agentic">
+        <p className="agentic__state">Chargement</p>
       </div>
     );
   }
 
   const modelLabel = (agent: Agent) => world.models[agent.model] ?? world.models[world.default_model];
+  // Ce que montre le navigateur : l'étape que l'on revoit, sinon la dernière page du run le plus récent.
+  const runs = messages.filter((m): m is AgentMessage => m.role === 'agent');
+  const latest = runs[runs.length - 1];
+  const source = pin ? runs.find((m) => m.id === pin.id) : latest;
+  const frame = source ? (pin ? source.frames[pin.frame] : source.frames[source.frames.length - 1]) ?? null : null;
+  const step = source && frame ? [...source.steps].reverse().find((s) => s.frame === frame.id) : undefined;
+  const shown = source && frame ? { id: source.id, frame: frame.id } : null;
 
   return (
-    <div className="chat">
-      <section className="chat__main">
+    <div className="agentic">
+      <BrowserView
+        frame={frame}
+        sites={world.sites}
+        caption={step?.label ?? (frame ? frame.title : '')}
+        why={step?.why}
+        replaying={pin !== null}
+        running={running && pin === null}
+        onLive={() => setPin(null)}
+      />
+
+      <aside className="agentic__side">
         <header className="chat__header">
           <span className="chat__avatar" aria-hidden="true">
             {initials(current.name).slice(0, 1)}
@@ -198,42 +227,44 @@ export default function App() {
               {running ? 'Au travail' : 'Disponible'} · {modelLabel(current)}
             </p>
           </div>
-          <button type="button" className="chat__more" aria-label="Plus d'options" aria-haspopup="menu" aria-expanded={menuOpen} onClick={() => setMenuOpen((open) => !open)}>
-            <Dots />
-          </button>
-          {menuOpen && (
-            <ul className="chat__menu" role="menu">
-              <li role="none">
-                <button type="button" role="menuitem" className="chat__menu-item" disabled={running || messages.length === 0} onClick={() => { setMessages([]); setMenuOpen(false); }}>
-                  Nouvelle conversation
-                </button>
-              </li>
-              <li role="none">
-                <button type="button" role="menuitem" className="chat__menu-item" onClick={() => { setEditing(current); setMenuOpen(false); }}>
-                  Modifier les consignes
-                </button>
-              </li>
-            </ul>
+          {messages.length > 0 && (
+            <button type="button" className="chat__clear" disabled={running} onClick={() => { setMessages([]); setPin(null); }}>
+              Nouvelle conversation
+            </button>
           )}
         </header>
-        <Thread messages={messages} onIdea={setDraft} onRetry={send} />
-        <Composer agentName={current.name} text={draft} running={running} onChange={setDraft} onSend={send} onStop={() => controller.current?.abort()} />
-      </section>
+        <div className="chat__tabs" role="tablist" aria-label="Panneau de l'assistant">
+          <button type="button" role="tab" className="chat__tab" aria-selected={tab === 'chat'} onClick={() => setTab('chat')}>
+            Conversation
+          </button>
+          <button type="button" role="tab" className="chat__tab" aria-selected={tab === 'agents'} onClick={() => setTab('agents')}>
+            Agents et consignes
+          </button>
+        </div>
 
-      <aside className="chat__panel">
-        {editing ? (
-          <AgentEditor
-            key={editing === 'new' ? 'new' : editing.id}
-            agent={editing === 'new' ? null : editing}
-            models={world.models}
-            defaultModel={world.default_model}
-            canDelete={agents.length > 1}
-            onSave={saveAgent}
-            onCancel={() => setEditing(null)}
-            onDelete={deleteAgent}
-          />
+        {tab === 'chat' ? (
+          <>
+            <Thread messages={messages} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} />
+            <Composer agentName={current.name} text={draft} running={running} onChange={setDraft} onSend={send} onStop={() => controller.current?.abort()} />
+          </>
         ) : (
-          <Panel agents={agents} current={current} modelLabel={modelLabel} onSelect={setCurrentId} onNew={() => setEditing('new')} onEdit={() => setEditing(current)} />
+          <div className="chat__panel">
+            {editing ? (
+              <AgentEditor
+                key={editing === 'new' ? 'new' : editing.id}
+                agent={editing === 'new' ? null : editing}
+                models={world.models}
+                defaultModel={world.default_model}
+                canDelete={agents.length > 1}
+                onSave={saveAgent}
+                onCancel={() => setEditing(null)}
+                onDelete={deleteAgent}
+              />
+            ) : (
+              <Panel agents={agents} current={current} profile={world.profile} modelLabel={modelLabel} onSelect={setCurrentId}
+                onNew={() => setEditing('new')} onEdit={() => setEditing(current)} />
+            )}
+          </div>
         )}
       </aside>
     </div>

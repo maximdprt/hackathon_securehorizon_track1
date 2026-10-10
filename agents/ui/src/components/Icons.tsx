@@ -27,9 +27,33 @@ export const Card = () => (
     <path d="M1.8 6.6h12.4M4.2 10h2.6" />
   </Icon>
 );
-export const Dots = () => (
-  <Icon size={18} width={2.4}>
-    <path d="M3.5 8h.01M8 8h.01M12.5 8h.01" />
+export const Pointer = () => (
+  <Icon>
+    <path d="M3.5 2.5l9 4.2-3.9 1.5-1.5 3.9z" />
+    <path d="M9.4 9.4l3.4 3.4" />
+  </Icon>
+);
+export const Pen = () => (
+  <Icon>
+    <path d="M2.5 13.5l.6-2.9 7.6-7.6 2.3 2.3-7.6 7.6z" />
+    <path d="M9.4 4.3l2.3 2.3" />
+  </Icon>
+);
+export const Scale = () => (
+  <Icon>
+    <path d="M8 2.2v11.6M4.5 13.8h7M3 4.5h10M3 4.5L1.5 9h3zM13 4.5L11.5 9h3z" />
+  </Icon>
+);
+export const Alert = () => (
+  <Icon>
+    <path d="M8 2L14.5 13.5h-13z" />
+    <path d="M8 6.5v3.2M8 11.6v.2" />
+  </Icon>
+);
+export const Lock = () => (
+  <Icon size={14}>
+    <rect x="3.2" y="7.2" width="9.6" height="6.6" rx="1.4" />
+    <path d="M5.4 7.2V5.2a2.6 2.6 0 0 1 5.2 0v2" />
   </Icon>
 );
 export const ArrowUp = () => (

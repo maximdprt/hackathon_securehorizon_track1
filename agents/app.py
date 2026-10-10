@@ -1,36 +1,39 @@
-"""Interface de chat de la sandbox, sur le principe d'un atelier d'agents : on règle les consignes de chaque
-agent, puis on lui écrit une demande d'achat. Il cherche parmi les 5 boutiques d'Apple Watch, justifie
-chaque étape, choisit, et s'arrête juste avant le paiement. Tout s'affiche en direct dans le navigateur.
+"""Interface de la sandbox : un navigateur agentique. On choisit un agent, on règle ses consignes, on lui écrit une
+demande d'achat, et on le regarde naviguer : recherche, boutiques, fiche produit, panier, formulaire de carte, paiement.
 
     cd agents/ui && npm install && npm run build     # une fois, puis après chaque modification de l'interface
     .venv/Scripts/python agents/app.py --open        # http://127.0.0.1:8765
 
-L'interface est une application React (agents/ui/src). Ce serveur sert sa version construite (agents/ui/dist) et
-l'API qu'elle appelle. Pour la modifier en direct : `npm run dev` dans agents/ui, avec ce serveur lancé à côté.
+L'interface est une application React (agents/ui/src). Ce serveur sert sa version construite (agents/ui/dist), l'API
+qu'elle appelle, et les 5 boutiques elles-mêmes sous /shop/<clé>/ : on peut y acheter à la main dans un onglet.
+Pour modifier l'interface en direct : `npm run dev` dans agents/ui, avec ce serveur lancé à côté.
 
-Aucun garde n'est branché ici : l'ordre de paiement est préparé, jamais envoyé, et on ne connaît donc pas
-le verdict. La requête `verify_payment` prête à partir est montrée dans l'interface et enregistrée dans
-agents/out/runs.jsonl, pour la rejouer contre le vrai garde plus tard (voir `run_open(..., guard=...)`).
+Aucun garde n'est branché ici : l'agent va jusqu'au bout et la boutique confirme la commande. Le paiement est simulé,
+le profil et la carte de l'acheteur sont fictifs. La requête `verify_payment` que le garde aurait reçue juste avant le
+clic sur "Payer" est montrée dans l'interface et enregistrée dans agents/out/runs.jsonl (voir `run_browser(guard=...)`).
 
-Tout reste sur la machine : le serveur n'écoute que sur 127.0.0.1 et les boutiques sont des fichiers locaux.
+Tout reste sur la machine : le serveur n'écoute que sur 127.0.0.1 et les boutiques n'existent que dans ce processus.
 """
 from __future__ import annotations
 
 import argparse
 import json
 import re
+import secrets
 import sys
 import time
 import webbrowser
+from http.cookies import SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from agents import world  # noqa: E402
+from agents import shops, world  # noqa: E402
+from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
 from agents.llm import MODEL_ID, BedrockLLM  # noqa: E402
-from agents.shopping_agent import run_open  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
 DIST = ROOT / "agents" / "ui" / "dist"  # l'interface React construite par `npm run build`
@@ -49,13 +52,17 @@ MODELS = {  # modèles proposés pour un agent
     "us.amazon.nova-lite-v1:0": "Nova Lite",
     "us.anthropic.claude-sonnet-4-6": "Claude Sonnet 4.6",
 }
-SITE_PATH = re.compile(r"/site/([a-z0-9]+)/([a-z.]*)")
+SHOP_PATH = re.compile(r"/shop/([a-z0-9]+)(/.*)?")
+# Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe.
+SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
+PACE = 0.25  # secondes entre deux champs remplis, pour qu'on les voie à l'écran
 _llms: dict[str, BedrockLLM] = {}
+_visitors: dict[str, shops.Session] = {}  # paniers et commandes des humains qui visitent /shop, par cookie
 
 
 def public_site(key: str) -> dict:
     s = world.SITES[key]
-    return {"key": key, "name": s["name"], "domain": s["domain"], "kind": s["kind"], "why": s["why"], "preview": f"/site/{key}/"}
+    return {"key": key, "name": s["name"], "domain": s["domain"], "kind": s["kind"], "why": s["why"], "preview": f"/shop/{key}/"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -74,8 +81,21 @@ class Handler(BaseHTTPRequestHandler):
         """Refuse les requêtes qui ne visent pas explicitement ce serveur local (rebinding DNS)."""
         return self.headers.get("Host", "").split(":")[0] in ("127.0.0.1", "localhost")
 
+    def _shop(self, method: str, key: str, path: str, form: dict[str, str]) -> None:
+        """Une boutique visitée par un humain. Son panier est tenu par un cookie de session."""
+        cookie = SimpleCookie(self.headers.get("Cookie", "")).get("visitor")
+        sid = cookie.value if cookie and cookie.value in _visitors else secrets.token_urlsafe(16)
+        if len(_visitors) > 200:  # outil local : on ne garde pas indéfiniment les paniers abandonnés
+            _visitors.clear()
+        res = shops.handle(key, method, path, form, _visitors.setdefault(sid, shops.Session()), f"/shop/{key}")
+        headers = {**SHOP_CSP, "Set-Cookie": f"visitor={sid}; Path=/shop; HttpOnly; SameSite=Strict"}
+        if res.location:
+            return self._send(303, b"", "text/html; charset=utf-8", {**headers, "Location": f"/shop/{key}{res.location}"})
+        self._send(res.status, res.html.encode(), "text/html; charset=utf-8", headers)
+
     def do_GET(self):
-        path = self.path.split("?", 1)[0]
+        url = urlsplit(self.path)
+        path = url.path
         if not self._local():
             return self._json(403, {"error": "local only"})
         if path == "/":
@@ -90,21 +110,31 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, file.read_bytes(), ASSET_TYPES[file.suffix])
             return self._json(404, {"error": "not found"})
         if path == "/api/world":
-            return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID})
-        m = SITE_PATH.fullmatch(path)
-        page = world.SITES[m.group(1)]["pages"].get(m.group(2)) if m and m.group(1) in world.SITES else None
-        if page is None:
-            return self._json(404, {"error": "not found"})
-        # aperçu pour un humain : la page est servie inerte (ni script, ni formulaire, ni chargement externe)
-        self._send(200, page.read_bytes(), "text/html; charset=utf-8",
-                   {"Content-Security-Policy": "sandbox; default-src 'none'; style-src 'unsafe-inline'"})
+            buyer = masked(PROFILE)
+            return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID,
+                                    "profile": {"name": buyer["name"], "city": buyer["city"], "card": buyer["card_number"]}})
+        if path == "/search":
+            query = parse_qs(url.query).get("q", [""])[0]
+            page = shops.search_page(query, "/search", lambda key: f"/shop/{key}/").replace('action="/search/"', 'action="/search"')
+            return self._send(200, page.encode(), "text/html; charset=utf-8", SHOP_CSP)
+        shop = SHOP_PATH.fullmatch(path)
+        if shop and shop.group(1) in world.SITES:
+            return self._shop("GET", shop.group(1), shop.group(2) or "/", {})
+        self._json(404, {"error": "not found"})
 
     def do_POST(self):
+        if not self._local():
+            return self._json(403, {"error": "local only"})
+        length = int(self.headers.get("Content-Length", 0))
+        shop = SHOP_PATH.fullmatch(self.path.split("?", 1)[0])
+        if shop and shop.group(1) in world.SITES and length <= 20_000:
+            fields = parse_qs(self.rfile.read(length).decode("utf-8", "replace"), keep_blank_values=True)
+            return self._shop("POST", shop.group(1), shop.group(2) or "/", {k: v[0] for k, v in fields.items()})
         # Content-Type JSON exigé : une page web tierce ne peut pas l'envoyer sans préflight CORS, que l'on n'accorde pas
-        if self.path != "/api/run" or not self._local() or not self.headers.get("Content-Type", "").startswith("application/json"):
+        if self.path != "/api/run" or not self.headers.get("Content-Type", "").startswith("application/json"):
             return self._json(404, {"error": "not found"})
         try:
-            body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            body = json.loads(self.rfile.read(length))
             prompt, model = body["prompt"].strip(), body.get("model") or MODEL_ID
             instructions, agent = str(body.get("instructions", "")).strip(), str(body.get("agent", "")).strip()
             assert prompt and len(prompt) <= 2000 and len(instructions) <= 4000 and len(agent) <= 80 and model in MODELS
@@ -122,14 +152,14 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
-            run = run_open(prompt, llm, instructions=instructions, emit=emit)  # pas de garde : arrêt avant le paiement
+            run = run_browser(prompt, llm, instructions=instructions, emit=emit, pace=PACE)  # pas de garde : le paiement part
             run.update(agent=agent, model=model, backend=None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
             OUT.mkdir(exist_ok=True)
             with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps(run, ensure_ascii=False) + "\n")
             request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères de HTML lus par l'agent>"}
-            emit({"type": "end", **{k: run[k] for k in ("outcome", "order", "item", "why", "chosen", "considered", "final_text", "turns")},
-                  "site": public_site(run["site"]) if run["site"] else None, "request": request})
+            keys = ("outcome", "order", "chosen", "why", "considered", "submitted", "confirmation", "expected", "final_text", "turns")
+            emit({"type": "end", **{k: run[k] for k in keys}, "site": public_site(run["site"]) if run["site"] else None, "request": request})
         except ConnectionError:
             pass  # l'onglet a été fermé pendant le run
         except Exception as exc:  # identifiants AWS expirés, modèle indisponible...
@@ -149,7 +179,7 @@ if __name__ == "__main__":
     a = p.parse_args()
     url = f"http://127.0.0.1:{a.port}/"
     server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
-    print(f"Chat de la sandbox -> {url}   (Ctrl+C pour arrêter)")
+    print(f"Sandbox -> {url}   boutiques : {url}search   (Ctrl+C pour arrêter)")
     if a.open:
         webbrowser.open(url)
     try:

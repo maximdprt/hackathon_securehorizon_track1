@@ -1,15 +1,20 @@
-import type { EndEvent, RunEvent } from './types';
+import type { Considered, EndEvent, RunEvent, View } from './types';
 
-/** Une action de l'agent, affichée comme une ligne d'outil. */
+/** Une image du navigateur de l'agent : la page à un instant du run. */
+export type Frame = View & { id: number; patch: boolean };
+
+/** Un geste de l'agent dans le fil : on peut cliquer dessus pour revoir la page à ce moment-là. */
 export type Step = {
   id: number;
-  kind: 'search' | 'shop' | 'missing' | 'thought' | 'invalid' | 'order';
-  name: string;
-  meta: string;
+  kind: 'search' | 'open' | 'click' | 'page' | 'fill' | 'choose' | 'pay' | 'invalid' | 'thought';
+  label: string;
+  meta?: string;
   why?: string;
+  /** L'image du navigateur à montrer pour ce geste. */
+  frame?: number;
+  fields?: { label: string; value: string }[];
+  considered?: Considered[];
   site?: string | null;
-  /** Ce que l'agent retient de la boutique : il le donne au moment de décider. */
-  found?: string;
 };
 
 export type UserMessage = { id: string; role: 'user'; text: string };
@@ -20,51 +25,46 @@ export type AgentMessage = {
   model: string;
   prompt: string;
   status: 'running' | 'done' | 'error' | 'stopped';
-  live: string;
   steps: Step[];
+  frames: Frame[];
   end?: EndEvent;
   error?: string;
 };
 export type Message = UserMessage | AgentMessage;
 
 export const host = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
-export const amount = (n: number) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+export const amount = (n: number) => Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pageName = (title: string) => title.split(' | ')[0];
 
-/** Applique une étape reçue du serveur à la réponse de l'agent. Fonction pure : elle rend un nouveau message. */
+/** Applique un geste reçu du serveur à la réponse de l'agent. Fonction pure : elle rend un nouveau message. */
 export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: string | null) => string | undefined): AgentMessage {
-  const add = (step: Omit<Step, 'id'>, live = msg.live): AgentMessage => ({ ...msg, live, steps: [...msg.steps, { ...step, id: msg.steps.length }] });
+  const frames = 'view' in ev ? [...msg.frames, { ...ev.view, id: msg.frames.length, patch: ev.type === 'fill' }] : msg.frames;
+  const frame = 'view' in ev ? frames.length - 1 : undefined;
+  const add = (step: Omit<Step, 'id'>): AgentMessage => ({ ...msg, frames, steps: [...msg.steps, { ...step, id: msg.steps.length, frame }] });
   switch (ev.type) {
     case 'thinking':
       return msg;
     case 'thought':
-      return add({ kind: 'thought', name: 'Réflexion', meta: ev.text });
-    case 'search': {
-      const found = `${ev.results.length} ${ev.results.length > 1 ? 'boutiques trouvées' : 'boutique trouvée'}`;
-      return add({ kind: 'search', name: 'Recherche web', meta: `« ${ev.query} » · ${found}`, why: ev.why }, 'Je cherche les boutiques qui vendent ce produit.');
+      return add({ kind: 'thought', label: 'Réflexion', meta: ev.text });
+    case 'nav':
+      if (ev.how === 'search') return add({ kind: 'search', label: `Recherche « ${ev.query ?? ''} »`, meta: host(ev.url).split('?')[0], why: ev.why });
+      if (ev.how === 'goto') return add({ kind: 'open', label: `Ouvre ${shopName(ev.site) ?? host(ev.url)}`, meta: host(ev.url), why: ev.why, site: ev.site });
+      return add({ kind: 'page', label: ev.status === 404 ? 'Page introuvable' : `Arrive sur « ${pageName(ev.title)} »`, meta: host(ev.url), site: ev.site });
+    case 'click':
+      return add({ kind: 'click', label: `Clique sur « ${ev.label} »`, why: ev.why });
+    case 'fill': {
+      const last = msg.steps[msg.steps.length - 1];
+      const field = { label: ev.label, value: ev.value };
+      if (last?.kind !== 'fill') return add({ kind: 'fill', label: 'Remplit le formulaire', why: ev.why, fields: [field] });
+      // les champs d'un même formulaire sont regroupés en un seul geste, qui montre le dernier champ rempli
+      return { ...msg, frames, steps: [...msg.steps.slice(0, -1), { ...last, fields: [...(last.fields ?? []), field], frame }] };
     }
-    case 'open': {
-      if (!ev.ok) return add({ kind: 'missing', name: 'Page absente', meta: host(ev.url), why: ev.why });
-      const name = shopName(ev.site) ?? host(ev.url);
-      return add({ kind: 'shop', name, meta: host(ev.url), why: ev.why, site: ev.site }, `J'étudie ${name.replace(/\.$/, '')}.`);
-    }
-    case 'invalid_order':
-      return add({ kind: 'invalid', name: 'Ordre invalide', meta: `adresse incomplète ou montant nul (${ev.recipient})` });
-    case 'pay': {
-      const noted = new Set<string>();
-      const steps = msg.steps.map((step) => {
-        const c = step.kind === 'shop' && step.site && !noted.has(step.site) ? ev.considered.find((x) => x.site === step.site) : undefined;
-        if (!c || !step.site) return step;
-        noted.add(step.site);
-        return { ...step, found: `${c.price != null ? `${amount(c.price)} USDC, ` : ''}${c.assessment}` };
-      });
-      const order: Step = {
-        id: steps.length,
-        kind: 'order',
-        name: 'Ordre de paiement',
-        meta: `${ev.order.action} ${amount(ev.order.amount)} ${ev.order.currency} vers ${ev.order.recipient}`,
-      };
-      return { ...msg, live: "Je prépare l'ordre de paiement.", steps: [...steps, order] };
-    }
+    case 'choose':
+      return add({ kind: 'choose', label: `Choisit ${(shopName(ev.site) ?? ev.merchant).replace(/\.$/, '')}`, why: ev.why, considered: ev.considered, site: ev.site });
+    case 'pay':
+      return add({ kind: 'pay', label: `Envoie le paiement de ${amount(ev.order.amount)} ${ev.order.currency === 'EUR' ? '€' : ev.order.currency}`, meta: ev.items.join(', '), site: ev.site });
+    case 'invalid':
+      return add({ kind: 'invalid', label: 'Geste impossible', meta: ev.message });
     case 'end':
       return { ...msg, status: 'done', end: ev };
     case 'error':
@@ -73,11 +73,12 @@ export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: stri
 }
 
 export type PlanStep = { label: string; state: 'done' | 'current' | 'todo' };
-const PLAN = ['Chercher les boutiques', 'Étudier et comparer les boutiques', "Préparer l'ordre de paiement"];
+const PLAN = ['Chercher les boutiques', 'Comparer et choisir', 'Remplir le panier et le formulaire', 'Payer'];
 
-/** Le plan en trois étapes, avec où en est l'agent. Rien n'est "en cours" quand le run ne tourne plus. */
+/** Le plan en quatre étapes, avec où en est l'agent. Rien n'est "en cours" quand le run ne tourne plus. */
 export function planOf(msg: AgentMessage): PlanStep[] {
-  const ready = msg.status === 'done' && msg.end?.outcome === 'ready';
-  const reached = ready ? 3 : msg.steps.some((s) => s.kind === 'order') ? 2 : msg.steps.some((s) => s.kind === 'search' || s.kind === 'shop') ? 1 : 0;
+  const has = (kind: Step['kind']) => msg.steps.some((s) => s.kind === kind);
+  const paid = msg.status === 'done' && msg.end?.outcome === 'paid';
+  const reached = paid ? 4 : has('pay') ? 3 : has('choose') ? 2 : has('search') || has('open') ? 1 : 0;
   return PLAN.map((label, i) => ({ label, state: i < reached ? 'done' : i === reached && msg.status === 'running' ? 'current' : 'todo' }));
 }
