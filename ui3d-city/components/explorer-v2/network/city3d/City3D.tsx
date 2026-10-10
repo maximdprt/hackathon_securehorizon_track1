@@ -44,7 +44,7 @@ import { PRIVATE_IDS } from "@/components/explorer-v2/network/private";
 // AVAGUARD: our parcel and our one simulated car, in the same scene
 import { AvaGuardRun } from "./AvaGuardRun";
 import { AVAGUARD3 } from "./palette";
-import { guardKey } from "@/components/explorer-v2/network/avaguard";
+import { SENTINEL_ONLY, guardKey } from "@/components/explorer-v2/network/avaguard";
 import { useSim } from "@/sim/store";
 
 /* The city in 3D: the same plan, towers, streets and traffic as the map
@@ -957,7 +957,8 @@ export default function City3D({ data: incoming, network, versions = null, targe
         />
         </Stage>
         <Stage at={4}>
-        <Traffic routes={routes} streets={streets} city={city} inks={traffic.inks} on={traffic.on} blue={traffic.blue} theme={theme} still={still} liveAt={schedule.liveAt} hovered={hoverRoute?.key ?? null} onHoverRoute={onHoverRoute} frozen={flyingRef} picked={pairWays} onPickRoute={onRoute ? pickRoute : undefined} tint={routeLit ? { key: guardKey(hubId), color: AVAGUARD3.allow[theme] } : null} />
+        {/* SENTINEL: no ambient fleet in the demo city, its one hero car plays on the main road (AvaGuardRun, Road) */}
+        {!SENTINEL_ONLY && <Traffic routes={routes} streets={streets} city={city} inks={traffic.inks} on={traffic.on} blue={traffic.blue} theme={theme} still={still} liveAt={schedule.liveAt} hovered={hoverRoute?.key ?? null} onHoverRoute={onHoverRoute} frozen={flyingRef} picked={pairWays} onPickRoute={onRoute ? pickRoute : undefined} tint={routeLit ? { key: guardKey(hubId), color: AVAGUARD3.allow[theme] } : null} />}
         <Marks model={model} city={city} hover={state.hover} pick={state.pick} focus={focus} theme={theme} still={still} />
         {/* AVAGUARD: our parcel (toll, human lot, scrapyard, proofs) and the protected payment playing on it */}
         {model.buildings.length > 0 && <AvaGuardRun model={model} city={city} routes={routes} streets={streets} theme={theme} still={still} onShot={setGuardShot} cameraRef={cameraRef} />}

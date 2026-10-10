@@ -27,6 +27,8 @@ import { guardGeoOf, poseAt, type GuardGeo } from "./guardGeo";
 import { Crown, ProofStack, RegistryBin, Scrapyard, Toll } from "./Parcel";
 import { HumanLot } from "./HumanLot";
 import { GuardCar } from "./GuardCar";
+import { Road } from "./Road";
+import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard";
 import { CarTip, Door, OPEN, ParkingTip, ProofTip, RegistryTip, ScrapTip, TollTip } from "./Door";
 
 type Props = { model: CityModel; city: City; routes: Route[]; streets: RouteStreets[]; theme: Theme; still: boolean; onShot: (s: Shot | null) => void; cameraRef?: RefObject<CameraHandle | null> };
@@ -47,7 +49,8 @@ function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
   };
   return {
     security: { key: "guard:security", points: [new Vector3(g.hq.x, top + 10, g.hq.z), g.toll.p, g.parking.c, g.scrapyard.c, ...ring(new Vector3(g.hq.x, 0, g.hq.z), g.S * 2.6)].map((p) => p.clone()), polar: 0.9, cap: 1 / 3.2, fill: 0.9, az: out(g.toll.p) },
-    toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.9), ...ring(g.toll.p, g.S * 1.2)], polar: 0.62, cap: 1 / 6, fill: 0.8, az: out(g.toll.p) },
+    // SENTINEL (deployed): a lower, closer look at the gantry, the car scanned under it
+    toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.1), ...ring(g.toll.p, g.S * 0.95)], polar: 0.46, cap: 1 / 5.4, fill: 0.92, az: out(g.toll.p) },
     // the lot from the side away from the HQ and from outside the ward, high: the HQ's tower stands behind it, never over its bays
     parking: { key: "guard:parking", points: [g.parking.c.clone().setY(g.carW * 2.4), ...ring(g.parking.c, g.parking.w * 0.55)], polar: 0.55, cap: 1 / 6, fill: 0.84, az: awayFrom(g.parking.c, g.hq) },
     scrapyard: { key: "guard:scrapyard", points: [g.scrapyard.c.clone().setY(g.S * 1.1), ...ring(g.scrapyard.c, g.scrapyard.w * 0.75)], polar: 0.7, cap: 1 / 6, fill: 0.86, az: out(g.scrapyard.c) },
@@ -377,7 +380,8 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
       scrapyard: [geo.scrapyard.c.clone().setY(geo.scrapyard.c.y + 0.3), geo.scrapyard.crusher.clone().setY(geo.carW * 0.6)],
       registry: [geo.scrapyard.bin.clone().setY(geo.carW * 0.9)],
       proof: [geo.proof.clone().setY(geo.proof.y + Math.max(1.6, geo.S * 0.12) * 0.45)],
-      hub: [new Vector3(0, geo.hubTop * 0.55, 0)],
+      // high on the red tower: our HQ stands in front of its foot from the home view
+      hub: [0.86, 0.75, 0.55].map((k) => new Vector3(0, geo.hubTop * k, 0)),
       hq: [new Vector3(geo.hq.x, geo.hq.base + geo.hq.crest * 0.5, geo.hq.z), new Vector3(geo.hq.x, geo.hq.base + geo.hq.crest * 0.3, geo.hq.z)],
       // another chain's tower: tall ones on the city's near side (the camera's home looks from +z), none behind downtown
       chain: [...model.buildings]
@@ -424,6 +428,7 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
   if (!geo) return null;
   return (
     <group>
+      {SENTINEL_ONLY && <Road geo={geo} theme={theme} />}
       <Crown geo={geo} theme={theme} />
       {/* each piece of the parcel is a door to its screen (Door.tsx, sim/nav.ts) */}
       <Door name="guard:toll" at={[geo.toll.p.x, geo.S * 1.1, geo.toll.p.z]} tip={<TollTip />} onOpen={OPEN.toll}>

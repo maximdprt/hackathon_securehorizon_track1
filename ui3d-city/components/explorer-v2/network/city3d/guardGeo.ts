@@ -173,8 +173,11 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   const x0 = -depth / 2 - aisle - edge;
   const x1 = depth / 2 + edge;
   const z1 = 3 * bay + edge;
-  const rP = rLat + carL * 0.75 + z1;
-  const aP = lot.a - runSide * ((corridor - x0) / rP);
+  // a ward that holds the whole circle (the Sentinel-only city): the human lot and the scrapyard stand either side of the
+  // HQ's block, at its radius, a service lane between; a narrow ward: beyond the block, a central lane between them
+  const beside = ward.a1 - ward.a0 > Math.PI;
+  const rP = beside ? lot.r : rLat + carL * 0.75 + z1;
+  const aP = beside ? blockMid - runSide * (blockHalf + (2 * corridor - x0) / rP) : lot.a - runSide * ((corridor - x0) / rP);
   const radial = new Vector3(Math.cos(aP), 0, Math.sin(aP));
   const tangent = (a: number) => new Vector3(-Math.sin(a), 0, Math.cos(a));
   // the frame: +x away from the central lane, +z a quarter turn from it (outward or inward, as the side falls)
@@ -213,8 +216,9 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   // the scrapyard: fenced, across the central lane from the human lot; its crusher by the lane, the registry's container at its far side
   const sw = S * 1.5;
   const sd = S * 1.6;
-  const rS = rLat + carL * 0.75 + sd / 2;
-  const aS = lot.a + runSide * ((corridor + sw / 2) / rS);
+  const rS = beside ? lot.r : rLat + carL * 0.75 + sd / 2;
+  const aS = beside ? blockMid + runSide * (blockHalf + (2 * corridor + sw / 2) / rS) : lot.a + runSide * ((corridor + sw / 2) / rS);
+  const sideS = blockMid + runSide * (blockHalf + corridor / lot.r);
   const sc = G(rS, aS);
   const scrapyard = {
     c: sc,
@@ -252,16 +256,18 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   const door = lp(laneBack, jDoor);
   // round the block by the service road, along the lateral street, down the central lane, in to the crusher
   const lane0 = G(rLat, lot.a);
-  const toScrapyard = pathOf(smooth([door, G(rIn, sideA), G(rLat, sideA), lane0, G(rS - sd * 0.3, lot.a), scrapyard.crusher.clone()]));
+  const toScrapyard = pathOf(
+    smooth(beside ? [door, G(rIn, sideS), G(rS - sd * 0.3, sideS), scrapyard.crusher.clone()] : [door, G(rIn, sideA), G(rLat, sideA), lane0, G(rS - sd * 0.3, lot.a), scrapyard.crusher.clone()]),
+  );
   const slot = slots[2];
   // in by the gate, along the aisle, a turn into P3; out in reverse to the aisle, then forward through the gate to the toll
   const slotZ = (2 - 2.5) * bay;
   const aisleX = -depth / 2 - aisle * 0.5;
   const toParking = pathOf(
-    smooth([stopP, G(rIn, sideA), G(rLat, sideA), lane0, L(x0 - carL * 0.7, gateZ), L(x0 + carW * 0.3, gateZ), L(aisleX, gateZ - inward * bay * 0.25), L(aisleX + aisle * 0.1, slotZ + inward * bay * 0.1), L(-depth / 2 + carW * 0.2, slotZ), slot.clone()]),
+    smooth([stopP, G(rIn, sideA), ...(beside ? [] : [G(rLat, sideA), lane0]), L(x0 - carL * 0.7, gateZ), L(x0 + carW * 0.3, gateZ), L(aisleX, gateZ - inward * bay * 0.25), L(aisleX + aisle * 0.1, slotZ + inward * bay * 0.1), L(-depth / 2 + carW * 0.2, slotZ), slot.clone()]),
   );
   const outOfBay = L(aisleX - aisle * 0.05, slotZ - inward * bay * 0.15);
-  const ahead2 = smooth([outOfBay, L(aisleX, gateZ - inward * bay * 0.2), L(x0 + carW * 0.3, gateZ), L(x0 - carL * 0.6, gateZ), lane0, G(rLat, sideA), G(rIn, sideA), stopP.clone()]);
+  const ahead2 = smooth([outOfBay, L(aisleX, gateZ - inward * bay * 0.2), L(x0 + carW * 0.3, gateZ), L(x0 - carL * 0.6, gateZ), ...(beside ? [] : [lane0, G(rLat, sideA)]), G(rIn, sideA), stopP.clone()]);
   const fromParking = pathOf([slot.clone(), L(-depth / 2 + carW * 0.1, slotZ), ...ahead2], [true, true, ...ahead2.map(() => false)]);
   const hubTop = hubB.base + hubB.crest;
   return {

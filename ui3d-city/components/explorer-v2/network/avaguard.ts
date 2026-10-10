@@ -8,6 +8,9 @@ export const AVAGUARD_ID = process.env.NEXT_PUBLIC_AVAGUARD_CHAIN_ID || "2PqooUD
 export const SENTINEL_SUBNET = "jUCDvuYEuP16TFpxjanBQt6JiedTDUBanrYTBjThmdmfw8PxH";
 export const SENTINEL_EVM_CHAIN_ID = 99999;
 export const AVAGUARD_NAME = "Sentinel L1";
+/** SENTINEL (the deployed sentinel-city-3d): the demo city is only our L1 and the C-Chain hub it reports to, one main
+    road between them and one hero car, no ambient fleet. NEXT_PUBLIC_CITY_FULL=1 stands every Fuji chain again. */
+export const SENTINEL_ONLY = process.env.NEXT_PUBLIC_CITY_FULL !== "1";
 /** its validator set today: one node (NodeID-5dd7CBhH8UDU3QCUbSWBFSckXZrC4mHi9) */
 export const AVAGUARD_VALIDATORS = 1;
 /** our HQ is a skyline landmark whatever its validator count, so it reads from the home view */

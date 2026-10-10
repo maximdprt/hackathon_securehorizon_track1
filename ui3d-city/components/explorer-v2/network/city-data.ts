@@ -15,7 +15,7 @@ import { C_CHAIN_ID, MAINNET_COUNTERPART, catalogBySubnet, catalogOf, resolveCat
 import type { PchainNetwork } from "@/lib/pchain-explorer";
 import { PRIMARY_SUBNET_ID } from "@/lib/pchain-node";
 import type { L1Chain } from "@/types/stats";
-import { AVAGUARD_CHAIN, AVAGUARD_FLOW, AVAGUARD_ID, SENTINEL_SUBNET, AVAGUARD_MIN_H, simulatedFlows } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD
+import { AVAGUARD_CHAIN, AVAGUARD_FLOW, AVAGUARD_ID, SENTINEL_ONLY, SENTINEL_SUBNET, AVAGUARD_MIN_H, simulatedFlows } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD
 
 /* The city's data, apart from the map that draws it (icm-map.tsx): the
    feeds, the catalog that names the chains, and the plan of lots and
@@ -204,7 +204,8 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
     const bySubnet = catalogBySubnet(network);
     // AVAGUARD: our L1 joins the chain feed before the plan, and its street to the C-Chain joins the flows; a network
     // whose feed has no ICM at all (Fuji today) gets plausible flows between the C-Chain and its most validated chains
-    const fed = chains ? [...chains.filter((c) => String(c.chainId) !== AVAGUARD_ID), AVAGUARD_CHAIN] : null;
+    // SENTINEL: in the demo city only the C-Chain hub stands beside our L1, so the main road, the toll and the car read clearly
+    const fed = chains ? [...chains.filter((c) => String(c.chainId) !== AVAGUARD_ID && (!SENTINEL_ONLY || String(c.chainId) === hubId)), AVAGUARD_CHAIN] : null;
     const icmSimulated = !!fed && !flows.some((f) => f.messageCount > 0);
     const allFlows = [
       ...(icmSimulated ? simulatedFlows(fed!, hubId) : flows),
@@ -313,7 +314,10 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
       });
     }
     // AVAGUARD: SentinelL1's own registry row (a guest on the Frontier) gives way to our HQ, so it stands once
-    const base = [...listed.map((c) => (freshAt.has(c.id) ? { ...c, newAt: freshAt.get(c.id)! } : c)), ...guests.filter((g) => g.subnetId !== SENTINEL_SUBNET && g.blockchainId !== AVAGUARD_ID)];
+    const base = [...listed.map((c) => (freshAt.has(c.id) ? { ...c, newAt: freshAt.get(c.id)! } : c)), ...guests.filter((g) => g.subnetId !== SENTINEL_SUBNET && g.blockchainId !== AVAGUARD_ID)].filter(
+      // SENTINEL: and no other listed chain nor P-Chain guest
+      (c) => !SENTINEL_ONLY || c.id === hubId || c.id === AVAGUARD_ID,
+    );
 
     const metric = (c: (typeof base)[number]) => (byMessages ? c.out + c.in : c.validators);
     const top = Math.max(byMessages ? 1 : H_TOP_MIN, ...base.map(metric));
