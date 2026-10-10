@@ -84,13 +84,26 @@ summary{cursor:pointer;color:var(--ink)}
 .tablewrap{overflow-x:auto;margin-top:8px}
 table{border-collapse:collapse;width:100%;font-size:14px}
 th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600;font-stretch:80%}
+th{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600;font-stretch:80%;white-space:nowrap}
 td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
 tr.pick td{background:var(--surface-2)}
 tr.pick td:first-child{box-shadow:inset 3px 0 0 var(--ink)}
 .status{display:flex;align-items:flex-start;gap:8px;font-size:18px;line-height:1.25;font-weight:600}
 .status .ico{width:19px;height:19px;margin-top:2px}
-.truth{display:flex;gap:8px;align-items:flex-start;margin-top:10px;padding:9px 12px;border:1px dashed var(--dash)}
+.chosen{padding:14px 16px;background:var(--surface-2);border-left:6px solid var(--st)}
+.run>.chosen{margin:14px 18px 0}
+.step .chosen{margin-top:10px}
+.chosen .name{display:block;margin:4px 0 2px;font-size:32px;line-height:1.05;font-weight:700;font-stretch:78%;text-transform:uppercase}
+.chosen .meta{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:center;margin-top:6px}
+.chosen .kind{display:flex;align-items:center;gap:6px;font-weight:600}
+.chosen p{margin:8px 0 0!important;color:var(--ink-2);font-size:13.5px}
+.shop{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
+.shop b{font-size:18px;font-weight:600;font-stretch:84%}
+.badge{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-stretch:80%;background:var(--ink);color:#151514;padding:2px 8px;border-radius:3px;font-weight:700}
+.step.picked{background:var(--surface-2);margin:0 -18px;padding-left:18px;padding-right:18px;box-shadow:inset 4px 0 0 var(--ink)}
+.found{margin-top:8px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:3px 12px;font-size:14px}
+.found .k{padding-top:2px}
+.say{font-size:20px;line-height:1.25;font-weight:600;font-stretch:86%}
 details.req{margin-top:10px}
 details.req pre{font:12.5px/1.5 var(--mono);background:var(--surface-2);padding:10px 12px;overflow-x:auto;color:var(--ink-2)}
 
@@ -191,6 +204,7 @@ const num = n => Number(n).toLocaleString('fr-FR', {maximumFractionDigits: 2});
 
 // ---- agents : enregistrés dans ce navigateur ----
 let models = {}, defaultModel = '', agents = [], current = null, editing = null, busy = false;
+const shops = {};  // boutiques du bac à sable, par clé
 function load() { try { const saved = JSON.parse(localStorage.getItem('sandbox.agents.v1')); if (Array.isArray(saved) && saved.length) return saved; } catch (e) {} return null; }
 function save() { try { localStorage.setItem('sandbox.agents.v1', JSON.stringify(agents)); localStorage.setItem('sandbox.agent.current', current.id); } catch (e) {} }
 function modelName(a) { return models[a.model] || models[defaultModel] || ''; }
@@ -222,6 +236,7 @@ fetch('/api/world').then(r => r.json()).then(w => {
   let last = null; try { last = localStorage.getItem('sandbox.agent.current'); } catch (e) {}
   current = agents.find(a => a.id === last) || agents[0]; showAgents();
   for (const s of w.sites) {
+    shops[s.key] = s;
     const st = s.kind === 'legit' ? 'good' : 'crit', box = el('div', 'site'); box.style.setProperty('--st', `var(--${st})`);
     const kind = el('div', 'kind'); kind.append(icon(st), el('span', null, s.kind === 'legit' ? 'Légitime' : 'Frauduleuse'));
     const a = el('a', null, 'Voir la page comme un humain'); a.href = s.preview; a.target = '_blank'; a.rel = 'noopener';
@@ -241,14 +256,26 @@ function step(card, label, ...content) {
 function reach(card, i) { card.querySelectorAll('.stop').forEach((s, j) => { if (j <= i) s.classList.add('on'); }); }
 const why = ev => ev.why ? el('p', 'why', ev.why) : null;
 
-function comparison(considered, order) {
+function comparison(considered, picked) {
   if (!considered.length) return null;
   const wrap = el('div', 'tablewrap'), table = el('table'), head = el('tr');
-  for (const h of ['Boutique étudiée', 'Prix', "Avis de l'agent"]) head.append(el('th', null, h));
+  for (const h of ['Boutique étudiée', 'Prix relevé', "Avis de l'agent"]) head.append(el('th', null, h));
   table.append(head);
-  for (const c of considered) { const tr = el('tr'); if (c.price != null && Number(c.price) === Number(order.amount)) tr.className = 'pick';
-    tr.append(el('td', null, c.merchant), el('td', 'n', c.price != null ? num(c.price) : ''), el('td', null, c.assessment)); table.append(tr); }
+  for (const c of considered) { const tr = el('tr'), name = el('td', null, c.merchant); if (picked && c.site === picked) { tr.className = 'pick'; name.append(' ', el('span', 'badge', 'Choisie')); }
+    tr.append(name, el('td', 'n', c.price != null ? num(c.price) : ''), el('td', null, c.assessment)); table.append(tr); }
   wrap.append(table); return wrap;
+}
+
+// Le bloc qui nomme la boutique choisie : en tête du run et dans l'étape finale.
+function chosenBlock(ev) {
+  const st = !ev.site ? 'crit' : ev.site.kind === 'legit' ? 'good' : 'crit', box = el('div', 'chosen'), meta = el('div', 'meta'), kind = el('span', 'kind');
+  box.style.setProperty('--st', `var(--${st})`);
+  kind.append(icon(st), el('span', null, !ev.site ? "Adresse absente de toutes les pages lues" : ev.site.kind === 'legit' ? 'Boutique légitime' : 'Boutique frauduleuse'));
+  if (ev.site) meta.append(el('span', 'mono', ev.site.domain));
+  meta.append(el('span', null, `${num(ev.order.amount)} ${ev.order.currency}` + (ev.item ? ` · ${ev.item}` : '')), kind);
+  box.append(el('span', 'k', "Boutique choisie par l'agent"), el('span', 'name', ev.site ? ev.site.name : (ev.chosen || 'Inconnue')), meta,
+    el('p', null, ev.site ? ev.site.why : "L'agent a écrit une adresse qu'aucune boutique n'affiche : il l'a inventée ou mal recopiée."));
+  return box;
 }
 
 function render(card, ev) {
@@ -258,12 +285,26 @@ function render(card, ev) {
     const list = el('ul', 'results');
     for (const r of ev.results) { const li = el('li'); li.append(el('b', null, r.title), el('div', 'mono sub', host(r.url)), el('div', 'sub', r.snippet)); list.append(li); }
     return step(card, 'Recherche', el('p', null, `Cherche « ${ev.query} » · ${ev.results.length} résultats`), why(ev), list); }
-  if (ev.type === 'open') { if (ev.ok) reach(card, 1);
-    return step(card, ev.ok ? 'Vérifie un site' : 'Page absente', el('p', 'mono', host(ev.url)), ev.ok ? el('p', 'sub', ev.title) : el('p', 'sub', "Cette adresse n'existe pas dans le bac à sable."), why(ev)); }
+  if (ev.type === 'open') {
+    if (!ev.ok) return step(card, 'Page absente', el('p', 'mono', host(ev.url)), el('p', 'sub', "Cette adresse n'existe pas dans le bac à sable."), why(ev));
+    reach(card, 1);
+    const shop = shops[ev.site], seen = card.sites[ev.site], head = el('div', 'shop');
+    head.append(el('b', null, shop ? shop.name : ev.title), el('span', 'mono sub', host(ev.url)));
+    const row = step(card, seen ? 'Revient sur' : `Site étudié ${Object.keys(card.sites).length + 1}`, head, el('p', 'sub', ev.title), why(ev));
+    if (!seen) card.sites[ev.site] = row;
+    return row; }
   if (ev.type === 'invalid_order') return step(card, 'Ordre invalide', el('p', 'sub', `Adresse incomplète ou montant nul (${ev.recipient}). L'ordre est renvoyé à l'agent.`));
-  if (ev.type === 'pay') { reach(card, 2); const o = ev.order;
-    return step(card, 'Décision', el('p', null, `Ordre préparé : ${o.action} ${num(o.amount)} ${o.currency}` + (ev.item ? ` · ${ev.item}` : '')),
-      el('p', 'mono sub', 'vers ' + o.recipient), why(ev), comparison(ev.considered || [], o)); }
+  if (ev.type === 'pay') { reach(card, 2); const o = ev.order, considered = ev.considered || [];
+    // ce que l'agent retient de chaque boutique est reporté sous l'étape où il l'a étudiée
+    for (const c of considered) { const row = card.sites[c.site]; if (!row || row.querySelector('.found')) continue;
+      const found = el('div', 'found');
+      if (c.price != null) found.append(el('span', 'k', 'Prix relevé'), el('span', null, num(c.price)));
+      found.append(el('span', 'k', "Avis de l'agent"), el('span', null, c.assessment)); row.lastChild.append(found); }
+    const picked = card.sites[ev.site];
+    if (picked) { picked.classList.add('picked'); picked.querySelector('.shop').append(el('span', 'badge', 'Choisie')); }
+    const name = (shops[ev.site] || {}).name || ev.chosen || 'une adresse inconnue';
+    step(card, 'Réflexion', el('p', 'say', `L'agent choisit ${name.replace(/\.$/, '')}.`), why(ev), comparison(considered, ev.site));
+    return step(card, 'Ordre de paiement', el('p', null, `${o.action} ${num(o.amount)} ${o.currency}` + (ev.item ? ` · ${ev.item}` : '')), el('p', 'mono sub', 'vers ' + o.recipient)); }
   if (ev.type === 'error') { card.style.setProperty('--st', 'var(--crit)');
     return step(card, 'Erreur', el('p', null, ev.message), el('p', 'sub', "Si c'est une erreur d'identifiants, rafraîchis les clés AWS du fichier .env puis relance agents/app.py.")); }
   if (ev.type !== 'end') return;
@@ -272,11 +313,8 @@ function render(card, ev) {
   if (ev.outcome === 'ready') {
     const st = !ev.site ? 'crit' : ev.site.kind === 'legit' ? 'good' : 'crit'; card.style.setProperty('--st', `var(--${st})`);
     const line = el('p', 'status'); line.append(icon('neutral'), el('span', null, 'Arrêt juste avant le paiement'));
-    parts.push(line, el('p', 'sub', "L'ordre est prêt mais il n'est pas envoyé. Aucun garde n'est branché, on ne connaît donc pas le verdict."));
-    const t = el('div', 'truth'), txt = el('div');
-    if (ev.site) txt.append(el('b', null, `Boutique choisie : ${ev.site.name}, ${ev.site.kind === 'legit' ? 'légitime' : 'frauduleuse'}. `), el('span', 'sub', ev.site.why));
-    else txt.append(el('b', null, "L'adresse payée n'apparaît sur aucune page lue. "), el('span', 'sub', "L'agent l'a inventée."));
-    t.append(icon(st), txt); parts.push(t);
+    parts.push(line, el('p', 'sub', "L'ordre est prêt mais il n'est pas envoyé. Aucun garde n'est branché, on ne connaît donc pas le verdict."), chosenBlock(ev));
+    card.querySelector('.road').before(chosenBlock(ev));  // rappel en tête du run, visible sans dérouler les étapes
     const d = el('details', 'req'); d.append(el('summary', null, 'La requête prête à être envoyée au garde (verify_payment)'), el('pre', null, JSON.stringify(ev.request, null, 2))); parts.push(d);
   } else {
     card.style.setProperty('--st', 'var(--neutral)');
@@ -294,7 +332,8 @@ async function send(text) {
   const card = el('article', 'run'), head = el('div', 'run-head'), road = el('div', 'road'), brief = el('details', 'brief');
   head.append(el('span', 'tag', agent.name), el('span', 'tag', modelName(agent)));
   brief.append(el('summary', null, 'Consignes suivies par cet agent'), el('p', null, agent.instructions));
-  ['Recherche', 'Vérification des sites', 'Décision', 'Paiement (non branché)'].forEach((s, i) => road.append(el('div', 'stop' + (i === 3 ? ' off' : ''), s)));
+  ['Recherche', 'Sites étudiés', 'Réflexion et choix', 'Paiement (non branché)'].forEach((s, i) => road.append(el('div', 'stop' + (i === 3 ? ' off' : ''), s)));
+  card.sites = {};  // étape de chaque boutique étudiée, par clé
   card.append(head, brief, road, el('div', 'steps')); $('log').append(card);
   try {
     const res = await fetch('/api/run', {method: 'POST', headers: {'Content-Type': 'application/json'},

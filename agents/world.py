@@ -87,6 +87,12 @@ def site_of(url: str) -> str | None:
     return next((k for k, s in _ALL.items() if s["domain"] == host), None)
 
 
+def site_by_name(text: str) -> str | None:
+    """Boutique du chat que désigne un nom écrit librement par l'agent ("Meridian", "meridian-watch.example"...)."""
+    text = text.lower()
+    return next((k for k, s in SITES.items() if text and (s["name"].split()[0].lower() in text or s["domain"] in text)), None)
+
+
 def web_for(keys) -> dict:
     """Le sous-ensemble du web visible pour un run : URL -> fichier, limité à ces sites."""
     return {url: path for url, path in WEB.items() if site_of(url) in keys}

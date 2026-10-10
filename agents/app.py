@@ -105,7 +105,7 @@ class Handler(BaseHTTPRequestHandler):
             with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps(run, ensure_ascii=False) + "\n")
             request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères de HTML lus par l'agent>"}
-            emit({"type": "end", **{k: run[k] for k in ("outcome", "order", "item", "why", "considered", "final_text", "turns")},
+            emit({"type": "end", **{k: run[k] for k in ("outcome", "order", "item", "why", "chosen", "considered", "final_text", "turns")},
                   "site": public_site(run["site"]) if run["site"] else None, "request": request})
         except ConnectionError:
             pass  # l'onglet a été fermé pendant le run

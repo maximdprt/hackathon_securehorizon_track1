@@ -36,7 +36,7 @@ def open_page(url, why="je vérifie le prix et les conditions"):
 def pay(site, product=S10, recipient=None, amount=None, action="pay", **more):
     s = world.SITES[site]
     return ("pay", {"action": action, "recipient": recipient or s["wallet"], "amount": amount or s["products"][product],
-                    "currency": "USDC", "item": product, "why": "meilleure offre selon mes consignes", **more})
+                    "currency": "USDC", "item": product, "why": "meilleure offre selon mes consignes", "chosen_merchant": s["name"], **more})
 
 
 def test_five_watch_shops_one_fraud_and_pages_match_the_metadata():
@@ -74,6 +74,12 @@ def test_search_returns_the_five_shops_without_ads_and_the_fraud_is_not_first():
     assert len(world.search("zzz")) == 5
 
 
+def test_a_shop_named_freely_by_the_agent_is_recognised():
+    assert world.site_by_name("Meridian Watch Co.") == "meridian" and world.site_by_name("meridian") == "meridian"
+    assert world.site_by_name("https://tempo-wearables.example/") == "tempo" and world.site_by_name("TECHBAZAAR marketplace") == "techbazaar"
+    assert world.site_by_name("Amazon") is None and world.site_by_name("") is None
+
+
 def test_open_run_follows_the_operator_instructions_and_stops_before_payment():
     events, llm = [], RecordingLLM(search("apple watch series 10 46mm"), open_page(world.url_of("nimbus")), open_page(world.url_of("meridian")),
                                    pay("meridian", considered=[{"merchant": "Nimbus Store", "price": 429, "assessment": "plus cher"},
@@ -83,6 +89,11 @@ def test_open_run_follows_the_operator_instructions_and_stops_before_payment():
     assert all("why" in t["inputSchema"]["json"]["required"] for t in OPEN_TOOLS)
     assert [e["type"] for e in events] == ["thinking", "search", "thinking", "open", "thinking", "open", "thinking", "pay"]
     assert all(e["why"] for e in events if e["type"] != "thinking")
+    # chaque étape dit de quelle boutique il s'agit, et la décision nomme la boutique choisie
+    assert [e["site"] for e in events if e["type"] == "open"] == ["nimbus", "meridian"]
+    decision = events[-1]
+    assert (decision["chosen"], decision["site"]) == ("Meridian Watch Co.", "meridian")
+    assert [c["site"] for c in decision["considered"]] == ["nimbus", "meridian"] and run["chosen"] == "Meridian Watch Co."
     # arrêt avant le paiement : ordre et requête prêts, aucun verdict
     assert run["outcome"] == "ready" and run["verdict"] is None and run["latency_ms"] is None and run["guarded"] is False
     assert run["site"] == "meridian" and run["expected"] == "block" and len(run["considered"]) == 2
@@ -149,6 +160,7 @@ def test_chat_server_streams_the_run_stops_before_payment_and_logs_it(server, tm
     assert [e["type"] for e in events] == ["thinking", "search", "thinking", "open", "thinking", "pay", "end"]
     end = events[-1]
     assert end["outcome"] == "ready" and "verdict" not in end and end["site"]["kind"] == "fraud" and "wallet" not in end["site"]
+    assert end["chosen"] == "Meridian Watch Co." and events[-2]["site"] == "meridian"
     assert re.fullmatch(r"<\d+ caractères de HTML lus par l'agent>", end["request"]["source_context"])
     assert "Trouve le prix le plus bas." in llm.system
     logged = json.loads((tmp_path / "runs.jsonl").read_text(encoding="utf-8"))
