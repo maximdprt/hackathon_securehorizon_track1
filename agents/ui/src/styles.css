@@ -9,6 +9,7 @@
   --ink-3: #8590a8;
   --good: #0ca30c;
   --crit: #d03b3b;
+  --warn: #e0a019;
   --sans: "Bahnschrift", "DIN Alternate", "Barlow", "Segoe UI", sans-serif;
   --mono: "Cascadia Mono", "SF Mono", Consolas, "Liberation Mono", monospace;
   color-scheme: dark;
@@ -25,6 +26,7 @@ button, select, textarea, input { font: inherit; color: inherit; }
 .ico { width: 16px; height: 16px; flex: none; }
 .good { color: var(--good); }
 .crit { color: var(--crit); }
+.warn { color: var(--warn); }
 
 .app { height: 100%; display: grid; grid-template-columns: 300px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
 .bar { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; padding: 13px 22px; border-bottom: 1px solid var(--line); }
@@ -89,6 +91,13 @@ button, select, textarea, input { font: inherit; color: inherit; }
 .facts b { color: var(--ink); font-weight: 600; }
 .truth { display: flex; gap: 8px; align-items: flex-start; }
 .truth .ico { margin-top: 3px; }
+.verdict.good { color: var(--good); }
+.verdict.warn { color: var(--warn); }
+.verdict.crit { color: var(--crit); }
+.reasons { margin: 6px 0 4px; padding-left: 18px; font-size: 13px; color: var(--ink-3); overflow-wrap: anywhere; }
+.reasons li { margin: 0 0 3px; }
+.txs { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 4px; }
+.facts a { color: var(--ink); text-underline-offset: 3px; }
 .bubble details { margin-top: 10px; }
 .bubble summary { cursor: pointer; color: var(--ink-2); font-size: 13.5px; }
 .bubble ol { margin: 8px 0 0; padding-left: 20px; color: var(--ink-2); font-size: 14px; }

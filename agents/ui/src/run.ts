@@ -1,8 +1,8 @@
-import type { EndEvent, RunEvent } from './types';
+import type { EndEvent, RunEvent, Verdict } from './types';
 
 export type Step = {
   id: number;
-  kind: 'search' | 'shop' | 'missing' | 'thought' | 'invalid' | 'order';
+  kind: 'search' | 'shop' | 'missing' | 'thought' | 'invalid' | 'order' | 'guard' | 'chain';
   title: string;
   detail?: string;
   why?: string;
@@ -28,6 +28,12 @@ export type Message = UserMessage | AgentMessage;
 
 export const host = (url: string) => url.replace(/^https?:\/\//, '').replace(/\/$/, '');
 export const amount = (n: number) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+
+export const VERDICT_LABEL: Record<Verdict['verdict'], string> = {
+  allow: 'achat validé',
+  needs_approval: "en attente d'un humain",
+  block: 'achat refusé',
+};
 
 /** Applique une étape reçue du serveur à la réponse de l'agent. Fonction pure : elle rend un nouveau message. */
 export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: string | null) => string | undefined): AgentMessage {
@@ -62,6 +68,20 @@ export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: stri
       };
       return { ...msg, live: 'Décide', steps: [...steps, order] };
     }
+    case 'guard':
+      return { ...msg, live: "Le garde vérifie l'ordre" };
+    case 'verdict':
+      return add(
+        { kind: 'guard', title: `Garde : ${VERDICT_LABEL[ev.verdict]}`, detail: ev.trust_score != null ? `confiance ${ev.trust_score}/100` : undefined,
+          why: ev.reasons.slice(0, 3).join(' ; ') || undefined },
+        `Garde : ${VERDICT_LABEL[ev.verdict]}`,
+      );
+    case 'chain':
+      return { ...msg, live: 'Inscription sur SentinelL1' };
+    case 'onchain':
+      return ev.ok
+        ? add({ kind: 'chain', title: 'Inscrit sur SentinelL1', detail: ev.payment_id }, 'Inscrit sur SentinelL1')
+        : add({ kind: 'chain', title: 'SentinelL1 injoignable', detail: ev.error });
     case 'end':
       return { ...msg, status: 'done', end: ev };
     case 'error':

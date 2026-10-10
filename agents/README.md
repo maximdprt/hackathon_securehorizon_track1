@@ -9,6 +9,10 @@ une frauduleuse, `sites/`), chat en direct `app.py --open` (http://127.0.0.1:876
 juste avant le paiement), runner `run_shopping.py`, client du garde `guard_client.py` (stub ou moteur). Tests :
 `.venv/bin/pytest agents/tests`.
 
+**Parcours branché** : `app.py` passe l'ordre au garde (`--guard engine`, défaut) puis inscrit le verdict sur SentinelL1
+via `sentinel_chain.py` (`--chain https://rpc.petroi.fr`, défaut ; `off` pour rester local). L'interface affiche le
+verdict, les transactions (liens explorateur) et le lien vers la ville 3D.
+
 | Agent | Use case | Issuer (mandat) | Outils | Pièges joués |
 |---|---|---|---|---|
 | `shopping_agent.py` | 1. agentic shopping | shopping-agent `0xA11ce…02` (pay, 300 USDC max) ou treasury-agent `…01` (pay/transfer, 100 USDC, vendeurs allowlistés) | `open_page`, `read_document`, `pay` | faux Walmart PromptFix (`demo/fake_store`), PDF trésorerie empoisonné, mail CEO, facture propre vers une adresse déjà flaguée |

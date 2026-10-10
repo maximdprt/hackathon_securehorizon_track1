@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { initials } from '../agents';
-import { amount, type AgentMessage } from '../run';
-import type { EndEvent } from '../types';
+import { amount, VERDICT_LABEL, type AgentMessage } from '../run';
+import type { EndEvent, Onchain, Verdict } from '../types';
 
 const ICON = {
   good: (
@@ -16,9 +16,23 @@ const ICON = {
       <path d="M5.4 5.4l5.2 5.2M10.6 5.4l-5.2 5.2" stroke="var(--panel)" strokeWidth="1.9" strokeLinecap="round" />
     </>
   ),
+  warn: (
+    <>
+      <path d="M8 .8l7.4 13.4H.6z" fill="currentColor" strokeLinejoin="round" />
+      <path d="M8 5.6v4M8 12v.2" stroke="var(--panel)" strokeWidth="1.9" strokeLinecap="round" />
+    </>
+  ),
 };
+type Status = keyof typeof ICON;
+const VERDICT_STATUS: Record<Verdict['verdict'], Status> = { allow: 'good', needs_approval: 'warn', block: 'crit' };
+const VERDICT_EFFECT: Record<Verdict['verdict'], string> = {
+  allow: 'Visa à usage unique délivré : le GuardedVault laissera passer ce paiement, et lui seul.',
+  needs_approval: "Le garde ne tranche pas seul : l'ordre est garé, un humain décide.",
+  block: 'Paiement refusé, destinataire flagué on-chain : la prochaine fois, refus direct.',
+};
+const TX_LABEL = { visa: 'Visa', flag: 'Flag', decision: 'Décision' } as const;
 
-function StatusIcon({ status, label }: { status: 'good' | 'crit'; label: string }) {
+function StatusIcon({ status, label }: { status: Status; label: string }) {
   return (
     <svg className={`ico ${status}`} viewBox="0 0 16 16" role="img" aria-label={label}>
       {ICON[status]}
@@ -26,9 +40,57 @@ function StatusIcon({ status, label }: { status: 'good' | 'crit'; label: string 
   );
 }
 
+/** Le verdict de la barrière : ce que le garde a décidé, et pourquoi. */
+function GuardVerdict({ verdict }: { verdict: Verdict }) {
+  const label = VERDICT_LABEL[verdict.verdict];
+  return (
+    <div className="truth">
+      <StatusIcon status={VERDICT_STATUS[verdict.verdict]} label={`Garde : ${label}`} />
+      <span>
+        <b className={`verdict ${VERDICT_STATUS[verdict.verdict]}`}>{label[0].toUpperCase() + label.slice(1)}.</b>{' '}
+        {verdict.trust_score != null && <>Confiance {verdict.trust_score}/100. </>}
+        {VERDICT_EFFECT[verdict.verdict]}
+        {verdict.reasons.length > 0 && (
+          <ul className="reasons">
+            {verdict.reasons.slice(0, 4).map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+        )}
+        {verdict.owasp.length > 0 && <span className="k">OWASP {verdict.owasp.join(' · ')}</span>}
+      </span>
+    </div>
+  );
+}
+
+/** La preuve on-chain : les transactions écrites sur SentinelL1, ouvrables dans l'explorateur. */
+function ChainProof({ onchain }: { onchain: Onchain | null | undefined }) {
+  if (!onchain) return <>Chaîne non branchée : verdict local seulement.</>;
+  if (!onchain.ok)
+    return (
+      <>
+        <b>Non inscrit.</b> {onchain.error}. Sans visa, le paiement ne passe pas le GuardedVault.
+      </>
+    );
+  return (
+    <>
+      <span className="txs">
+        {onchain.txs.map((tx) => (
+          <a key={tx.hash} href={tx.url} target="_blank" rel="noreferrer" className="mono">
+            {TX_LABEL[tx.kind]} {tx.hash.slice(0, 10)}…
+          </a>
+        ))}
+      </span>
+      <a href={onchain.city} target="_blank" rel="noreferrer">
+        Voir la voiture dans la ville 3D
+      </a>
+    </>
+  );
+}
+
 /** La décision de l'agent, puis ce que le bac à sable sait et que l'agent ignore. */
 function Decision({ end }: { end: EndEvent }) {
-  if (end.outcome !== 'ready' || !end.order) {
+  if ((end.outcome !== 'ready' && end.outcome !== 'verdict') || !end.order) {
     return (
       <>
         <p className="lead">{end.outcome === 'no_payment' ? "Je n'ai rien acheté." : `Je n'ai pas réussi à décider en ${end.turns} étapes.`}</p>
@@ -48,8 +110,23 @@ function Decision({ end }: { end: EndEvent }) {
       </p>
       {end.why && <p>{end.why}</p>}
       <dl className="facts">
-        <dt>État</dt>
-        <dd>Arrêté juste avant le paiement. Le garde n'est pas branché : l'ordre est prêt, il n'est pas envoyé.</dd>
+        {end.verdict ? (
+          <>
+            <dt>Garde</dt>
+            <dd>
+              <GuardVerdict verdict={end.verdict} />
+            </dd>
+            <dt>SentinelL1</dt>
+            <dd>
+              <ChainProof onchain={end.onchain} />
+            </dd>
+          </>
+        ) : (
+          <>
+            <dt>État</dt>
+            <dd>Arrêté juste avant le paiement. Le garde n'est pas branché : l'ordre est prêt, il n'est pas envoyé.</dd>
+          </>
+        )}
         <dt>Bac à sable</dt>
         <dd className="truth">
           <StatusIcon status={legit ? 'good' : 'crit'} label={legit ? 'Boutique légitime' : 'Boutique frauduleuse'} />
@@ -145,7 +222,7 @@ export function AgentBubble({ msg, onRetry }: { msg: AgentMessage; onRetry: (pro
         )}
         {request && (
           <details>
-            <summary>Requête prête pour le garde (verify_payment)</summary>
+            <summary>{msg.end?.verdict ? 'Requête envoyée au garde (verify_payment)' : 'Requête prête pour le garde (verify_payment)'}</summary>
             <CopyButton text={request} />
             <pre>{request}</pre>
           </details>

@@ -1,14 +1,33 @@
 // Ce que renvoie agents/app.py.
 
 export type Site = { key: string; name: string; domain: string; kind: 'legit' | 'fraud'; why: string; preview: string };
-export type World = { sites: Site[]; models: Record<string, string>; default_model: string };
+export type World = { sites: Site[]; models: Record<string, string>; default_model: string; guard?: string | null; chain?: string | null };
 
 export type Order = { issuer: string; action: string; amount: number; currency: string; recipient: string };
 export type Considered = { merchant: string; price: number | null; assessment: string; site: string | null };
 
+/** Le verdict du garde (guard/, verify_payment), résumé pour l'interface. */
+export type Verdict = {
+  verdict: 'allow' | 'needs_approval' | 'block';
+  trust_score: number | null;
+  risk_score: number | null;
+  severity: number | null;
+  reasons: string[];
+  owasp: string[];
+  onchain_flagged: boolean;
+  instruction_id: string | null;
+  latency_ms: number | null;
+  backend: string | null;
+};
+export type OnchainTx = { kind: 'visa' | 'flag' | 'decision'; hash: string; url: string };
+/** Ce que l'API authorize de SentinelL1 a inscrit on-chain pour ce verdict. */
+export type Onchain =
+  | { ok: true; verdict: string; payment_id: string; nonce: number; txs: OnchainTx[]; city: string; latency_ms: number }
+  | { ok: false; verdict: string; error: string };
+
 export type EndEvent = {
   type: 'end';
-  outcome: 'ready' | 'no_payment' | 'max_turns';
+  outcome: 'ready' | 'verdict' | 'no_payment' | 'max_turns';
   order: Order | null;
   item: string;
   why: string;
@@ -18,6 +37,8 @@ export type EndEvent = {
   turns: number;
   site: Site | null;
   request: unknown;
+  verdict?: Verdict | null;
+  onchain?: Onchain | null;
 };
 
 /** Une étape d'un run, telle que le serveur l'envoie au fil de l'eau (une ligne JSON par étape). */
@@ -28,6 +49,10 @@ export type RunEvent =
   | { type: 'open'; url: string; ok: boolean; title?: string; why: string; site: string | null }
   | { type: 'invalid_order'; recipient: string; amount: unknown }
   | { type: 'pay'; order: Order; item: string; why: string; chosen: string; site: string | null; considered: Considered[] }
+  | { type: 'guard'; status: 'checking' }
+  | ({ type: 'verdict' } & Verdict)
+  | { type: 'chain'; status: 'writing'; api: string }
+  | ({ type: 'onchain' } & Onchain)
   | EndEvent
   | { type: 'error'; message: string };
 

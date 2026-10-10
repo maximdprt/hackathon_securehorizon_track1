@@ -118,7 +118,8 @@ def merchant_context(key: str, order: dict) -> dict:
     bought = next((p for p, price in s["products"].items() if abs(price - float(order["amount"])) < 0.005), None)
     if bought:  # prix connus seulement si le montant payé correspond à un produit affiché
         merchant.update(price=s["products"][bought], market_price=MARKET[bought])
-    return {"merchant": merchant, "history": {"avg_amount": 60, "payments_last_hour": 0, "prior_purchase": key == "nimbus"}}
+    # historique de l'agent shopping : panier moyen de 200 USDC, cohérent avec son plafond de 300 (cf LIMIT)
+    return {"merchant": merchant, "history": {"avg_amount": 200, "payments_last_hour": 0, "prior_purchase": key == "nimbus"}}
 
 
 def expected_verdict(key: str | None, order: dict) -> str:

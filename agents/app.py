@@ -8,18 +8,27 @@ chaque étape, choisit, et s'arrête juste avant le paiement. Tout s'affiche en 
 L'interface est une application React (agents/ui/src). Ce serveur sert sa version construite (agents/ui/dist) et
 l'API qu'elle appelle. Pour la modifier en direct : `npm run dev` dans agents/ui, avec ce serveur lancé à côté.
 
-Aucun garde n'est branché ici : l'ordre de paiement est préparé, jamais envoyé, et on ne connaît donc pas
-le verdict. La requête `verify_payment` prête à partir est montrée dans l'interface et enregistrée dans
-agents/out/runs.jsonl, pour la rejouer contre le vrai garde plus tard (voir `run_open(..., guard=...)`).
+Le parcours complet : l'agent choisit une boutique et prépare l'ordre, le garde (guard/, le moteur de
+verify_payment) le vérifie, puis le verdict est inscrit sur SentinelL1 par l'API authorize de Walid :
+allow -> visa à usage unique, block -> destinataire flagué, needs_approval -> en attente d'un humain.
+Chaque décision apparaît dans l'explorateur et dans la ville 3D.
 
-Tout reste sur la machine : le serveur n'écoute que sur 127.0.0.1 et les boutiques sont des fichiers locaux.
+    --guard engine|stub|off     défaut engine ; off = arrêt avant le paiement, rien n'est vérifié ni envoyé
+    --chain URL|off             défaut https://rpc.petroi.fr (env SENTINEL_API) ; off = verdict local seulement
+    GUARD_LLM=on                le garde consulte aussi Claude (Bedrock), sinon heuristiques seules
+
+Les boutiques sont des fichiers locaux et le serveur n'écoute que sur 127.0.0.1. Seul le verdict (ordre,
+raisons, scores) part vers l'API authorize quand la chaîne est branchée. Chaque run est enregistré dans
+agents/out/runs.jsonl.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+import threading
 import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -30,7 +39,9 @@ sys.path.insert(0, str(ROOT))
 
 from agents import world  # noqa: E402
 from agents.llm import MODEL_ID, BedrockLLM  # noqa: E402
+from agents.guard_client import GuardClient  # noqa: E402
 from agents.sandbox_agent import run_open  # noqa: E402
+from agents.sentinel_chain import API as CHAIN_API, SentinelChain, short_reason  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
 DIST = ROOT / "agents" / "ui" / "dist"  # l'interface React construite par `npm run build`
@@ -51,6 +62,32 @@ MODELS = {  # modèles proposés pour un agent
 }
 SITE_PATH = re.compile(r"/site/([a-z0-9]+)/([a-z.]*)")
 _llms: dict[str, BedrockLLM] = {}
+_guard: GuardClient | None = None   # réglés au lancement (--guard, --chain)
+_chain: SentinelChain | None = None
+_guard_lock = threading.Lock()      # le moteur écrit son état (file humaine, registre menaces) : un verdict à la fois
+
+
+def verdict_summary(v: dict, latency_ms: float | None) -> dict:
+    """Ce que l'interface montre du verdict du garde."""
+    return {"verdict": v["verdict"], "trust_score": v.get("trust_score"), "risk_score": v.get("risk_score"),
+            "severity": v.get("severity"), "reasons": [short_reason([r], 220) for r in (v.get("reasons") or [])[:6]],
+            "owasp": v.get("owasp") or [], "onchain_flagged": bool(v.get("onchain_flagged")),
+            "instruction_id": v.get("instruction_id"), "latency_ms": latency_ms,
+            "backend": _guard.backend if _guard else None}
+
+
+class LiveGuard:
+    """Le garde du serveur, qui annonce son passage dans le flux du run."""
+
+    def __init__(self, emit):
+        self.emit = emit
+
+    def verify(self, request: dict) -> tuple[dict, float]:
+        self.emit({"type": "guard", "status": "checking"})
+        with _guard_lock:
+            verdict, ms = _guard.verify(request)
+        self.emit({"type": "verdict", **verdict_summary(verdict, ms)})
+        return verdict, ms
 
 
 def public_site(key: str) -> dict:
@@ -90,7 +127,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, file.read_bytes(), ASSET_TYPES[file.suffix])
             return self._json(404, {"error": "not found"})
         if path == "/api/world":
-            return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID})
+            return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID,
+                                    "guard": _guard.backend if _guard else None, "chain": _chain.base if _chain else None})
         m = SITE_PATH.fullmatch(path)
         page = world.SITES[m.group(1)]["pages"].get(m.group(2)) if m and m.group(1) in world.SITES else None
         if page is None:
@@ -122,14 +160,20 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
-            run = run_open(prompt, llm, instructions=instructions, emit=emit)  # pas de garde : arrêt avant le paiement
-            run.update(agent=agent, model=model, backend=None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+            run = run_open(prompt, llm, guard=LiveGuard(emit) if _guard else None, instructions=instructions, emit=emit)
+            if run["verdict"] and _chain:  # la barrière a parlé : on inscrit sa décision sur SentinelL1
+                emit({"type": "chain", "status": "writing", "api": _chain.base})
+                site = public_site(run["site"]) if run["site"] else None
+                run["onchain"] = _chain.authorize(run["verdict"], site, item=run["item"])
+                emit({"type": "onchain", **run["onchain"]})
+            run.update(agent=agent, model=model, backend=_guard.backend if _guard else None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
             OUT.mkdir(exist_ok=True)
             with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps(run, ensure_ascii=False) + "\n")
             request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères de HTML lus par l'agent>"}
             emit({"type": "end", **{k: run[k] for k in ("outcome", "order", "item", "why", "chosen", "considered", "final_text", "turns")},
-                  "site": public_site(run["site"]) if run["site"] else None, "request": request})
+                  "site": public_site(run["site"]) if run["site"] else None, "request": request,
+                  **({"verdict": verdict_summary(run["verdict"], run["latency_ms"]), "onchain": run.get("onchain")} if run["verdict"] else {})})
         except ConnectionError:
             pass  # l'onglet a été fermé pendant le run
         except Exception as exc:  # identifiants AWS expirés, modèle indisponible...
@@ -146,10 +190,17 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--open", action="store_true", help="ouvre l'interface dans le navigateur")
+    p.add_argument("--guard", choices=["engine", "stub", "off"], default=os.environ.get("GUARD_BACKEND", "engine"),
+                   help="le garde devant le paiement (défaut engine : le vrai moteur guard/)")
+    p.add_argument("--chain", default=CHAIN_API, help="API authorize de SentinelL1, ou off")
     a = p.parse_args()
+    _guard = None if a.guard == "off" else GuardClient(a.guard)
+    _chain = SentinelChain(a.chain) if _guard and a.chain != "off" else None
     url = f"http://127.0.0.1:{a.port}/"
     server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     print(f"Chat de la sandbox -> {url}   (Ctrl+C pour arrêter)")
+    print(f"  garde : {_guard.backend if _guard else 'off'}   chaîne : {_chain.base if _chain else 'off'}"
+          f"   Claude dans le garde : {os.environ.get('GUARD_LLM', 'off')}")
     if a.open:
         webbrowser.open(url)
     try:
