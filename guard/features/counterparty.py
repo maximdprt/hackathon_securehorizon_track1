@@ -132,6 +132,10 @@ def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource
                 sig.append(Signal("domain_age_days", LAYER, 0.50, f"domain registered {age} days ago"))
             elif age < 30:
                 sig.append(Signal("domain_age_days", LAYER, 0.30, f"domain registered {age} days ago"))
+            # a shop that did not exist last month, and the user is known never to have bought there: the Scamlexity pattern
+            if 0 <= age < 30 and _dict(req.context.get("history")).get("prior_purchase") is False:
+                sig.append(Signal("new_merchant_first_payment", LAYER, 0.50,
+                                  f"first payment to a merchant whose domain is {age:g} days old", owasp=["ASI07"]))
         if tld in RISKY_TLDS:
             sig.append(Signal("tld_risk", LAYER, 0.15, f"high-abuse TLD {tld}"))
         if any(host.endswith(f) for f in FREE_HOSTS):

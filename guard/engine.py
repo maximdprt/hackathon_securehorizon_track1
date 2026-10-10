@@ -114,6 +114,9 @@ class Engine:
         for s in signals:
             if s.id not in best or s.weight > best[s.id].weight or (s.hard and not best[s.id].hard):
                 best[s.id] = s
+        # same fact twice: the mandate cap and the on-chain cap both say "over the limit", count it once
+        if "amount_within_mandate" in best and "amount_over_onchain_cap" in best:
+            del best["amount_over_onchain_cap"]
         signals = list(best.values())
 
         rec_flag = self.source.is_flagged(o.recipient)[0] if o.recipient else False

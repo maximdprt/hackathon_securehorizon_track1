@@ -71,7 +71,9 @@ def extract(req: VerifyRequest, cleaned: Cleaned) -> list[Signal]:
         else:
             sig.append(Signal("imperative_to_agent", LAYER, 0.55, f"instruction aimed at the agent in data: {visible_imp[0]!r}", owasp=["ASI03", "ASI07"]))
 
-    truly_hidden = [src for src in cleaned.hidden_sources if src.startswith("hidden:") or src in ("html_comment", "unicode_tags_decoded")]
+    # page code (CSS rules, scripts) is not prose hidden from a reader: the lexicon above still scans it, the ratio does not count it
+    truly_hidden = [src for src in cleaned.hidden_sources
+                    if (src.startswith("hidden:") and src not in ("hidden:style", "hidden:script")) or src in ("html_comment", "unicode_tags_decoded")]
     if cleaned.hidden and len(cleaned.hidden) > 20 and truly_hidden:
         sig.append(Signal("hidden_text_ratio", LAYER, 0.20, f"{len(cleaned.hidden)} chars hidden from humans ({', '.join(sorted(set(truly_hidden))[:4])}), ratio {cleaned.hidden_ratio:.2f}"))
 

@@ -103,3 +103,31 @@ def test_unendorsed_facilitator_gets_flagged_not_the_service(engine):
     engine.verify({"order": {"issuer": X, "action": "pay", "amount": 0.5, "recipient": SERVICE, "nonce": "n3"},
                    "source_context": "402", "context": {"origin": "tool_output", "x402": {"quote_amount": 0.5, "facilitator": ROGUE}}})
     assert engine.source.is_flagged(ROGUE)[1] == 3 and engine.source.is_flagged(SERVICE)[1] == 1
+
+
+def shop(amount, domain_age, prior_purchase, avg=200):
+    """A shopping-agent order on a merchant page (sandbox shape): the recipient comes from the page."""
+    return {"order": {"issuer": S, "action": "pay", "amount": amount, "recipient": "0x3e21d1a400000000000000000000000000000c7b"},
+            "source_context": "<h1>Watch shop</h1><p>Apple Watch 0x3e21d1a400000000000000000000000000000c7b</p>", "context_type": "html",
+            "context": {"origin": "webpage", "merchant": {"domain": "watch-shop.example", "domain_age_days": domain_age},
+                        "history": {"avg_amount": avg, "prior_purchase": prior_purchase}}}
+
+
+def ids(v):
+    return {s["id"] for s in v["signals"]}
+
+
+def test_brand_new_merchant_on_a_first_purchase_is_blocked(engine):
+    v = engine.verify(shop(229, domain_age=9, prior_purchase=False))
+    assert "new_merchant_first_payment" in ids(v) and v["verdict"] == "block"
+    # same shop, but the user already bought there: new domain alone is a warning, not the combination
+    assert "new_merchant_first_payment" not in ids(engine.verify(shop(229, domain_age=9, prior_purchase=True)))
+    # established merchant, first purchase: no combination either
+    assert "new_merchant_first_payment" not in ids(engine.verify(shop(229, domain_age=1460, prior_purchase=False)))
+
+
+def test_over_cap_is_counted_once_and_escalates_up_to_twice_the_cap(engine):
+    v = engine.verify(shop(280 * 1.5, domain_age=1460, prior_purchase=True))  # 420 > cap 300, < 2x
+    assert "amount_within_mandate" in ids(v) and "amount_over_onchain_cap" not in ids(v)
+    assert v["verdict"] == "needs_approval"
+    assert engine.verify(shop(700, domain_age=1460, prior_purchase=True))["verdict"] == "block"  # > 2x cap: hard
