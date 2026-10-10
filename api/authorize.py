@@ -39,6 +39,14 @@ ABI = [
     {"name": "recordDecision", "type": "function", "stateMutability": "nonpayable",
      "inputs": [{"name": "paymentId", "type": "bytes32"}, {"name": "issuer", "type": "address"},
                 {"name": "verdict", "type": "string"}, {"name": "reason", "type": "string"}], "outputs": []},
+    {"name": "isVisaValid", "type": "function", "stateMutability": "view",
+     "inputs": [{"name": "paymentId", "type": "bytes32"}], "outputs": [{"name": "", "type": "bool"}]},
+    {"name": "isFlagged", "type": "function", "stateMutability": "view",
+     "inputs": [{"name": "subject", "type": "bytes32"}],
+     "outputs": [{"name": "", "type": "bool"}, {"name": "", "type": "uint8"}]},
+    {"name": "isAuthorized", "type": "function", "stateMutability": "view",
+     "inputs": [{"name": "issuer", "type": "address"}, {"name": "amount", "type": "uint256"}],
+     "outputs": [{"name": "", "type": "bool"}]},
 ]
 
 w3 = Web3(Web3.HTTPProvider(RPC_URL))
