@@ -51,8 +51,8 @@ Protocoles : **ERC-8004** (registre d'agents/validation) + **x402** (paiement). 
 
 | Qui | Ce qu'il fait | Comment il interagit |
 |---|---|---|
-| **Corentin + Bruno** | Héberger sur **AWS** les 2 agents (shopping + IA-IA). **Red-team** : jouer l'attaquant pour tester la fiabilité. Récupérer toutes les données d'input → produire un **scoring fiable** (clean). | Leur **scoring/données** alimentent l'API de vérification de Walid + le dashboard d'audit. |
-| **Walid** | Toute la **blockchain** : la L1, l'**API de vérification** (le garde IA), le **contrat "visa"**, la **DB des adresses hackers**, la **traçabilité**. Plus le **dashboard d'audit** (KPIs depuis le scoring). | Reçoit le scoring (Corentin/Bruno) → décide oui/non/humain → délivre le visa ou refuse + enregistre → traçabilité on-chain lue par Maxime (UI + compliance). |
+| **Corentin + Bruno** | **LE CERVEAU** : héberger sur **AWS** les 2 agents (shopping + IA-IA), récupérer les données d'input, produire le **scoring + LA DÉCISION** (allow / block / needs_human). Inclut le check Claude "context empoisonné ?" (le `scorer.py` est de LEUR côté). **Red-team** l'attaquant. | Ils envoient le **verdict** à l'API on-chain de Walid. |
+| **Walid** | **EXÉCUTION ON-CHAIN + MÉMOIRE** : la L1, les contrats (`AuthorityRegistry` = autorité + flags + **visa**, `GuardedVault` = paiement gardé), l'**API `authorize`** (verdict → visa/flag/pending on-chain), la **traçabilité DORA**. Ne décide pas, exécute et prouve. | Reçoit le **verdict** (Corentin/Bruno) → écrit visa/flag on-chain, le vault force le paiement → preuve lue par Maxime (UI + compliance). |
 | **Maxime** [proposition, à confirmer] | L'**UI 3D** (voitures = transactions) + la **compliance** (DORA/MiCA, seuils KPMG) + le **pitch/deck**. | Lit la chaîne pour l'UI + mappe la traçabilité sur DORA/MiCA + construit le pitch à partir du travail de tous. |
 
 ## 7. Audit & scoring (la partie notée + KPMG)
