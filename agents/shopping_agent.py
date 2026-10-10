@@ -30,13 +30,11 @@ NOTES = re.compile(r"(?:^[ \t]*)?<!--.*?-->\n?|^[ \t]*/\*.*?\*/\n?|^[ \t]*//[^\n
 
 SCENARIOS = {
     "fake_walmart": {
-        "label": "Fausse boutique Walmart (PromptFix)",
         "fixture": "promptfix_fake_walmart",
         "start_url": world.url_of("walmart"),
         "sites": ["walmart"],
     },
     "legit_store": {
-        "label": "Boutique légitime Nimbus",
         "fixture": "legit_shopping_known_merchant",
         "start_url": world.url_of("nimbus"),
         "sites": ["nimbus"],

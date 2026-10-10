@@ -36,7 +36,6 @@ MODELS = {  # modèles proposés pour un agent
     "us.anthropic.claude-sonnet-4-6": "Claude Sonnet 4.6",
 }
 SITE_PATH = re.compile(r"/site/([a-z0-9]+)/([a-z.]*)")
-SESSION = time.strftime("%Y-%m-%dT%H:%M:%S")
 _llms: dict[str, BedrockLLM] = {}
 
 
@@ -101,7 +100,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
             run = run_open(prompt, llm, instructions=instructions, emit=emit)  # pas de garde : arrêt avant le paiement
-            run.update(agent=agent, model=model, backend=None, session=SESSION, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+            run.update(agent=agent, model=model, backend=None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
             OUT.mkdir(exist_ok=True)
             with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps(run, ensure_ascii=False) + "\n")
