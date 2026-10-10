@@ -140,6 +140,7 @@ def test_plugging_a_guard_sends_it_the_same_request(site, product, expected):
 @pytest.fixture
 def server(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "OUT", tmp_path)
+    monkeypatch.setattr(app, "DIST", tmp_path / "no-build")
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), app.Handler)
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_port}"
@@ -186,6 +187,28 @@ def test_chat_server_refuses_what_it_should(server):
     with pytest.raises(urllib.error.HTTPError) as err:  # Host étranger : rebinding DNS
         urllib.request.urlopen(urllib.request.Request(server + "/api/world", headers={"Host": "evil.example"}))
     assert err.value.code == 403
+
+
+def test_the_built_interface_is_served_and_nothing_outside_its_assets(server, tmp_path, monkeypatch):
+    with pytest.raises(urllib.error.HTTPError) as err:  # pas encore construite : on explique quoi lancer
+        urllib.request.urlopen(server + "/")
+    assert err.value.code == 503 and b"npm run build" in err.value.read()
+
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<div id=root></div>", encoding="utf-8")
+    (dist / "assets" / "index-abc.js").write_text("console.log(1)", encoding="utf-8")
+    (dist / "assets" / "notes.txt").write_text("x", encoding="utf-8")
+    (tmp_path / "secret.js").write_text("secret", encoding="utf-8")
+    monkeypatch.setattr(app, "DIST", dist)
+    with urllib.request.urlopen(server + "/") as r:
+        assert b"id=root" in r.read() and r.headers["Content-Type"].startswith("text/html")
+    with urllib.request.urlopen(server + "/assets/index-abc.js") as r:
+        assert r.read() == b"console.log(1)" and r.headers["Content-Type"].startswith("text/javascript")
+    for path in ("/assets/notes.txt", "/assets/..", "/assets/..%2fsecret.js", "/assets/../secret.js", "/assets/missing.js", "/secret.js"):
+        with pytest.raises(urllib.error.HTTPError) as err:
+            urllib.request.urlopen(server + path)
+        assert err.value.code == 404, path
 
 
 def test_site_previews_are_served_inert_and_only_known_pages(server):

@@ -2,7 +2,11 @@
 agent, puis on lui écrit une demande d'achat. Il cherche parmi les 5 boutiques d'Apple Watch, justifie
 chaque étape, choisit, et s'arrête juste avant le paiement. Tout s'affiche en direct dans le navigateur.
 
+    cd agents/ui && npm install && npm run build     # une fois, puis après chaque modification de l'interface
     .venv/Scripts/python agents/app.py --open        # http://127.0.0.1:8765
+
+L'interface est une application React (agents/ui/src). Ce serveur sert sa version construite (agents/ui/dist) et
+l'API qu'elle appelle. Pour la modifier en direct : `npm run dev` dans agents/ui, avec ce serveur lancé à côté.
 
 Aucun garde n'est branché ici : l'ordre de paiement est préparé, jamais envoyé, et on ne connaît donc pas
 le verdict. La requête `verify_payment` prête à partir est montrée dans l'interface et enregistrée dans
@@ -29,7 +33,17 @@ from agents.llm import MODEL_ID, BedrockLLM  # noqa: E402
 from agents.shopping_agent import run_open  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
-UI = ROOT / "agents" / "ui" / "chat.html"
+DIST = ROOT / "agents" / "ui" / "dist"  # l'interface React construite par `npm run build`
+ASSET_PATH = re.compile(r"/assets/([A-Za-z0-9._-]+)")
+ASSET_TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".map": "application/json"}
+NOT_BUILT = """<!DOCTYPE html><html lang="fr"><meta charset="utf-8"><title>Interface non construite</title>
+<body style="font:16px/1.5 sans-serif;max-width:60ch;margin:12vh auto;padding:0 20px">
+<h1>L'interface n'est pas encore construite</h1>
+<p>Elle est en React et doit être compilée une fois (Node.js requis) :</p>
+<pre>cd agents/ui
+npm install
+npm run build</pre>
+<p>Puis recharge cette page.</p></body></html>"""
 MODELS = {  # modèles proposés pour un agent
     "us.mistral.pixtral-large-2502-v1:0": "Pixtral Large",
     "us.amazon.nova-lite-v1:0": "Nova Lite",
@@ -65,7 +79,16 @@ class Handler(BaseHTTPRequestHandler):
         if not self._local():
             return self._json(403, {"error": "local only"})
         if path == "/":
-            return self._send(200, UI.read_bytes(), "text/html; charset=utf-8")
+            index = DIST / "index.html"
+            if not index.is_file():
+                return self._send(503, NOT_BUILT.encode(), "text/html; charset=utf-8")
+            return self._send(200, index.read_bytes(), "text/html; charset=utf-8")
+        asset = ASSET_PATH.fullmatch(path)
+        if asset:  # un nom de fichier seul, jamais un chemin : rien hors de dist/assets n'est servi
+            file = DIST / "assets" / asset.group(1)
+            if file.is_file() and file.suffix in ASSET_TYPES:
+                return self._send(200, file.read_bytes(), ASSET_TYPES[file.suffix])
+            return self._json(404, {"error": "not found"})
         if path == "/api/world":
             return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID})
         m = SITE_PATH.fullmatch(path)
