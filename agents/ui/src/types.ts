@@ -6,7 +6,7 @@ export type World = { sites: Site[]; models: Record<string, string>; default_mod
 export type Order = { issuer: string; action: string; amount: number; currency: string; recipient: string };
 export type Considered = { merchant: string; price: number | null; assessment: string; site: string | null };
 
-/** Le verdict du garde (guard/, verify_payment), résumé pour l'interface. */
+/** L'analyse de la transaction à l'entrée de SentinelL1 (outil MCP verify_payment), résumée pour l'interface. */
 export type Verdict = {
   verdict: 'allow' | 'needs_approval' | 'block';
   trust_score: number | null;
@@ -27,7 +27,8 @@ export type Onchain =
 
 export type EndEvent = {
   type: 'end';
-  outcome: 'ready' | 'verdict' | 'no_payment' | 'max_turns';
+  /** ready : transaction préparée mais pas envoyée ; submitted : envoyée à SentinelL1, qui l'a vérifiée. */
+  outcome: 'ready' | 'submitted' | 'no_payment' | 'max_turns';
   order: Order | null;
   item: string;
   why: string;
@@ -49,6 +50,7 @@ export type RunEvent =
   | { type: 'open'; url: string; ok: boolean; title?: string; why: string; site: string | null }
   | { type: 'invalid_order'; recipient: string; amount: unknown }
   | { type: 'pay'; order: Order; item: string; why: string; chosen: string; site: string | null; considered: Considered[] }
+  | { type: 'submit'; network: string }
   | { type: 'guard'; status: 'checking' }
   | ({ type: 'verdict' } & Verdict)
   | { type: 'chain'; status: 'writing'; api: string }

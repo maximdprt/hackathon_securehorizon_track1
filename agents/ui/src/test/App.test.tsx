@@ -43,7 +43,7 @@ function server(events: RunEvent[] = run(), { hang = false } = {}) {
   return bodies;
 }
 
-/** Le même run, cette fois avec la barrière : le garde bloque, puis SentinelL1 inscrit le flag et la décision. */
+/** Le même run, cette fois l'agent envoie sa transaction : SentinelL1 la vérifie à son entrée, la refuse, inscrit flag et décision. */
 function guardedRun(): RunEvent[] {
   const events = run().slice(0, -1);
   const verdict = { verdict: 'block' as const, trust_score: 8, risk_score: 0.92, severity: 3, onchain_flagged: false, instruction_id: '0xab',
@@ -51,11 +51,12 @@ function guardedRun(): RunEvent[] {
   const onchain = { ok: true as const, verdict: 'block', payment_id: '0x11', nonce: 1, city: 'https://city.test/?live=1', latency_ms: 900,
     txs: [{ kind: 'flag' as const, hash: '0xf1f1f1f1f1f1f1f1', url: 'https://explorer.test/tx/0xf1' }, { kind: 'decision' as const, hash: '0xd1d1d1d1d1d1d1d1', url: 'https://explorer.test/tx/0xd1' }] };
   return [...events,
+    { type: 'submit', network: 'SentinelL1' },
     { type: 'guard', status: 'checking' },
     { type: 'verdict', ...verdict },
     { type: 'chain', status: 'writing', api: 'https://rpc.test' },
     { type: 'onchain', ...onchain },
-    { type: 'end', outcome: 'verdict', order: ORDER, item: 'Apple Watch Series 10 46mm', why: 'prix le plus bas', chosen: 'Meridian Watch Co.', considered: CONSIDERED,
+    { type: 'end', outcome: 'submitted', order: ORDER, item: 'Apple Watch Series 10 46mm', why: 'prix le plus bas', chosen: 'Meridian Watch Co.', considered: CONSIDERED,
       final_text: '', turns: 5, site: MERIDIAN, request: { order: ORDER, task: 'x' }, verdict, onchain }];
 }
 
@@ -210,22 +211,27 @@ test('applyEvent keeps the assessment on the first visit of a shop and names unk
   expect(start.steps).toHaveLength(0); // le message de départ n'est pas modifié
 });
 
-test('the guard blocks the fraud shop and the decision links to the explorer and the 3D city', async () => {
+test('the agent sends its transaction, SentinelL1 refuses it at the chain entry and links the proof', async () => {
   server(guardedRun());
   render(<App />);
   await screen.findByRole('button', { name: /Chasseur de prix/, pressed: true });
   await ask('Achète une Apple Watch Series 10 46mm');
   expect(await screen.findByText('Je choisis Meridian Watch Co.')).toBeInTheDocument();
-  expect(screen.getByRole('img', { name: 'Garde : achat refusé' })).toBeInTheDocument();
-  expect(screen.getByText('Achat refusé.')).toBeInTheDocument();
-  expect(screen.getByText(/Confiance 8\/100/)).toBeInTheDocument();
-  expect(screen.queryByText(/Le garde n'est pas branché/)).not.toBeInTheDocument();
+  expect(screen.getByText(/Envoyée à SentinelL1 : 389 USDC vers/)).toBeInTheDocument();
+  // la vérification est un acteur à part, pas l'agent
+  const sentinel = screen.getByRole('region', { name: 'Vérification SentinelL1' });
+  expect(within(sentinel).getByRole('img', { name: 'SentinelL1 : transaction frauduleuse, refusée' })).toBeInTheDocument();
+  expect(within(sentinel).getByText('Transaction frauduleuse, refusée.')).toBeInTheDocument();
+  expect(within(sentinel).getByText(/Confiance 8\/100/)).toBeInTheDocument();
+  expect(within(sentinel).getByText(/l'argent reste dans le wallet/)).toBeInTheDocument();
+  expect(screen.queryByText(/n'est pas branché/)).not.toBeInTheDocument();
   expect(screen.getByRole('link', { name: /Flag 0xf1f1f1f1/ })).toHaveAttribute('href', 'https://explorer.test/tx/0xf1');
   expect(screen.getByRole('link', { name: /Décision 0xd1d1d1d1/ })).toHaveAttribute('href', 'https://explorer.test/tx/0xd1');
   expect(screen.getByRole('link', { name: 'Voir la voiture dans la ville 3D' })).toHaveAttribute('href', 'https://city.test/?live=1');
-  const steps = screen.getByText(/Étapes de l'agent \(6\)/).closest('details')!;
-  expect(within(steps).getByText('Garde : achat refusé.')).toBeInTheDocument();
-  expect(within(steps).getByText('Inscrit sur SentinelL1.')).toBeInTheDocument();
+  const steps = screen.getByText(/Étapes de l'agent \(7\)/).closest('details')!;
+  expect(within(steps).getByText('Envoie la transaction à SentinelL1.')).toBeInTheDocument();
+  expect(within(steps).getByText('SentinelL1 : transaction frauduleuse, refusée.')).toBeInTheDocument();
+  expect(within(steps).getByText('Décision inscrite sur SentinelL1.')).toBeInTheDocument();
 });
 
 test('when the chain is down the verdict stands and the page says no visa was issued', () => {

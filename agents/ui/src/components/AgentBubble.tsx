@@ -26,9 +26,9 @@ const ICON = {
 type Status = keyof typeof ICON;
 const VERDICT_STATUS: Record<Verdict['verdict'], Status> = { allow: 'good', needs_approval: 'warn', block: 'crit' };
 const VERDICT_EFFECT: Record<Verdict['verdict'], string> = {
-  allow: 'Visa à usage unique délivré : le GuardedVault laissera passer ce paiement, et lui seul.',
-  needs_approval: "Le garde ne tranche pas seul : l'ordre est garé, un humain décide.",
-  block: 'Paiement refusé, destinataire flagué on-chain : la prochaine fois, refus direct.',
+  allow: 'Visa à usage unique délivré on-chain : ce paiement peut passer, et lui seul.',
+  needs_approval: 'SentinelL1 ne tranche pas seul : la transaction est garée, un humain décide.',
+  block: "Arrêtée à l'entrée de la chaîne, l'argent reste dans le wallet. Destinataire flagué : la prochaine fois, refus direct.",
 };
 const TX_LABEL = { visa: 'Visa', flag: 'Flag', decision: 'Décision' } as const;
 
@@ -40,12 +40,12 @@ function StatusIcon({ status, label }: { status: Status; label: string }) {
   );
 }
 
-/** Le verdict de la barrière : ce que le garde a décidé, et pourquoi. */
+/** Ce que l'analyse de SentinelL1 a décidé de la transaction, et pourquoi. */
 function GuardVerdict({ verdict }: { verdict: Verdict }) {
   const label = VERDICT_LABEL[verdict.verdict];
   return (
     <div className="truth">
-      <StatusIcon status={VERDICT_STATUS[verdict.verdict]} label={`Garde : ${label}`} />
+      <StatusIcon status={VERDICT_STATUS[verdict.verdict]} label={`SentinelL1 : ${label}`} />
       <span>
         <b className={`verdict ${VERDICT_STATUS[verdict.verdict]}`}>{label[0].toUpperCase() + label.slice(1)}.</b>{' '}
         {verdict.trust_score != null && <>Confiance {verdict.trust_score}/100. </>}
@@ -65,7 +65,7 @@ function GuardVerdict({ verdict }: { verdict: Verdict }) {
 
 /** La preuve on-chain : les transactions écrites sur SentinelL1, ouvrables dans l'explorateur. */
 function ChainProof({ onchain }: { onchain: Onchain | null | undefined }) {
-  if (!onchain) return <>Chaîne non branchée : verdict local seulement.</>;
+  if (!onchain) return <>Chaîne non branchée : décision locale seulement.</>;
   if (!onchain.ok)
     return (
       <>
@@ -88,9 +88,31 @@ function ChainProof({ onchain }: { onchain: Onchain | null | undefined }) {
   );
 }
 
+/** La vérification de SentinelL1 : un acteur à part, que l'agent ne connaît pas. Elle a lieu quand la
+ *  transaction arrive à l'entrée de la chaîne. */
+function SentinelCheck({ end }: { end: EndEvent }) {
+  if (!end.verdict) return null;
+  return (
+    <section className="sentinel" aria-label="Vérification SentinelL1">
+      <p className="k">SentinelL1 · vérification de la transaction</p>
+      <p className="sub">Analysée à l'entrée de la chaîne par l'outil MCP verify_payment.</p>
+      <dl className="facts">
+        <dt>Décision</dt>
+        <dd>
+          <GuardVerdict verdict={end.verdict} />
+        </dd>
+        <dt>On-chain</dt>
+        <dd>
+          <ChainProof onchain={end.onchain} />
+        </dd>
+      </dl>
+    </section>
+  );
+}
+
 /** La décision de l'agent, puis ce que le bac à sable sait et que l'agent ignore. */
 function Decision({ end }: { end: EndEvent }) {
-  if ((end.outcome !== 'ready' && end.outcome !== 'verdict') || !end.order) {
+  if ((end.outcome !== 'ready' && end.outcome !== 'submitted') || !end.order) {
     return (
       <>
         <p className="lead">{end.outcome === 'no_payment' ? "Je n'ai rien acheté." : `Je n'ai pas réussi à décider en ${end.turns} étapes.`}</p>
@@ -110,23 +132,16 @@ function Decision({ end }: { end: EndEvent }) {
       </p>
       {end.why && <p>{end.why}</p>}
       <dl className="facts">
-        {end.verdict ? (
-          <>
-            <dt>Garde</dt>
-            <dd>
-              <GuardVerdict verdict={end.verdict} />
-            </dd>
-            <dt>SentinelL1</dt>
-            <dd>
-              <ChainProof onchain={end.onchain} />
-            </dd>
-          </>
-        ) : (
-          <>
-            <dt>État</dt>
-            <dd>Arrêté juste avant le paiement. Le garde n'est pas branché : l'ordre est prêt, il n'est pas envoyé.</dd>
-          </>
-        )}
+        <dt>Transaction</dt>
+        <dd>
+          {end.outcome === 'submitted' ? (
+            <>
+              Envoyée à SentinelL1 : {amount(order.amount)} {order.currency} vers <span className="mono">{order.recipient}</span>.
+            </>
+          ) : (
+            <>Arrêté juste avant le paiement. SentinelL1 n'est pas branché : la transaction est prête, elle n'est pas envoyée.</>
+          )}
+        </dd>
         <dt>Bac à sable</dt>
         <dd className="truth">
           <StatusIcon status={legit ? 'good' : 'crit'} label={legit ? 'Boutique légitime' : 'Boutique frauduleuse'} />
@@ -191,7 +206,12 @@ export function AgentBubble({ msg, onRetry }: { msg: AgentMessage; onRetry: (pro
             )}
           </>
         )}
-        {msg.status === 'done' && msg.end && <Decision end={msg.end} />}
+        {msg.status === 'done' && msg.end && (
+          <>
+            <Decision end={msg.end} />
+            <SentinelCheck end={msg.end} />
+          </>
+        )}
         {msg.status === 'stopped' && <p className="lead">Run interrompu.</p>}
         {msg.status === 'error' && (
           <>
@@ -222,7 +242,7 @@ export function AgentBubble({ msg, onRetry }: { msg: AgentMessage; onRetry: (pro
         )}
         {request && (
           <details>
-            <summary>{msg.end?.verdict ? 'Requête envoyée au garde (verify_payment)' : 'Requête prête pour le garde (verify_payment)'}</summary>
+            <summary>{msg.end?.verdict ? 'Transaction analysée par SentinelL1 (verify_payment)' : 'Transaction prête pour SentinelL1 (verify_payment)'}</summary>
             <CopyButton text={request} />
             <pre>{request}</pre>
           </details>

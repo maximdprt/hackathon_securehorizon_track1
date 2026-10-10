@@ -9,9 +9,10 @@ une frauduleuse, `sites/`), chat en direct `app.py --open` (http://127.0.0.1:876
 juste avant le paiement), runner `run_shopping.py`, client du garde `guard_client.py` (stub ou moteur). Tests :
 `.venv/bin/pytest agents/tests`.
 
-**Parcours branché** : `app.py` passe l'ordre au garde (`--guard engine`, défaut) puis inscrit le verdict sur SentinelL1
-via `sentinel_chain.py` (`--chain https://rpc.petroi.fr`, défaut ; `off` pour rester local). L'interface affiche le
-verdict, les transactions (liens explorateur) et le lien vers la ville 3D.
+**Parcours branché** : l'agent ne connaît pas le garde. Il envoie sa transaction à SentinelL1 ; à l'entrée de la chaîne,
+`sentinel_gateway.py` l'analyse avec notre MCP `verify_payment` (`--guard engine`, défaut) et `sentinel_chain.py` inscrit
+la décision on-chain (`--chain https://rpc.petroi.fr`, défaut ; `off` pour rester local). L'interface montre l'agent
+d'un côté, la vérification SentinelL1 de l'autre (décision, transactions dans l'explorateur, lien vers la ville 3D).
 
 | Agent | Use case | Issuer (mandat) | Outils | Pièges joués |
 |---|---|---|---|---|
