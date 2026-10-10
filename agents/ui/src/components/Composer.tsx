@@ -1,16 +1,16 @@
-import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, useEffect, useRef } from 'react';
+import { ArrowUp, Stop } from './Icons';
 
-const IDEAS = [
-  'Achète-moi une Apple Watch Series 10 46mm.',
-  'Achète une Apple Watch SE 40mm.',
-  'Achète une Apple Watch Ultra 2.',
-  'Je veux une Apple Watch Series 10 42mm, livrée vite.',
-];
+type Props = {
+  agentName: string;
+  text: string;
+  running: boolean;
+  onChange: (text: string) => void;
+  onSend: (text: string) => void;
+  onStop: () => void;
+};
 
-type Props = { agentName: string; running: boolean; onSend: (text: string) => void; onStop: () => void };
-
-export function Composer({ agentName, running, onSend, onStop }: Props) {
-  const [text, setText] = useState('');
+export function Composer({ agentName, text, running, onChange, onSend, onStop }: Props) {
   const input = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -23,13 +23,13 @@ export function Composer({ agentName, running, onSend, onStop }: Props) {
 
   useEffect(() => {
     if (!running) input.current?.focus();
-  }, [running]);
+  }, [running, text]);
 
   function submit(event?: FormEvent) {
     event?.preventDefault();
     const value = text.trim();
     if (!value || running) return;
-    setText('');
+    onChange('');
     onSend(value);
   }
 
@@ -41,36 +41,27 @@ export function Composer({ agentName, running, onSend, onStop }: Props) {
   }
 
   return (
-    <form className="ask" onSubmit={submit}>
-      <div className="ideas">
-        {IDEAS.map((idea) => (
-          <button key={idea} type="button" className="idea" disabled={running} onClick={() => { setText(idea); input.current?.focus(); }}>
-            {idea}
-          </button>
-        ))}
-      </div>
-      <div className="send">
-        <textarea
-          ref={input}
-          rows={1}
-          value={text}
-          disabled={running}
-          aria-label="Demande pour l'agent"
-          placeholder={`Écris à ${agentName} : achète-moi une Apple Watch Series 10 46mm`}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={onKeyDown}
-        />
-        {running ? (
-          <button type="button" className="btn ghost" onClick={onStop}>
-            Arrêter
-          </button>
-        ) : (
-          <button type="submit" className="btn" disabled={!text.trim()}>
-            Envoyer
-          </button>
-        )}
-      </div>
-      <p className="keys">Entrée pour envoyer, Maj + Entrée pour aller à la ligne.</p>
+    <form className="chat__composer" onSubmit={submit}>
+      <textarea
+        className="chat__input"
+        ref={input}
+        rows={1}
+        value={text}
+        disabled={running}
+        aria-label="Demande pour l'agent"
+        placeholder={`Donnez une consigne à ${agentName}`}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+      />
+      {running ? (
+        <button type="button" className="chat__send chat__send--stop" aria-label="Arrêter" onClick={onStop}>
+          <Stop />
+        </button>
+      ) : (
+        <button type="submit" className="chat__send" aria-label="Envoyer" disabled={!text.trim()}>
+          <ArrowUp />
+        </button>
+      )}
     </form>
   );
 }

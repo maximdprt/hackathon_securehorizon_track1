@@ -260,7 +260,7 @@ if __name__ == "__main__":
 
 # ---------------------------------------------------------------------------
 # Interface "catalogue" : les mêmes fonctions que world.py, pour que le même
-# agent (agents/sandbox_agent.run_open) tourne sur ce marché sans modification.
+# agent (agents/shopping_agent.run_browser) tourne sur ce marché sans modification.
 # ---------------------------------------------------------------------------
 import re as _re
 from urllib.parse import urlsplit as _urlsplit

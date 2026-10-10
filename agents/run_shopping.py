@@ -21,7 +21,7 @@ sys.path.insert(0, str(ROOT))
 
 from agents.guard_client import GuardClient  # noqa: E402
 from agents.llm import BedrockLLM  # noqa: E402
-from agents.sandbox_agent import SCENARIOS, run_agent  # noqa: E402
+from agents.shopping_agent import SCENARIOS, run_agent  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
 
