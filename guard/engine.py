@@ -56,7 +56,7 @@ class Engine:
                 chain = ChainSource(rpc, addr, os.environ.get("GUARD_OWNER_KEY"), fallback=mock)
                 source = chain
                 if os.environ.get("GUARD_OWNER_KEY"):
-                    sinks.append(ChainSink(chain))
+                    sinks.insert(0, ChainSink(chain))  # chain first, so the local log carries onchain_tx
                 log.info("chain source enabled: %s", addr)
             except Exception as e:
                 log.error("chain source disabled (%s), using mock", e)

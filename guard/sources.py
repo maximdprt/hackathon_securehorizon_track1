@@ -5,6 +5,7 @@ import json
 import os
 import threading
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Protocol
 
@@ -109,6 +110,10 @@ class ChainSource:
         self.owner_key = owner_key
         self.fallback = fallback
         self.decimals = int(os.environ.get("GUARD_TOKEN_DECIMALS", "6"))
+        self._tx_lock = threading.Lock()  # one tx at a time: sequential nonces, receipt awaited
+
+    def to_units(self, amount: float) -> int:
+        return int(Decimal(str(amount)) * (10 ** self.decimals))
 
     def get_authority(self, issuer: str) -> Authority | None:
         from web3 import Web3
@@ -120,21 +125,27 @@ class ChainSource:
 
     def is_flagged(self, key: str) -> tuple[bool, int, str]:
         flagged, severity, reason, _disputed, _at = self.contract.functions.threats(subject_key(key)).call()
-        return bool(flagged), int(severity), str(reason)
+        if flagged:
+            return True, int(severity), str(reason)
+        # read-only deployments (no owner key) remember incidents locally
+        return self.fallback.is_flagged(key) if self.fallback else (False, 0, "")
 
-    def _send(self, fn):
-        from web3 import Web3
+    def _send(self, fn) -> str:
         if not self.owner_key:
             raise RuntimeError("GUARD_OWNER_KEY not set: cannot write on-chain")
-        acct = self.w3.eth.account.from_key(self.owner_key)
-        tx = fn.build_transaction({"from": acct.address, "nonce": self.w3.eth.get_transaction_count(acct.address)})
-        signed = acct.sign_transaction(tx)
-        return self.w3.eth.send_raw_transaction(signed.raw_transaction).hex()
+        with self._tx_lock:
+            acct = self.w3.eth.account.from_key(self.owner_key)
+            nonce = self.w3.eth.get_transaction_count(acct.address, "pending")
+            tx = fn.build_transaction({"from": acct.address, "nonce": nonce})
+            signed = acct.sign_transaction(tx)
+            tx_hash = self.w3.eth.send_raw_transaction(signed.raw_transaction)
+            self.w3.eth.wait_for_transaction_receipt(tx_hash, timeout=int(os.environ.get("GUARD_TX_TIMEOUT", "60")))
+            return self.w3.to_hex(tx_hash)
 
     def mark_threat(self, key: str, severity: int, reason: str) -> None:
-        self._send(self.contract.functions.flagThreat(subject_key(key), severity, reason[:200]))
-        if self.fallback:
+        if self.fallback:  # local memory first: survives a failed or read-only chain write
             self.fallback.mark_threat(key, severity, reason)
+        self._send(self.contract.functions.flagThreat(subject_key(key), severity, reason[:200]))
 
     def nonce_seen(self, nonce: str) -> bool:
         # nonces stay local: the contract has no nonce store
@@ -143,4 +154,4 @@ class ChainSource:
     def record_decision(self, instruction_id: str, issuer: str, amount: float, verdict_code: int, reason: str) -> str:
         from web3 import Web3
         return self._send(self.contract.functions.recordDecision(
-            subject_key(instruction_id), Web3.to_checksum_address(issuer), int(amount * 10 ** self.decimals), verdict_code, reason[:200]))
+            subject_key(instruction_id), Web3.to_checksum_address(issuer), self.to_units(amount), verdict_code, reason[:200]))

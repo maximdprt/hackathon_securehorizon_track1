@@ -90,7 +90,7 @@ Donner de la **crypto en récompense** quand un utilisateur fait une transaction
 **Lancer le garde** : `uv venv --python 3.12 .venv && uv pip install -e ".[dev]"` puis `set -a; source .env; set +a; .venv/bin/python mcp_server.py` (stdio). `GUARD_LLM=off` pour tourner sans Bedrock. Tests : `.venv/bin/pytest`. Pour brancher Fuji (Walid) : `GUARD_CONTRACT_ADDRESS=0x... AVAX_RPC_URL=... GUARD_OWNER_KEY=...` + `uv pip install -e ".[chain]"`.
 
 ## 12. Prochaines étapes (priorité)
-1. **Walid** : déployer la L1 / le contrat "visa", puis brancher `guard/sources.py:ChainSource` (lecture `authorities`/`threats`, écriture `recordDecision`/`flagThreat`) via les variables d'env. Le `mcp_server.py` est fait côté Corentin/Bruno.
+1. **Walid** : déployer la L1 / le contrat "visa", puis brancher `guard/sources.py:ChainSource` (lecture `authorities`/`threats`, écriture `recordDecision`/`flagThreat`) via les variables d'env. Le `mcp_server.py` est fait côté Corentin/Bruno. **Lire `docs/chain-e2e.md`** : test bout en bout sur le vrai contrat compilé (`tests/test_chain_e2e.py`, 3 actes on-chain), valeurs de seed Remix en 6 décimales, et 3 écarts contrat à régler (`maxAmount == 0` veut dire sans plafond on-chain mais jamais payer dans `mandates.json` ; `assess()` ignore le destinataire ; `recordDecision` sans `onlyOwner`).
 2. **Corentin + Bruno** : monter les 2 agents sur AWS + les scénarios d'attaque + produire le scoring.
 3. **Maxime** : l'UI 3D + la slide compliance DORA/MiCA + le pitch.
 4. Tous : chemin doré Acte 1 (agent vidé) → Acte 2 (sauvé + visa refusé + log on-chain) → Acte 3 (2e agent immunisé).

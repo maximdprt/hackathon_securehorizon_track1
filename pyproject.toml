@@ -11,7 +11,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-chain = ["web3>=6.0"]
+chain = [
+    "web3>=7.0",            # ChainSource uses signed.raw_transaction (web3 >= 7 naming)
+    "py-solc-x>=2.0",       # compiles contracts/AuthorityRegistry.sol in tests/test_chain_e2e.py
+    "eth-tester[py-evm]>=0.12", # in-process EVM for tests/test_chain_e2e.py
+]
 dev = ["pytest>=8.0"]
 
 [tool.pytest.ini_options]
