@@ -58,21 +58,21 @@ def main() -> int:
         for _ in range(replay):
             out = engine.verify(req)
         ok = out["verdict"] in c["expected"]
-        rows.append((n, c["family"], "/".join(c["expected"]), out["verdict"], out["risk_score"], out["severity"], out["latency_ms"], ok,
-                     [s["id"] for s in out["signals"]]))
+        rows.append((n, c["family"], "/".join(c["expected"]), out["verdict"], out["trust_score"], out["severity"], out["latency_ms"], ok,
+                     [s["id"] for s in out["signals"]], out["risk_score"]))
         (controls if c["family"] == "control" else attacks).append(ok)
 
     w = max(len(r[0]) for r in rows)
-    print(f"{'case':<{w}}  {'fam':<8} {'expected':<22} {'got':<15} {'risk':>5} {'sev':>3} {'ms':>6}  ok  signals")
+    print(f"{'case':<{w}}  {'fam':<8} {'expected':<22} {'got':<15} {'trust':>5} {'sev':>3} {'ms':>6}  ok  signals")
     for r in rows:
-        print(f"{r[0]:<{w}}  {r[1]:<8} {r[2]:<22} {r[3]:<15} {r[4]:>5.2f} {r[5]:>3} {r[6]:>6.2f}  {'OK' if r[7] else 'XX'}  {', '.join(r[8])[:90]}")
+        print(f"{r[0]:<{w}}  {r[1]:<8} {r[2]:<22} {r[3]:<15} {r[4]:>5d} {r[5]:>3} {r[6]:>6.2f}  {'OK' if r[7] else 'XX'}  {', '.join(r[8])[:90]}")
 
     det = sum(attacks) / len(attacks) if attacks else 0
     fp = (len(controls) - sum(controls)) / len(controls) if controls else 0
     lat = sum(r[6] for r in rows) / len(rows)
     print(f"\nattacks: {len(attacks)}  detection rate: {det:.0%}   controls: {len(controls)}  false positives: {fp:.0%}   mean time to detect: {lat:.2f} ms   llm: {os.environ['GUARD_LLM']}")
     kpis = {"detection_rate": det, "false_positive_rate": fp, "mean_latency_ms": lat, "attacks": len(attacks), "controls": len(controls),
-            "llm": os.environ["GUARD_LLM"], "cases": [{"name": r[0], "family": r[1], "expected": r[2], "verdict": r[3], "risk": r[4], "severity": r[5], "ok": r[7]} for r in rows]}
+            "llm": os.environ["GUARD_LLM"], "cases": [{"name": r[0], "family": r[1], "expected": r[2], "verdict": r[3], "trust": r[4], "risk": r[9], "severity": r[5], "ok": r[7]} for r in rows]}
     (ROOT / "redteam" / "last_run.json").write_text(json.dumps(kpis, indent=1))
     return 0 if det >= 0.9 and fp == 0 else 1
 

@@ -122,6 +122,7 @@ class Verdict:
     recipient: str
     verdict: str
     risk_score: float
+    trust_score: int
     reasons: list[str]
     owasp: list[str]
     authority_check: dict[str, Any]
@@ -129,6 +130,7 @@ class Verdict:
     onchain_flagged: bool
     severity: int
     signals: list[dict[str, Any]]
+    deductions: list[dict[str, Any]]
     risk_heuristic: float
     risk_llm: float | None
     llm_available: bool

@@ -103,3 +103,10 @@ Python 3.12 (uv), `mcp`, `beautifulsoup4`, `boto3`, `pytest`, `web3` en extra op
   checkout_domain, is_ad, redirect_final_domain}, `x402` {quote_amount, facilitator, nonce},
   `tools` [{name, description, pinned_hash}], `history` {avg_amount, payments_last_hour, prior_purchase}.
   Tout champ absent = feature non évaluée, jamais un signal.
+
+## 11. Score de confiance dégressif (décision Bruno, 2026-10-10)
+Chaque ordre part à **100 de confiance**. Chaque signal retire une part de ce qui reste (coût = poids x confiance restante),
+un bloc dur retire tout. Mathématiquement `trust = 100 x (1 - risk)` avec le même noisy-OR : rien ne change dans la
+calibration, seule la lecture change. Le verdict expose `trust_score`, `deductions[]` (coût par signal, confiance après)
+et `trust_thresholds`. Lecture : allow si confiance >= 70, needs_approval entre 30 et 70, block sous 30 ; sur un montant
+>= 50 % du plafond : 80 / 40. `risk_score` reste présent pour `verdict.schema.json`.

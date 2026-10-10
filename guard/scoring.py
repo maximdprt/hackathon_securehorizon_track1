@@ -35,11 +35,28 @@ def noisy_or(weights: list[float]) -> float:
     return round(1.0 - p, 4)
 
 
+def trust_from_risk(risk: float) -> int:
+    """Degressive trust score: every order starts at 100, each finding takes a share of what is left."""
+    return int(round(100 * (1.0 - min(max(risk, 0.0), 1.0))))
+
+
+def deductions(signals: list[Signal]) -> list[dict]:
+    """Walk the signals strongest first, starting at 100 trust: each one costs weight x remaining trust.
+    A hard signal takes everything. Sum of deductions == 100 - final trust (up to rounding)."""
+    out, trust = [], 100.0
+    for s in sorted(signals, key=lambda s: (-s.hard, -s.weight)):
+        cost = trust if s.hard else trust * min(max(s.weight, 0.0), 1.0)
+        trust -= cost
+        out.append({"id": s.id, "layer": s.layer, "hard": s.hard, "cost": round(cost, 1), "trust_after": round(trust, 1)})
+    return out
+
+
 @dataclass
 class ScoreResult:
     risk_heuristic: float
     risk_llm: float | None
     risk: float
+    trust: int
     verdict: str
     severity: int
     hard_block: bool
@@ -103,4 +120,4 @@ def combine(signals: list[Signal], llm: dict | None, amount: float, max_amount: 
         severity += 1
         notes.append("repeat offender: severity raised")
 
-    return ScoreResult(round(risk_h, 4), risk_llm, round(risk, 4), verdict, severity, bool(hard), (lo, hi), notes)
+    return ScoreResult(round(risk_h, 4), risk_llm, round(risk, 4), trust_from_risk(risk), verdict, severity, bool(hard), (lo, hi), notes)

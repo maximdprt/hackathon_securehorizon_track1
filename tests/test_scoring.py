@@ -39,3 +39,21 @@ def test_llm_unavailable_never_guesses_allow_on_substantive_signal():
 
 def test_floor_for_undecodable_calldata():
     assert combine([sig("calldata_undecodable", 0.1)], {"risk_score": 0.0, "reasons": ["x"]}, 1, 100).verdict == "needs_approval"
+
+
+def test_trust_is_degressive_and_deductions_add_up():
+    from guard.scoring import deductions, trust_from_risk
+    assert trust_from_risk(0.0) == 100 and trust_from_risk(1.0) == 0 and trust_from_risk(0.3) == 70
+    sigs = [sig("a", 0.4), sig("b", 0.2)]
+    d = deductions(sigs)
+    assert [x["id"] for x in d] == ["a", "b"]
+    assert d[0]["cost"] == 40.0 and d[0]["trust_after"] == 60.0
+    assert d[1]["cost"] == 12.0 and d[1]["trust_after"] == 48.0
+    assert abs(sum(x["cost"] for x in d) - (100 - trust_from_risk(noisy_or([0.4, 0.2])))) < 0.6
+    hard = deductions([sig("x", 0.1), sig("h", 0.1, hard=True)])
+    assert hard[0]["id"] == "h" and hard[0]["cost"] == 100.0 and hard[1]["cost"] == 0.0
+
+
+def test_combine_exposes_trust():
+    r = combine([sig("a", 0.4), sig("b", 0.2)], None, 10, 100)
+    assert r.trust == 48 and r.verdict == "needs_approval"

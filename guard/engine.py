@@ -123,7 +123,11 @@ class Engine:
         res = scoring.combine(signals, llm_for_scoring, o.amount, mandate.max_amount if mandate else 0.0,
                               self.thresholds, repeat_offender=repeat)
 
-        reasons = [f"[{s.layer}] {s.id}: {s.evidence}" for s in sorted(signals, key=lambda s: (-s.hard, -s.weight))]
+        ded = scoring.deductions(signals)
+        cost = {d["id"]: d["cost"] for d in ded}
+        reasons = [f"[{s.layer}] {s.id} (-{cost[s.id]:g}): {s.evidence}" for s in sorted(signals, key=lambda s: (-s.hard, -s.weight))]
+        if res.risk_llm is not None and res.risk_llm > res.risk_heuristic:
+            reasons.append(f"[claude] trust lowered to {res.trust} by Claude's judgement (risk {res.risk_llm})")
         reasons += [f"[claude] {r}" for r in (llm_result or {}).get("reasons", [])[:5]]
         reasons += [f"[engine] {n}" for n in res.notes]
         owasp = sorted({x for s in signals for x in s.owasp} | set((llm_result or {}).get("owasp", [])))
@@ -135,16 +139,17 @@ class Engine:
 
         v = Verdict(
             instruction_id=o.instruction_id(), issuer=o.issuer, action=o.action, amount=o.amount, currency=o.currency,
-            recipient=o.recipient, verdict=res.verdict, risk_score=res.risk, reasons=reasons, owasp=owasp,
+            recipient=o.recipient, verdict=res.verdict, risk_score=res.risk, trust_score=res.trust, reasons=reasons, owasp=owasp,
             authority_check={"authorized": bool(auth and auth.active), "within_limit": bool(mandate and (not mandate.max_amount or o.amount <= mandate.max_amount)),
                              "source": "onchain" if source_ok and not isinstance(self.source, MockJsonSource) else "mock"},
             poison_check=poison, onchain_flagged=bool(rec_flag or iss_flag), severity=res.severity,
-            signals=[s.to_dict() for s in signals], risk_heuristic=res.risk_heuristic, risk_llm=res.risk_llm,
+            signals=[s.to_dict() for s in signals], deductions=ded, risk_heuristic=res.risk_heuristic, risk_llm=res.risk_llm,
             llm_available=llm_available, latency_ms=round((time.perf_counter() - t0) * 1000, 2),
         )
         out = v.to_dict()
         out["mandate"] = {"role": mandate.role, "max_amount": mandate.max_amount, "allowed_actions": mandate.allowed_actions} if mandate else None
         out["thresholds"] = list(res.thresholds)
+        out["trust_thresholds"] = {"allow_at_or_above": scoring.trust_from_risk(res.thresholds[0]), "block_below": scoring.trust_from_risk(res.thresholds[1])}
         self._effects(out)
         return out
 
@@ -170,6 +175,7 @@ class Engine:
         if pending is None:
             raise KeyError(f"no pending decision {instruction_id}")
         pending["verdict"] = decision
+        pending["trust_score"] = 0 if decision == "block" else pending.get("trust_score", 0)
         pending["approved_by"] = approver
         pending["reasons"].append(f"[human] {approver}: {decision} ({note or 'no note'})")
         pending["timestamp"] = datetime.now(timezone.utc).isoformat()

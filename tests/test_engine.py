@@ -73,3 +73,11 @@ def test_invalid_request_rejected(engine):
         engine.verify({"order": {"issuer": T, "action": "steal", "amount": 1}})
     with pytest.raises(ValueError):
         engine.verify({"order": {"issuer": T, "action": "pay", "amount": -1}})
+
+
+def test_verdict_carries_trust_and_deductions(engine):
+    b = engine.verify(poisoned())
+    assert b["trust_score"] == 0 and b["deductions"][0]["hard"] and b["deductions"][0]["cost"] == 100.0
+    a = engine.verify(legit())
+    assert a["trust_score"] == 100 and a["deductions"] == []
+    assert a["trust_thresholds"]["allow_at_or_above"] in (70, 80)
