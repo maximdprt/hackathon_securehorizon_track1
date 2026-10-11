@@ -181,7 +181,7 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
         const doorName = ["toll", "parking", "scrapyard", "registry", "proof"].includes(k) ? `guard:${k}` : null;
         let owner: Object3D | null = hit?.object ?? null;
         while (owner && !owner.name.startsWith("guard:")) owner = owner.parent;
-        if (doorName ? !hit || owner?.name !== doorName || (k === "registry" && camera.position.distanceTo(v) - hit.distance > geo.carW * 1.2) : hit && hit.distance < camera.position.distanceTo(v) - geo.carW * 1.5 && hit.point.distanceTo(v) > geo.carW * 4) continue;
+        if (doorName ? !hit || owner?.name !== doorName || (k === "registry" && camera.position.distanceTo(v) - hit.distance > geo.carW * 1.2) : hit && hit.distance < camera.position.distanceTo(v) - geo.carW * 1.5 && hit.point.distanceTo(v) > geo.S * 0.6) continue;
         const p = v.clone().project(camera);
         const at: [number, number] = [Math.round(r.left + (p.x * 0.5 + 0.5) * size.width), Math.round(r.top + (-p.y * 0.5 + 0.5) * size.height)];
         first ??= at;
