@@ -130,7 +130,7 @@ export function guardGeoOf(model: CityModel, city: City): GuardGeo | null {
   if (!hubB || hqI === undefined) return null;
   const hq = model.buildings[hqI];
   const S = city.lot;
-  const carW = WIDTH * Math.min(1.25, Math.max(0.6, S / LOT)) * SIZE * 1.15; // our car: a little over a pod, on the city's own streets
+  const carW = WIDTH * Math.min(1.25, Math.max(0.6, S / LOT)) * SIZE * 0.9; // our car: a pod's size, on the city's own streets
   const carL = CAR_LENGTH * carW; // the City's car (carModel.ts)
   const k = carW / POD_W; // the yard's metres: its car is POD_W metres wide
   const blockY = BLOCK_H; // the tower's block stands a step over the streets
@@ -175,13 +175,15 @@ export function guardGeoOf(model: CityModel, city: City): GuardGeo | null {
   const z1 = (nBays / 2) * bay + edge;
   const gateZ = z1 - bay * 0.55;
   const dDoor = dHQ - hq.n.w * 0.6;
-  const dPre = dDoor - carL * 0.3;
+  // room between each piece: out of the door three car lengths before the gantry, two widths past the stop before the
+  // post's gate
+  const dPre = dDoor - carL * 3;
   const dBeam = dPre - (carL / 2 + carW * 0.25);
   const dStop = dBeam - (carL / 2 + carW * 0.3);
-  const dPost = dStop - carW * 2 - gateZ;
+  const dPost = dStop - carW * 2.2 - gateZ;
   const dGate = core - carW * 0.4;
   const dEnd = dGate - carL * 1.5;
-  const roadHalf = ringHalf * 0.8;
+  const roadHalf = Math.min(ringHalf * 0.8, 2.6 * k); // no wider than the gantry
 
   const step = carW * 0.25;
   const approach = pathOf(run(A(dHQ), A(dPre), step));

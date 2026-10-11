@@ -5,6 +5,7 @@ import type { City } from "@/components/explorer-v2/network/city";
 import type { Ground } from "@/components/explorer-v2/network/ground";
 import type { Site } from "@/components/explorer-v2/network/newcomers";
 import { PRIVATE_IDS } from "@/components/explorer-v2/network/private";
+import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD
 import { hubWindows } from "./HubTower";
 import { noShapes, plannerOf, type FormPart, type ShapeKey } from "./forms";
 import { estateOf } from "./forms/estate";
@@ -20,7 +21,9 @@ import { estateOf } from "./forms/estate";
    returns. */
 
 /** the blocks' curb: every lot stands this far over the streets */
-export const BLOCK_H = 2;
+// AVAGUARD: the Sentinel-only city stands on one layer: its block is flush with the streets, no curb (a step's
+// hairline only, so its paint does not fight the ground's)
+export const BLOCK_H = SENTINEL_ONLY ? 0.04 : 2;
 /** the city's squares are turned a quarter of a right angle to the plate */
 export const YAW = -Math.PI / 4;
 /** how far a ribbon of glass stands off its wall */
