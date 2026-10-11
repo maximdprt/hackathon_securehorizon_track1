@@ -58,7 +58,8 @@ _chain = None
 def _guard_chain():
     global _guard, _chain
     if _guard is None:
-        _guard = GuardClient(os.environ.get("GUARD_BACKEND", "engine"))
+        # en Lambda seul /tmp est inscriptible : le garde y copie data/ et y écrit son état jetable
+        _guard = GuardClient(os.environ.get("GUARD_BACKEND", "engine"), data_dir=Path("/tmp/guard_data"))
         _chain = None if os.environ.get("SENTINEL_API") == "off" else SentinelChain()
     return _guard, _chain
 
