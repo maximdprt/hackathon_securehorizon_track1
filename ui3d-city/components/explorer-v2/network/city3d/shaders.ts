@@ -255,6 +255,7 @@ varying float vHue;
 varying float vDeep;
 varying vec2 vPane;
 varying float vBandH;
+varying float vSeed;
 `;
 const GLASS_BEGIN = /* glsl */ `
 #include <begin_vertex>
@@ -276,6 +277,8 @@ vDeep = max( boost - 1.0, 0.0 );
 {
   float sx = length( instanceMatrix[ 0 ].xyz );
   vBandH = length( instanceMatrix[ 1 ].xyz );
+  // AVAGUARD: the band's own seed, from its place, for its rooms' lights at night
+  vSeed = dot( instanceMatrix[ 3 ].xyz, vec3( 0.173, 0.711, 0.379 ) );
   #ifdef GLASS_BAND
   vPane = vec2( uv.x * 6.2831853 * sx / uMull, uv.y );
   #else
@@ -303,6 +306,7 @@ varying float vHue;
 varying float vDeep;
 varying vec2 vPane;
 varying float vBandH;
+varying float vSeed;
 `;
 const GLASS_COLOR = /* glsl */ `
 // the frame: a mullion every uMull across the band, and a transom two thirds up it, crisp at any distance
@@ -317,6 +321,13 @@ float frame = max( mullion, transom * 0.8 );
 // the glass: the curtain wall's own, tinted by the district's hue as it lights, lighter at its head where it takes the sky
 vec3 tint = mix( uPlain, vColor, vLit );
 vec3 glassTone = mix( uGlassBase, tint, vHue ) * mix( 0.93, 1.05, vPane.y ) * ( 1.0 - vDeep );
+// AVAGUARD: by night not every room is lit: each pane between two mullions draws its lot from its place, about one in five
+// dark, the rest lit a little more or less, one in six in a warmer light; by day the glass stands whole, as before. A
+// transaction's flash still lights its whole floor
+float night = 1.0 - uSky;
+float room = fract( sin( floor( vPane.x ) * 12.9898 + vSeed * 78.233 ) * 43758.5453 );
+glassTone *= mix( 1.0, mix( 0.14, 1.0, step( 0.21, room ) ) * mix( 0.8, 1.08, fract( room * 7.31 ) ), night );
+glassTone = mix( glassTone, glassTone * vec3( 1.07, 0.94, 0.76 ), night * step( 0.83, fract( room * 13.7 ) ) );
 glassTone = mix( glassTone, uFlashColor, vFlash );
 diffuseColor.rgb *= mix( uWall, mix( glassTone, uFrame, frame ), vDim );
 // by day, the sill: a lit hairline along the band's foot with its shadow line over it, a pixel each on screen, where the band stands tall enough to carry one

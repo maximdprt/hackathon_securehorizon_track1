@@ -391,8 +391,9 @@ export default function CityShell() {
           </div>
         </div>
 
-        {/* the key in the bottom left corner (city-key.tsx's place), hidden under the open list */}
-        <div className={cn("absolute bottom-(--frame) left-(--frame) z-30 hidden transition-opacity duration-200 xl:block", listOpen && "pointer-events-none opacity-0")}>
+        {/* the key in the bottom left corner (city-key.tsx's place), hidden under the open list, and while a payment plays:
+            the card at the right tells it then, and the stage keeps the whole protocol in view */}
+        <div className={cn("absolute bottom-(--frame) left-(--frame) z-30 hidden transition-opacity duration-300 xl:block", (listOpen || busyRight) && "pointer-events-none opacity-0")}>
           <SentinelKey network={SENTINEL_RING ? Math.max(0, data.nodes.length - 2) : 0} />
         </div>
 
