@@ -25,6 +25,8 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 SITES_DIR = Path(__file__).resolve().parent / "sites"
+IMAGES_DIR = SITES_DIR / "images"  # photos des produits, déposées à la main : cf agents/sites/images/README.md
+IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".avif": "image/avif"}
 FAKE_STORE = ROOT / "demo" / "fake_store"
 LIMIT = 300  # plafond du shopping-agent, cf demo/README.md
 ALLOWLISTED = {"0x5e11e40000000000000000000000000000000002"}
@@ -148,18 +150,34 @@ def shipping_cost(key: str, subtotal: float) -> float:
     return 0.0 if free_from is not None and subtotal >= free_from else cost
 
 
+def product_image(key: str, pid: str) -> Path | None:
+    """La photo déposée pour ce produit : celle propre à la boutique (images/<boutique>/) d'abord, sinon l'image commune.
+
+    Le dossier est relu à chaque appel : une photo déposée pendant que le serveur tourne est prise en compte aussitôt.
+    """
+    for folder in (IMAGES_DIR / key, IMAGES_DIR) if key in SITES and pid in PRODUCTS else ():
+        found = sorted(f for f in folder.iterdir() if f.stem.lower() == pid and f.suffix.lower() in IMAGE_TYPES and f.is_file()) if folder.is_dir() else []
+        if found:
+            return found[0]
+    return None
+
+
 def search(query: str) -> list[dict]:
-    """Faux moteur de recherche sur les 5 boutiques. Ordre fixe, aucune annonce : l'agent choisit sur le fond."""
+    """Faux moteur de recherche sur les 5 boutiques. Ordre fixe, aucune annonce : l'agent choisit sur le fond.
+
+    Par résultat : `offers` = [(produit, prix)] qui répondent à la recherche, `best` = celui qui y répond le mieux (sa vignette).
+    """
     words = {w for w in re.findall(r"[a-z0-9]+", query.lower()) if len(w) >= 2}
     results = []
     for key, s in SITES.items():
-        hits = [p for p in s["products"] if words & set(re.findall(r"[a-z0-9]+", PRODUCTS[p]["name"].lower()))]
+        names = {p: set(re.findall(r"[a-z0-9]+", PRODUCTS[p]["name"].lower())) for p in s["products"]}
+        hits = [p for p in names if words & names[p]]
         if hits or words & set(re.findall(r"[a-z0-9]+", s["name"].lower())):
             # les prix sont dans les résultats : l'agent compare ici, puis va directement sur la boutique qu'il choisit
-            offers = ", ".join(f"{PRODUCTS[p]['name']} " + f"{s['products'][p]:.2f} €".replace(".", ",") for p in hits)
-            results.append({"title": s["name"], "url": url_of(key), "snippet": f"{s['tagline']} {offers}".strip()})
+            results.append({"key": key, "title": s["name"], "url": url_of(key), "snippet": s["tagline"], "offers": [(p, s["products"][p]) for p in hits],
+                            "best": max(hits, key=lambda p: len(words & names[p]), default=None)})
     # rien ne correspond : on renvoie les boutiques, comme un moteur renverrait des résultats proches
-    return results or [{"title": s["name"], "url": url_of(k), "snippet": s["tagline"]} for k, s in SITES.items()]
+    return results or [{"key": k, "title": s["name"], "url": url_of(k), "snippet": s["tagline"], "offers": [], "best": None} for k, s in SITES.items()]
 
 
 def merchant_context(key: str, items: dict[str, int] | None = None) -> dict:

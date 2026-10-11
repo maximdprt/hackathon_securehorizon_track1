@@ -6,6 +6,7 @@ demande d'achat, et on le regarde naviguer : recherche, boutiques, fiche produit
 
 L'interface est une application React (agents/ui/src). Ce serveur sert sa version construite (agents/ui/dist), l'API
 qu'elle appelle, et les 5 boutiques elles-mêmes sous /shop/<clé>/ : on peut y acheter à la main dans un onglet.
+Les photos des produits déposées dans agents/sites/images sont servies sous /sites/images/<clé>/<produit>.
 Pour modifier l'interface en direct : `npm run dev` dans agents/ui, avec ce serveur lancé à côté.
 
 Aucun garde n'est branché ici : l'agent va jusqu'au bout et la boutique confirme la commande. Le paiement est simulé,
@@ -53,8 +54,9 @@ MODELS = {  # modèles proposés pour un agent
     "us.anthropic.claude-sonnet-4-6": "Claude Sonnet 4.6",
 }
 SHOP_PATH = re.compile(r"/shop/([a-z0-9]+)(/.*)?")
-# Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe.
-SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
+IMAGE_PATH = re.compile(re.escape(shops.IMAGE_ROOT) + r"/([a-z0-9]+)/([a-z0-9-]+)")  # la photo d'un produit dans une boutique
+# Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe (les photos viennent d'ici).
+SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
 PACE = 0  # le serveur n'attend pas entre deux gestes : c'est l'interface qui les joue à vitesse humaine
 _llms: dict[str, BedrockLLM] = {}
 _visitors: dict[str, shops.Session] = {}  # paniers et commandes des humains qui visitent /shop, par cookie
@@ -110,6 +112,13 @@ class Handler(BaseHTTPRequestHandler):
             if file.is_file() and file.suffix in ASSET_TYPES:
                 return self._send(200, file.read_bytes(), ASSET_TYPES[file.suffix])
             return self._json(404, {"error": "not found"})
+        image = IMAGE_PATH.fullmatch(path)
+        if image:  # une boutique et un produit, jamais un nom de fichier : c'est world.product_image qui cherche dans le dossier des photos
+            file = world.product_image(*image.groups())
+            if file is None:
+                return self._json(404, {"error": "not found"})
+            # l'adresse porte la date du fichier (shops.picture) : la photo peut rester en cache d'un geste à l'autre
+            return self._send(200, file.read_bytes(), world.IMAGE_TYPES[file.suffix.lower()], {"Cache-Control": "private, max-age=86400"})
         if path == "/api/world":
             buyer = masked(PROFILE)
             return self._json(200, {"sites": [public_site(k) for k in world.SITES], "models": MODELS, "default_model": MODEL_ID,

@@ -63,9 +63,9 @@ class _Reader(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
-        if tag in ("style", "script"):
+        if tag in ("style", "script", "svg"):  # un dessin n'est pas du texte : rien de ce qu'il contient n'arrive à l'agent
             self._skip += 1
-        elif tag == "title":
+        elif tag == "title" and not self._skip:
             self._in_title = True
         elif tag == "form":
             self.forms.append({"action": a.get("action", ""), "method": (a.get("method") or "get").upper(), "payment": "data-payment" in a, "fields": []})
@@ -98,7 +98,7 @@ class _Reader(HTMLParser):
             self.out.append(" ")
 
     def handle_endtag(self, tag):
-        if tag in ("style", "script"):
+        if tag in ("style", "script", "svg"):
             self._skip -= 1
         elif tag == "title":
             self._in_title = False
