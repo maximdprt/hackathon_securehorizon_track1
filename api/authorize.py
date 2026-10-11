@@ -4,7 +4,8 @@ Walid's lane - on-chain authorization executor.
 The brain (Corentin/Bruno: agents + scoring) decides verdict = allow | block | needs_human.
 This module takes that verdict + the payment and EXECUTES it on-chain on SentinelL1:
   - allow       -> registry.grantVisa(...)  (the GuardedVault will then let the payment through)
-  - block       -> registry.flagThreat(recipient)  (next time = instant on-chain block)
+  - block       -> registry.flagThreat(recipient)  (next time = instant on-chain block), unless the caller
+                   passes flag_severity=None: then only the decision is recorded (the recipient is not condemned)
   - needs_human -> record a pending decision (human approval happens, then call authorize(..., "allow"))
 Every decision is also recorded on-chain = DORA audit trail.
 
@@ -19,6 +20,8 @@ Usage:
 """
 import os
 import time
+from typing import Optional
+
 from web3 import Web3
 from eth_account import Account
 
@@ -97,9 +100,16 @@ def _send(fn, nonce):
     return w3.to_hex(h)
 
 
-def authorize(payment: dict, verdict: str, reason: str = "", ttl: int = DEFAULT_TTL, nonce: int = None) -> dict:
-    """verdict in -> on-chain execution out. Returns the on-chain proof."""
+def authorize(payment: dict, verdict: str, reason: str = "", ttl: int = DEFAULT_TTL, nonce: int = None,
+              flag_severity: Optional[int] = 3) -> dict:
+    """verdict in -> on-chain execution out. Returns the on-chain proof.
+
+    flag_severity only matters for a block: 1..3 flags the recipient at that severity (default 3, the historical
+    behaviour), None or 0 records the block decision alone. The hosted API passes None when the refusal says nothing
+    against the recipient (an unknown issuer, a client's word it could not check), so one caller cannot ban a merchant."""
     assert _acct and _reg, "set L1_RPC_URL, REGISTRY_ADDRESS, AUTHORIZER_KEY"
+    if flag_severity and not 1 <= int(flag_severity) <= 3:
+        raise ValueError(f"flag_severity must be 1..3 or None, got {flag_severity!r}")
     issuer = Web3.to_checksum_address(payment["issuer"])
     recipient = Web3.to_checksum_address(payment["recipient"])
     amount = int(payment["amount"])
@@ -112,9 +122,11 @@ def authorize(payment: dict, verdict: str, reason: str = "", ttl: int = DEFAULT_
     if verdict == "allow":
         out["visa_tx"] = _send(_reg.functions.grantVisa(pid, issuer, recipient, amount, ttl), txn)
         out["decision_tx"] = _send(_reg.functions.recordDecision(pid, issuer, "allow", reason), txn + 1)
-    elif verdict == "block":
-        out["flag_tx"] = _send(_reg.functions.flagThreat(address_key(recipient), 3, reason), txn)
+    elif verdict == "block" and flag_severity:
+        out["flag_tx"] = _send(_reg.functions.flagThreat(address_key(recipient), int(flag_severity), reason), txn)
         out["decision_tx"] = _send(_reg.functions.recordDecision(pid, issuer, "block", reason), txn + 1)
+    elif verdict == "block":  # refused, recipient not flagged: the decision alone is the audit trail
+        out["decision_tx"] = _send(_reg.functions.recordDecision(pid, issuer, "block", reason), txn)
     else:  # needs_human
         out["decision_tx"] = _send(_reg.functions.recordDecision(pid, issuer, "needs_human", reason), txn)
     return out

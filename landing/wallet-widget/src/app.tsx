@@ -230,6 +230,19 @@ function apiKey(a: Agent) {
   return `sk_sentinel_${fnv(0x811c9dc5, false)}${fnv(0x811c9dc5, true)}`;
 }
 
+/** register the agent's key with the hosted API so connected mode recognises it (best-effort; local mode needs none) */
+const SENTINEL_API = 'https://rpc.petroi.fr';
+async function registerKey(key: string, getAccessToken: () => Promise<string | null>) {
+  try {
+    const token = await getAccessToken().catch(() => null);
+    await fetch(`${SENTINEL_API}/keys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify({ key }),
+    });
+  } catch { /* the key still works once the API knows it; retried each time the Connect tab opens */ }
+}
+
 /** step 1: write the agent's mandate (its limits) once, so Sentinel enforces exactly what the dashboard shows */
 function initCmd(a: Agent) {
   const parts = [
@@ -270,6 +283,9 @@ function AgentEditor({ agent, walletAddress, onClose, onSave, onDelete }: { agen
     actions: ['pay'], recipients: [], humanAbove: 150, prompt: '', createdAt: new Date().toISOString() };
   const [f, setF] = useState<Agent>(init);
   const [tab, setTab] = useState<'settings' | 'prompt' | 'connect'>(agent ? 'prompt' : 'settings');
+  const { getAccessToken } = usePrivy();
+  // opening Connect registers this agent's key with the hosted API, so the copy-paste connected-mode command just works
+  useEffect(() => { if (tab === 'connect' && f.issuer) registerKey(apiKey(f), getAccessToken); }, [tab, f.id, f.issuer]); // eslint-disable-line
   // the prompt follows the settings until the user writes in it
   const [custom, setCustom] = useState(!!agent && agent.prompt !== promptTemplate(agent));
   const template = useMemo(() => promptTemplate(f), [f.name, f.framework, f.useCase, f.perPayment, f.daily, f.currency, f.actions.join(), f.recipients.join(), f.humanAbove]); // eslint-disable-line
