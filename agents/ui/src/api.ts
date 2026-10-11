@@ -9,7 +9,7 @@ export async function fetchWorld(): Promise<World> {
 export type RunRequest = { prompt: string; agent: string; instructions: string; model: string; mode?: Mode; /** false : le paiement part sans vérification. */ guard?: boolean };
 
 /** Un humain tranche une décision en attente du garde. */
-export async function decide(instruction_id: string, decision: 'allow' | 'block'): Promise<{ verdict: string }> {
+export async function decide(instruction_id: string, decision: 'allow' | 'decline' | 'block'): Promise<{ verdict: string }> {
   const res = await fetch('/api/decide', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ instruction_id, decision }) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `Le serveur a répondu ${res.status}`);

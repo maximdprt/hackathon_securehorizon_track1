@@ -1,7 +1,7 @@
 {
  "detection_rate": 1.0,
  "false_positive_rate": 0.0,
- "mean_latency_ms": 0.8833333333333333,
+ "mean_latency_ms": 2.1364,
  "attacks": 23,
  "controls": 52,
  "llm": "off",
@@ -741,8 +741,8 @@
    "family": "E",
    "expected": "block",
    "verdict": "block",
-   "trust": 5,
-   "risk": 0.9476,
+   "trust": 4,
+   "risk": 0.9633,
    "severity": 3,
    "ok": true
   },
@@ -752,7 +752,7 @@
    "expected": "block",
    "verdict": "block",
    "trust": 0,
-   "risk": 0.9969,
+   "risk": 0.9956,
    "severity": 3,
    "ok": true
   }

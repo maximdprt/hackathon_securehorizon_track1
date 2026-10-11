@@ -35,7 +35,7 @@ type ThreadProps = {
   onIdea: (text: string) => void;
   onSelect: (id: string, frame: number) => void;
   onRetry: (prompt: string) => void;
-  onDecide: (id: string, decision: 'allow' | 'block') => void;
+  onDecide: (id: string, decision: 'allow' | 'decline' | 'block') => void;
 };
 
 function Thread({ messages, mode, shown, onIdea, onSelect, onRetry, onDecide }: ThreadProps) {
@@ -177,7 +177,7 @@ export default function App() {
   );
 
   /** Un humain tranche un paiement mis en attente par le garde. */
-  async function settle(id: string, decision: 'allow' | 'block') {
+  async function settle(id: string, decision: 'allow' | 'decline' | 'block') {
     const target = messages.find((m) => m.id === id);
     const iid = target?.role === 'agent' ? target.end?.verdict?.instruction_id : null;
     if (!iid) return;

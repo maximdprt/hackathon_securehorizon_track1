@@ -162,6 +162,8 @@
 .button { height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid #E3E7ED; background: #fff; color: #16202B; font-size: 14px; font-weight: 600;
   white-space: nowrap; }
 .button--primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.button--danger { border-color: color-mix(in srgb, var(--danger) 45%, transparent); color: var(--danger); }
+.button--danger:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: var(--on-ink); }
 .button--wide { width: 100%; }
 .button:disabled { background: #F0F2F5; border-color: #E3E7ED; color: #8A95A3; }
 

@@ -91,6 +91,23 @@ test('a payment held for a human is settled from the thread and the decision goe
   expect(card.queryByRole('button')).toBeNull(); // tranché une fois
 });
 
+test('refusing a held payment and reporting a fraud are two different decisions', async () => {
+  for (const [button, decision, told] of [
+    ['Refuser', 'decline', /rien n'est retenu contre le marchand/],
+    ['Signaler une fraude', 'block', /Fraude signalée par un humain/],
+  ] as const) {
+    const calls = server(world('mcp'), end('needs_approval', PENDING, NIMBUS));
+    const { unmount } = render(<App />);
+    await ready();
+    await ask();
+    const card = within(await screen.findByRole('region', { name: 'Verdict du garde' }));
+    await userEvent.click(card.getByRole('button', { name: button }));
+    expect(await card.findByText(told)).toBeInTheDocument();
+    expect(calls[1].body).toEqual({ instruction_id: '0xdef', decision });
+    unmount();
+  }
+});
+
 test('a decision the guard cannot record is reported and can be tried again', async () => {
   server(world('mcp'), end('needs_approval', PENDING, NIMBUS), 409);
   render(<App />);

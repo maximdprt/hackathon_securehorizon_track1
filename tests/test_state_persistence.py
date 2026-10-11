@@ -46,7 +46,8 @@ def test_state_survives_restart(data_dir):
     # the files on disk are what a restart will read
     threats = json.loads((data_dir / "threats.mock.json").read_text())
     assert threats[BAD]["severity"] == 3 and threats[blocked["instruction_id"]]["flagged"]
-    assert "n-1" in json.loads((data_dir / "nonces.json").read_text())["seen"]
+    # nonces are kept per issuer, and only for payments that went through: the blocked order's nonce (p-1) is not spent
+    assert json.loads((data_dir / "nonces.json").read_text())["seen"] == [f"{T}:n-1"]
 
     b = make_engine(data_dir)  # simulated restart: fresh process state, same directory
     assert b.source.is_flagged(BAD) == (True, 3, blocked["reasons"][0][:120])
@@ -107,7 +108,7 @@ def test_concurrent_verifications_keep_state_files_consistent(data_dir):
     assert verdicts.count("allow") == 80 and verdicts.count("block") == 80
 
     seen = set(json.loads((data_dir / "nonces.json").read_text())["seen"])
-    expected = {f"t{t}-n{i}" for t in range(8) for i in range(20)}
+    expected = {f"{T}:t{t}-n{i}" for t in range(8) for i in range(0, 20, 2)}  # per issuer, and only the 80 payments that went through
     assert seen == expected
 
     threats = json.loads((data_dir / "threats.mock.json").read_text())  # valid JSON after 80 concurrent writers

@@ -11,6 +11,8 @@ def extract(req: VerifyRequest, mandate: Mandate | None) -> list[Signal]:
     o = req.order
     if o.amount > 1e18:
         sig.append(Signal("amount_implausible", LAYER, 1.0, f"amount {o.amount:g} is above any plausible value: an unlimited transfer in disguise", hard=True, owasp=["ASI03"]))
+    if o.action in ("pay", "transfer") and not o.recipient:
+        sig.append(Signal("recipient_missing", LAYER, 1.0, f"a {o.action} order names no recipient: nothing can be checked about who gets the money", hard=True, owasp=["ASI03"]))
     if mandate is None:
         sig.append(Signal("issuer_in_registry", LAYER, 1.0, f"no mandate registered for issuer {o.issuer}", hard=True, owasp=["ASI03"]))
         return sig

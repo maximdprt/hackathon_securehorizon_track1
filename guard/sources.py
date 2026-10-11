@@ -29,6 +29,8 @@ class AuthoritySource(Protocol):
     def is_flagged(self, key: str) -> tuple[bool, int, str]: ...
     def mark_threat(self, key: str, severity: int, reason: str) -> None: ...
     def nonce_seen(self, nonce: str) -> bool: ...
+    def nonce_used(self, nonce: str) -> bool: ...
+    def clear_threat(self, key: str) -> bool: ...
 
 
 def _key(s: str) -> str:
@@ -71,7 +73,21 @@ class MockJsonSource:
             self.threats[_key(key)] = {"flagged": True, "severity": severity, "reason": reason}
             self._save("threats.mock.json", self.threats)
 
+    def clear_threat(self, key: str) -> bool:
+        """A human lifts a flag. True if there was one."""
+        with self._lock:
+            had = self.threats.pop(_key(key), None) is not None
+            if had:
+                self._save("threats.mock.json", self.threats)
+            return had
+
+    def nonce_used(self, nonce: str) -> bool:
+        """Read only: has this nonce already paid for something?"""
+        with self._lock:
+            return nonce in self.nonces
+
     def nonce_seen(self, nonce: str) -> bool:
+        """Spend the nonce. True if it was already spent."""
         with self._lock:
             seen = nonce in self.nonces
             self.nonces.add(nonce)
@@ -152,6 +168,13 @@ class ChainSource:
     def nonce_seen(self, nonce: str) -> bool:
         # nonces stay local: the contract has no nonce store
         return self.fallback.nonce_seen(nonce) if self.fallback else False
+
+    def nonce_used(self, nonce: str) -> bool:
+        return self.fallback.nonce_used(nonce) if self.fallback else False
+
+    def clear_threat(self, key: str) -> bool:
+        # the contract has no unflag: only the local memory is lifted, an on-chain flag stays until disputed there
+        return self.fallback.clear_threat(key) if self.fallback else False
 
     def record_decision(self, instruction_id: str, issuer: str, verdict: str, reason: str) -> str:
         from web3 import Web3

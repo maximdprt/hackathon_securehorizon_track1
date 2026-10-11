@@ -158,7 +158,7 @@ def test_the_finance_run_ends_on_the_guard_verdict(server, monkeypatch):
 def test_the_guard_answers_over_the_mcp_protocol_like_the_engine_does(tmp_path):
     mcp = GuardClient("mcp", tmp_path / "mcp_data")
     try:
-        assert mcp._impl.tools == ["approve_pending", "get_decision", "list_pending", "verify_payment"]
+        assert mcp._impl.tools == ["approve_pending", "get_decision", "lift_flag", "list_pending", "verify_payment"]
         refused = purchase("meridian", S10, mcp)
         assert (refused["outcome"], refused["verdict"]["verdict"], refused["verdict"]["trust_score"]) == ("blocked", "block", 35)
         held = purchase("nimbus", S10, mcp)

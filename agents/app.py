@@ -177,7 +177,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 body = json.loads(self.rfile.read(length))
                 iid, decision = str(body["instruction_id"]), body["decision"]
-                assert decision in ("allow", "block") and len(iid) <= 100 and _guard is not None
+                assert decision in ("allow", "decline", "block") and len(iid) <= 100 and _guard is not None
             except Exception:
                 return self._json(400, {"error": "bad request"})
             try:

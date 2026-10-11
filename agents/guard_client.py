@@ -21,6 +21,7 @@ import importlib.util
 import json
 import os
 import re
+import secrets
 import shutil
 import sys
 import threading
@@ -103,7 +104,7 @@ class StubGuard:
         }
 
 
-STATE = ("decisions.jsonl", "pending.json", "nonces.json", "threats.mock.json", "spend.json")  # ce que le garde écrit
+STATE = ("decisions.jsonl", "pending.json", "nonces.json", "threats.mock.json", "spend.json", "visas.json", "registry_events.jsonl")  # ce que le garde écrit
 
 
 def fresh_data(target: Path | None = None) -> Path:
@@ -140,6 +141,9 @@ class EngineGuard:
     def decision(self, instruction_id: str) -> dict | None:
         return self.engine.decision(instruction_id)
 
+    def lift(self, subject: str, approver: str, note: str = "") -> dict:
+        return self.engine.lift_flag(subject, approver, note)
+
     def close(self) -> None:
         pass
 
@@ -152,6 +156,8 @@ class McpGuard:
 
     def __init__(self, data_dir: Path | None = None, start_timeout: float = 60):
         self.data_dir = fresh_data(data_dir)
+        # le jeton de l'approbateur : tiré au lancement, donné au serveur et gardé ici. L'agent, lui, ne passe que par verify().
+        self._token = secrets.token_urlsafe(24)
         self.tools: list[str] = []
         self._loop = asyncio.new_event_loop()
         self._ready, self._lock, self._error = threading.Event(), threading.Lock(), None
@@ -170,7 +176,8 @@ class McpGuard:
         try:
             from mcp import ClientSession, StdioServerParameters
             from mcp.client.stdio import stdio_client
-            env = dict(os.environ, GUARD_DATA_DIR=str(self.data_dir), GUARD_LLM=os.environ.get("GUARD_LLM", "off"), PYTHONUNBUFFERED="1", PYTHONUTF8="1")
+            env = dict(os.environ, GUARD_DATA_DIR=str(self.data_dir), GUARD_LLM=os.environ.get("GUARD_LLM", "off"), PYTHONUNBUFFERED="1", PYTHONUTF8="1",
+                       GUARD_APPROVER_TOKEN=self._token)
             params = StdioServerParameters(command=sys.executable, args=[str(ROOT / "mcp_server.py")], cwd=str(ROOT), env=env)
             async with stdio_client(params) as (read, write):
                 async with ClientSession(read, write) as session:
@@ -203,7 +210,10 @@ class McpGuard:
         return self._call("list_pending", {}) or []
 
     def approve(self, instruction_id: str, decision: str, approver: str, note: str = "") -> dict:
-        return self._call("approve_pending", {"instruction_id": instruction_id, "decision": decision, "approver": approver, "note": note})
+        return self._call("approve_pending", {"instruction_id": instruction_id, "decision": decision, "approver": approver, "note": note, "token": self._token})
+
+    def lift(self, subject: str, approver: str, note: str = "") -> dict:
+        return self._call("lift_flag", {"subject": subject, "approver": approver, "note": note, "token": self._token})
 
     def decision(self, instruction_id: str) -> dict | None:
         try:
@@ -237,8 +247,13 @@ class GuardClient:
         return self._impl.pending()
 
     def approve(self, instruction_id: str, decision: str, approver: str, note: str = "") -> dict:
-        """Un humain tranche une décision en attente : "allow" ou "block"."""
+        """Un humain tranche une décision en attente : "allow" (le même ordre, renvoyé, passe une fois), "decline" (pas ce
+        paiement, rien n'est retenu contre le destinataire) ou "block" (fraude : le destinataire est refusé désormais)."""
         return self._impl.approve(instruction_id, decision, approver, note)
+
+    def lift(self, subject: str, approver: str, note: str = "") -> dict:
+        """Un humain sort une adresse ou un domaine du registre des incidents."""
+        return self._impl.lift(subject, approver, note)
 
     def decision(self, instruction_id: str) -> dict | None:
         """La décision enregistrée pour un ordre, avec son score et chaque retrait."""

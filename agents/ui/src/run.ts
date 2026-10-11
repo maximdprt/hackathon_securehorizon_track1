@@ -42,7 +42,7 @@ export type AgentMessage = {
   end?: EndEvent;
   error?: string;
   /** La décision d'un humain sur un paiement que le garde a mis en attente. */
-  human?: { state: 'sending' | 'done' | 'error'; decision: 'allow' | 'block'; error?: string };
+  human?: { state: 'sending' | 'done' | 'error'; decision: 'allow' | 'decline' | 'block'; error?: string };
 };
 export type Message = UserMessage | AgentMessage;
 

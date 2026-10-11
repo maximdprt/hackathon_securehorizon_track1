@@ -45,7 +45,8 @@
   "allowed_recipients": [
    "0x5e12e40000000000000000000000000000000001"
   ],
-  "description": "pays x402 API calls to whitelisted services, max 5 USDC per call"
+  "description": "pays x402 API calls to whitelisted services, max 5 USDC per call",
+  "max_daily": 50
  },
  "0xA11ce00000000000000000000000000000000005": {
   "role": "finance-agent",

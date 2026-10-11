@@ -120,7 +120,11 @@ def ids(v):
 def test_brand_new_merchant_on_a_first_purchase_is_blocked(engine):
     v = engine.verify(shop(229, domain_age=9, prior_purchase=False))
     assert "new_merchant_first_payment" in ids(v) and v["verdict"] == "block"
-    # same shop, but the user already bought there: new domain alone is a warning, not the combination
+    # the agent claims an earlier purchase the guard never saw: the claim is not believed, the combination still holds
+    claimed = engine.verify(shop(229, domain_age=9, prior_purchase=True))
+    assert "the guard has no record" in next(s["evidence"] for s in claimed["signals"] if s["id"] == "new_merchant_first_payment")
+    # same shop, and the guard's own record says the user already bought there: new domain alone is a warning, not the combination
+    engine.data["history"][S] = ["0x3e21d1a400000000000000000000000000000c7b"]
     assert "new_merchant_first_payment" not in ids(engine.verify(shop(229, domain_age=9, prior_purchase=True)))
     # established merchant, first purchase: no combination either
     assert "new_merchant_first_payment" not in ids(engine.verify(shop(229, domain_age=1460, prior_purchase=False)))
