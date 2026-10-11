@@ -144,7 +144,7 @@ SITES: dict[str, Site] = {s.key: s for s in [
          "allow", "revendeur de confiance (allowlist), domaine ancien", allowlisted=True,
          domain_age_days=1800, prior_purchase=True,
          footer="GameVault SARL · 8 avenue des Ternes, 75017 Paris"),
-    _ps5("consolemarket", "ConsoleMarket", "consolemarket.example", "legit", SCAM_1.replace("d4ead", "b0b111"), 289.0,
+    _ps5("consolemarket", "ConsoleMarket", "consolemarket.example", "legit", SCAM_1.replace("d4ead", "b0b11"), 289.0,
          "Place de marché : vendeurs tiers, prix variables.",
          {"Livraison": "selon vendeur", "Garantie": "1 an", "Retours": "14 jours", "Avis": "4,2 / 5 (12 400)"},
          ["★★★★☆ Dépend du vendeur. — Sofiane A."],
