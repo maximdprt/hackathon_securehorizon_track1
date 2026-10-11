@@ -12,42 +12,144 @@
 .agentic__state-title { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
 .agentic__side { flex: none; width: 440px; min-height: 0; display: flex; flex-direction: column; background: #fff; border-left: 1px solid #E3E7ED; }
 
-/* la fenêtre de navigation */
+/* la fenêtre de navigation. --t-out et --t-in (la page qui s'efface, la suivante qui arrive) sont posés par BrowserView depuis timing.ts. */
 .browser { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px; }
-.browser__bar { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #E3E7ED; border-radius: 14px 14px 0 0; }
+
+/* l'onglet : la pastille prend la couleur de la boutique ouverte (--site), neutre pour la recherche et l'accueil */
+.browser__tabs { flex: none; display: flex; align-items: flex-end; height: 42px; padding: 0 10px; background: #EBEEF2; border: 1px solid #E3E7ED;
+  border-bottom: 0; border-radius: 14px 14px 0 0; }
+.browser__tab { display: flex; align-items: center; gap: 9px; min-width: 0; max-width: 380px; height: 34px; padding: 0 18px 0 12px;
+  border-radius: 10px 10px 0 0; background: #fff; font-size: 13px; font-weight: 600; }
+.browser__favicon { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; background: #DDE2E9; color: #5E6B7A;
+  font-size: 11px; font-weight: 700; line-height: 1; animation: browser-pop var(--t-med) var(--ease); }
+.browser__favicon--site { background: var(--site, #5E6B7A); color: #fff; }
+.browser__favicon > svg { width: 12px; height: 12px; }
+.browser__spinner { flex: none; width: 14px; height: 14px; margin: 2px; border-radius: 50%; border: 2px solid #DDE2E9; border-top-color: var(--accent);
+  animation: browser-spin 0.7s linear infinite; }
+.browser__tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: browser-rise var(--t-med) var(--ease); }
+
+/* la barre d'adresse */
+.browser__bar { position: relative; flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #E3E7ED;
+  border-top: 0; }
 .browser__address { flex: 1; min-width: 0; height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 10px;
-  background: #F0F2F5; color: #5E6B7A; }
+  background: #F0F2F5; color: #5E6B7A; transition: background-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
+.browser__address--typing { background: #fff; box-shadow: 0 0 0 2px var(--accent); }
 .browser__url { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #16202B;
   font: 400 13px 'JetBrains Mono', Consolas, monospace; }
+.browser__url--empty { color: #5E6B7A; font-family: inherit; }
+.browser__address--typing .browser__url::after { content: ''; display: inline-block; width: 2px; height: 14px; margin-left: 2px; vertical-align: -2px;
+  background: var(--accent); }
 .browser__state { padding: 0 6px; font-size: 13px; font-weight: 600; color: #5E6B7A; white-space: nowrap; }
 .browser__state--live { color: var(--accent); }
 .browser__bar .button { display: inline-flex; align-items: center; text-decoration: none; }
+/* la barre de chargement : elle avance pendant que l'ancienne page s'efface, se remplit quand la nouvelle arrive, puis s'éteint */
+.browser__progress { position: absolute; left: -1px; right: -1px; bottom: -1px; z-index: 1; height: 3px; background: var(--site, var(--accent));
+  transform-origin: 0 50%; opacity: 0; animation: browser-progress calc(var(--t-out, 160ms) + var(--t-in, 420ms) + 160ms) linear; }
+@keyframes browser-progress {
+  0% { transform: scaleX(0); opacity: 1; animation-timing-function: cubic-bezier(.2, .7, .3, 1); }
+  40% { transform: scaleX(.62); opacity: 1; animation-timing-function: cubic-bezier(.22, .8, .26, 1); }
+  78% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* la page : elle s'efface en montant un peu, la suivante arrive par le bas. Au repos elle n'a aucun décalage : le curseur vise juste. */
 .browser__viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; border: 1px solid #E3E7ED; border-top: 0; border-bottom: 0; background: #fff; }
-.browser__page { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; opacity: 1; transition: opacity 0.3s ease; }
-.browser__page--hidden { opacity: 0; transition-duration: 0.14s; }
-/* le curseur de l'agent : sa pointe est à l'origine du bloc */
-.browser__cursor { position: absolute; top: 0; left: 0; z-index: 2; pointer-events: none; color: var(--accent); will-change: transform;
-  transition-property: transform; transition-timing-function: cubic-bezier(0.3, 0.05, 0.2, 1); }
-.browser__pointer { display: block; width: 24px; height: 24px; margin: -3px 0 0 -4px; transform-origin: 4px 3px; transition: transform 0.12s ease; }
+.browser__page { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; opacity: 1; transform: none;
+  transition: opacity var(--t-in, 420ms) var(--ease), transform var(--t-in, 420ms) var(--ease); }
+.browser__page--hidden { opacity: 0; transition: none; }
+.browser__page--out { transform: translateY(-6px); transition: opacity var(--t-out, 160ms) ease-in, transform var(--t-out, 160ms) ease-in; }
+.browser__page--below { transform: translateY(12px); }
+
+/* le halo : posé par-dessus la page, sur le rectangle de l'élément visé. Il se resserre pendant que le curseur approche,
+   puis s'efface au clic, là où la page trace son propre anneau. */
+.browser__halo { position: absolute; z-index: 1; pointer-events: none; }
+.browser__halo::before, .browser__halo::after { content: ''; position: absolute; inset: -6px; border-radius: 11px; opacity: 0;
+  transition: opacity var(--t-med) var(--ease), inset var(--t-med) var(--ease); }
+.browser__halo::before { background: var(--k-click); }
+.browser__halo::after { border: 2px solid var(--k-click); }
+.browser__halo--aim::before { opacity: 0.13; animation: browser-halo var(--t-med) var(--ease); }
+.browser__halo--aim::after { opacity: 0.85; animation: browser-halo var(--t-med) var(--ease); }
+.browser__halo--hit::before, .browser__halo--hit::after { inset: -3px; }
+.browser__halo--pay::before { background: var(--k-pay); animation: browser-halo-pay 0.7s var(--ease); }
+.browser__halo--pay::after { border: 3px solid var(--k-pay); animation: browser-halo-leave 0.7s var(--ease); }
+@keyframes browser-halo { from { inset: -20px; opacity: 0; } }
+@keyframes browser-halo-pay { 0% { opacity: 0; } 25% { opacity: 0.28; } 100% { opacity: 0; } }
+@keyframes browser-halo-leave { from { inset: -6px; opacity: 1; } to { inset: -20px; opacity: 0; } }
+
+/* la traînée du curseur : le bout de courbe qu'il vient de parcourir, de plus en plus fin */
+.browser__trail { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; overflow: visible; pointer-events: none; fill: none;
+  stroke: var(--accent); stroke-linecap: round; stroke-linejoin: round; }
+.browser__trail > path:nth-child(1) { stroke-width: 3.5; opacity: 0.3; }
+.browser__trail > path:nth-child(2) { stroke-width: 2.5; opacity: 0.17; }
+.browser__trail > path:nth-child(3) { stroke-width: 1.5; opacity: 0.08; }
+
+/* le curseur de l'agent : sa pointe est à l'origine du bloc, et sa position est écrite image par image par BrowserView */
+.browser__cursor { position: absolute; top: 0; left: 0; z-index: 3; pointer-events: none; color: var(--accent); will-change: transform;
+  animation: browser-fade var(--t-med) var(--ease); }
+.browser__pointer { display: block; width: 24px; height: 24px; margin: -3px 0 0 -4px; transform-origin: 4px 3px; transition: transform var(--t-fast) var(--ease); }
 .browser__cursor--pressed .browser__pointer { transform: scale(0.82); }
-.browser__cursor-tag { position: absolute; top: 20px; left: 16px; padding: 2px 9px; border-radius: 999px; background: var(--accent); color: #fff;
-  font-size: 11px; font-weight: 600; white-space: nowrap; }
-.browser__ripple { position: absolute; top: -16px; left: -16px; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--accent);
-  animation: cursor-ripple 0.42s ease-out forwards; }
-@keyframes cursor-ripple { from { transform: scale(0.25); opacity: 0.9; } to { transform: scale(1.4); opacity: 0; } }
-.browser__caption { min-height: 66px; padding: 12px 18px; border-radius: 0 0 14px 14px; background: #16202B; color: #fff; }
-.browser__action { margin: 0; font-size: 15px; font-weight: 600; }
-.browser__why { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: #C9D1DD; }
-.browser__start { flex: 1; min-height: 0; overflow-y: auto; padding: 40px 44px; background: #fff; border: 1px solid #E3E7ED; border-top: 0;
+.browser__cursor-tag { position: absolute; top: 20px; left: 16px; display: flex; align-items: center; padding: 2px 9px; border-radius: 999px;
+  background: var(--accent); color: #fff; font-size: 11px; font-weight: 600; white-space: nowrap; transition: transform var(--t-med) var(--ease); }
+.browser__cursor--flip .browser__cursor-tag { transform: translateX(calc(-100% - 12px)); } /* près du bord droit, l'étiquette passe à gauche */
+/* l'onde du clic, à la couleur du geste : un disque qui s'efface et un anneau qui s'élargit */
+.browser__ripple { --gesture: var(--k-click); position: absolute; top: 0; left: 0; z-index: -1; }
+.browser__ripple--type { --gesture: var(--k-type); }
+.browser__ripple--pay { --gesture: var(--k-pay); }
+.browser__ripple::before, .browser__ripple::after { content: ''; position: absolute; top: -20px; left: -20px; width: 40px; height: 40px;
+  border-radius: 50%; opacity: 0; }
+.browser__ripple::before { background: var(--gesture); animation: browser-ripple-disc 0.42s var(--ease); }
+.browser__ripple::after { border: 2px solid var(--gesture); animation: browser-ripple-ring 0.6s var(--ease); }
+.browser__ripple--pay::after { border-width: 3px; animation-duration: 0.8s; }
+@keyframes browser-ripple-disc { from { transform: scale(0.2); opacity: 0.4; } to { transform: scale(0.9); opacity: 0; } }
+@keyframes browser-ripple-ring { from { transform: scale(0.3); opacity: 0.95; } to { transform: scale(1.5); opacity: 0; } }
+
+/* trois points : l'agent réfléchit. Ils n'apparaissent qu'après un court délai, pour ne pas clignoter entre deux gestes. */
+.browser__dots { display: inline-flex; align-items: center; gap: 3px; width: 18px; margin-left: 7px; overflow: hidden;
+  animation: browser-dots var(--t-med) var(--ease) 0.35s backwards; }
+.browser__dots > i { flex: none; width: 4px; height: 4px; border-radius: 50%; background: currentColor; animation: browser-dot 1.2s ease-in-out infinite; }
+.browser__dots > i:nth-child(2) { animation-delay: 0.16s; }
+.browser__dots > i:nth-child(3) { animation-delay: 0.32s; }
+@keyframes browser-dots { from { width: 0; margin-left: 0; opacity: 0; } }
+@keyframes browser-dot { 0%, 60%, 100% { opacity: 0.4; } 30% { opacity: 1; } }
+
+/* la légende : sa hauteur est fixe, pour que la page ne bouge pas quand le texte change. La couleur est celle du geste. */
+.browser__caption { --gesture: var(--k-search); flex: none; display: flex; align-items: center; gap: 14px; height: 88px; padding: 0 18px; overflow: hidden;
+  border-top: 3px solid var(--gesture); border-radius: 0 0 14px 14px; background: #16202B; color: #fff; transition: border-color var(--t-med) var(--ease); }
+.browser__caption--click { --gesture: var(--k-click); }
+.browser__caption--type { --gesture: var(--k-type); }
+.browser__caption--pay { --gesture: var(--k-pay); }
+.browser__chip { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--gesture); color: #fff;
+  animation: browser-pop var(--t-med) var(--ease); }
+.browser__legend { min-width: 0; animation: browser-rise var(--t-med) var(--ease); }
+.browser__action { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; }
+.browser__why { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin: 2px 0 0; overflow: hidden; font-size: 13px;
+  line-height: 1.45; color: #C9D1DD; }
+
+/* l'écran d'accueil */
+.browser__start { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 40px 44px; text-align: center; background: #fff; border: 1px solid #E3E7ED; border-top: 0;
   border-radius: 0 0 14px 14px; }
-.browser__start-title { margin: 0 0 10px; font-size: 22px; font-weight: 700; }
-.browser__start-text { max-width: 62ch; margin: 0 0 12px; font-size: 15px; line-height: 1.55; color: #44505E; }
-.browser__tiles { margin: 18px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
-.browser__tile { display: flex; flex-direction: column; gap: 4px; min-height: 44px; padding: 16px; border: 1px solid #E3E7ED; border-radius: 12px;
-  background: #F7F8FA; color: inherit; text-decoration: none; }
-.browser__tile:hover { border-color: var(--accent); }
-.browser__tile-name { font-size: 15px; font-weight: 600; }
-.browser__tile-domain { font: 400 12px 'JetBrains Mono', Consolas, monospace; color: #5E6B7A; }
+.browser__start-mark { position: relative; flex: none; display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 22px; border-radius: 18px;
+  background: var(--k-click-soft); color: var(--accent); animation: browser-pop var(--t-slow) var(--ease) backwards; }
+.browser__start-mark::after { content: ''; position: absolute; inset: 0; border-radius: 18px; border: 2px solid var(--accent); opacity: 0;
+  animation: browser-start-ring 0.9s var(--ease) 0.45s; }
+.browser__start-pointer { width: 26px; height: 26px; margin: 3px 0 0 3px; }
+.browser__start-title { margin: 0 0 10px; font-size: 22px; font-weight: 700; animation: browser-rise var(--t-slow) var(--ease) 0.08s backwards; }
+.browser__start-text { max-width: 52ch; margin: 0; font-size: 15px; line-height: 1.55; color: #44505E; animation: browser-rise var(--t-slow) var(--ease) 0.16s backwards; }
+.browser__start-wait { display: inline-flex; align-items: center; margin: 22px 0 0; padding: 6px 14px; border-radius: 999px; background: var(--k-click-soft);
+  font-size: 13px; font-weight: 600; animation: browser-rise var(--t-med) var(--ease); }
+.browser__start-wait .browser__dots { color: var(--accent); animation-delay: 0s; }
+@keyframes browser-start-ring { from { transform: scale(1); opacity: 0.7; } to { transform: scale(1.45); opacity: 0; } }
+
+@keyframes browser-fade { from { opacity: 0; } }
+@keyframes browser-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes browser-pop { from { opacity: 0; transform: scale(0.7); } }
+@keyframes browser-spin { to { transform: rotate(360deg); } }
+
+/* réglage du système "réduire les animations" : tout s'affiche en place, sans mouvement */
+@media (prefers-reduced-motion: reduce) {
+  .browser, .browser *, .browser *::before, .browser *::after { animation: none !important; transition: none !important; }
+}
 
 @media (max-width: 1000px) {
   .agentic { flex-direction: column; height: auto; min-height: 100%; }

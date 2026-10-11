@@ -9,6 +9,13 @@
 .chat__tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 20px 14px; border-bottom: 1px solid #E3E7ED; }
 .chat__tab { min-height: 40px; padding: 0 14px; border: 1px solid #E3E7ED; border-radius: 999px; background: #fff; color: #44505E; font-size: 13px; font-weight: 600; }
 .chat__tab[aria-selected="true"] { background: #16202B; border-color: #16202B; color: #fff; }
+/* Le type de tâche : boutiques (l'agent navigue) ou finance (l'agent analyse des placements). Un seul choix à la fois. */
+.chat__mode { display: flex; gap: 4px; margin: 12px 20px 10px; padding: 4px; border-radius: 12px; background: #EEF1F5; }
+.chat__mode-btn { flex: 1; min-height: 36px; padding: 0 12px; border: 0; border-radius: 9px; background: transparent; color: #5E6B7A; font-size: 13px;
+  font-weight: 600; transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
+.chat__mode-btn:hover:not(:disabled):not([aria-pressed="true"]) { color: #16202B; }
+.chat__mode-btn[aria-pressed="true"] { background: #fff; color: var(--accent); box-shadow: 0 1px 2px rgba(22, 32, 43, .12); }
+.chat__mode-btn:disabled { opacity: .6; }
 .chat__clear { flex: none; min-height: 40px; margin-left: auto; padding: 0 12px; border: 1px solid #E3E7ED; border-radius: 10px; background: #fff; color: #44505E; font-size: 13px; font-weight: 600; }
 .chat__clear:disabled { color: #8A95A3; }
 

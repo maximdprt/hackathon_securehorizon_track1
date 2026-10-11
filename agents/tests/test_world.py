@@ -11,7 +11,7 @@ from http.server import ThreadingHTTPServer
 import pytest
 
 from agents import app, shops, world
-from agents.browser import SEARCH_ROOT, Browser
+from agents.browser import SEARCH_ROOT, Browser, _Reader
 from agents.browser_agent import PROFILE, TOOLS, masked, run_browser
 from agents.guard_client import INJECTION
 from agents.shopping_agent import ADDRESS
@@ -19,6 +19,15 @@ from agents.shopping_agent import ADDRESS
 PIXTRAL = "us.mistral.pixtral-large-2502-v1:0"
 S10 = "series-10-46"
 S10_NAME = world.PRODUCTS[S10]["name"]
+PHOTO = b"\x89PNG\r\n\x1a\n photo synthetique"  # servie telle quelle : pas besoin d'une vraie image
+
+
+@pytest.fixture(autouse=True)
+def images(tmp_path, monkeypatch):
+    """Le dossier des photos, vide pour chaque test : celles déposées dans agents/sites/images ne changent aucun résultat."""
+    monkeypatch.setattr(world, "IMAGES_DIR", tmp_path / "images")
+    (tmp_path / "images").mkdir()
+    return tmp_path / "images"
 
 
 # ---------- les boutiques ----------
@@ -347,6 +356,7 @@ def test_server_reports_llm_failures_and_refuses_what_it_should(server, monkeypa
     with urllib.request.urlopen(server + "/api/world") as r:
         w = json.loads(r.read())
     assert len(w["sites"]) == 8 and w["default_model"] in w["models"] and "wallet" not in w["sites"][0] and w["sites"][0]["preview"] == "/shop/nimbus/"
+    assert [s["color"] for s in w["sites"][:5]] == list(world.COLORS.values()) and all(s["color"].startswith("#") for s in w["sites"])
     assert w["profile"] == {"name": "Camille Martin", "city": "Lyon", "card": "•••• •••• •••• 4242"}
 
 
@@ -401,3 +411,158 @@ def test_the_built_interface_is_served_and_nothing_outside_its_assets(server, tm
         with pytest.raises(urllib.error.HTTPError) as err:
             urllib.request.urlopen(server + path)
         assert err.value.code == 404, path
+
+
+# ---------- les images des produits et l'habillage des pages ----------
+
+def shop_pages(key):
+    """Les pages d'une boutique qui montrent un produit, puis celle du paiement, avec la Series 10 46 mm au panier."""
+    session = shops.Session(carts={key: {S10: 1}})
+    return {path: shops.handle(key, "GET", path, {}, session, "https://x").html for path in ("/", f"/product/{S10}", "/cart", "/checkout")}
+
+
+def test_without_a_photo_each_product_is_drawn_in_its_own_tint():
+    pages = shop_pages("nimbus")
+    drawings = re.findall(r'<svg class="shot[^"]*" viewBox="[\d ]+" role="img" aria-label="([^"]+)">(.*?)</svg>', pages["/"])
+    assert [name for name, _ in drawings] == [world.PRODUCTS[p]["name"] for p in world.SITES["nimbus"]["products"]]
+    assert len({shape for _, shape in drawings}) == 6  # une forme ou une teinte par produit
+    assert [pages[path].count('<svg class="shot') for path in pages] == [6, 1, 1, 0]
+    assert shops.search_page(S10_NAME, "", world.url_of).count(f'role="img" aria-label="{S10_NAME}"') == 5  # la vignette : le produit cherché
+    for html in [*pages.values(), shops.search_page(S10_NAME, "", world.url_of)]:
+        assert "<img" not in html and "data:" not in html and "<title>" not in html.split("</head>")[1] and "<text" not in html
+    assert "gradient" not in (shops.CSS + shops.SEARCH_CSS + "".join(pages.values())).lower()  # aplats seulement
+
+
+def test_a_dropped_photo_replaces_the_drawing_and_a_shop_variant_wins(images):
+    (images / "meridian").mkdir()
+    (images / "SERIES-10-46.JPG").write_bytes(b"commune")  # la casse du nom ne compte pas
+    (images / "meridian" / f"{S10}.webp").write_bytes(b"meridian")
+    for ignored in ("se-40.txt", "se-40.svg", "nope.png", "README.md"):
+        (images / ignored).write_bytes(b"x")
+    assert world.product_image("nimbus", S10) == images / "SERIES-10-46.JPG" and world.product_image("meridian", S10) == images / "meridian" / f"{S10}.webp"
+    assert all(world.product_image(*args) is None for args in [("nimbus", "se-40"), ("nimbus", "nope"), ("nope", S10), ("..", S10), ("nimbus", "../app")])
+    for key in ("nimbus", "meridian"):
+        pages = shop_pages(key)
+        for path in ("/", f"/product/{S10}", "/cart"):
+            (img,) = re.findall(r"<img [^>]*>", pages[path])
+            assert f'src="/sites/images/{key}/{S10}?v=' in img and f'alt="{S10_NAME}"' in img and re.search(r' width="\d+" height="\d+"', img), path
+            assert "loading" not in img and "data:" not in pages[path]  # une adresse, chargée tout de suite : la page reste légère et ne bouge pas
+            assert pages[path].count('<svg class="shot') == {"/": len(world.SITES[key]["products"]) - 1}.get(path, 0)
+        assert "<img" not in pages["/checkout"]
+    assert ".shot{" in shops.CSS and "object-fit:contain" in shops.CSS and "object-fit:contain" in shops.SEARCH_CSS
+    results = shops.search_page(S10_NAME, "", world.url_of)
+    assert results.count("<img") == 5 and all(f'src="/sites/images/{key}/{S10}?v=' in results for key in world.SITES)
+    (images / "SERIES-10-46.JPG").unlink()  # le dossier est relu à chaque page : rien à redémarrer
+    assert "<img" not in shop_pages("nimbus")["/"] and shop_pages("meridian")["/"].count("<img") == 1
+
+
+def test_images_never_reach_the_text_the_agent_reads(images):
+    def read():
+        b, seen = Browser(shops.Session(carts={"meridian": {S10: 1}})), []
+        for url in (f"{SEARCH_ROOT}/?q=apple+watch+series+10", "https://meridian-watch.example/", f"https://meridian-watch.example/product/{S10}",
+                    "https://meridian-watch.example/cart"):
+            b.goto(url)
+            seen.append((b.snapshot(), b.title, {ref: (el.kind, el.label, el.href) for ref, el in b.elements.items()}))
+        return seen
+
+    drawn = read()
+    for pid in world.PRODUCTS:
+        (images / f"{pid}.png").write_bytes(PHOTO)
+    assert read() == drawn  # avec ou sans photo : le même texte, les mêmes repères, les mêmes libellés
+    for text, title, _ in drawn:
+        assert not any(noise in text for noise in ("<svg", "<img", "viewBox", "aria-label", "/sites/images", "stroke", ".png")), text
+    assert [title for _, title, _ in drawn] == ["apple watch series 10 | Recherche", "Apple Watch | Meridian Watch Co.", f"{S10_NAME} | Meridian Watch Co.",
+                                                "Panier | Meridian Watch Co."]
+    assert f"| {S10_NAME} | 1 | 389,00 €" in drawn[3][0] and f"{S10_NAME}\n389,00 €\nEn stock" in drawn[2][0]
+    reader = _Reader()  # même un dessin qui porterait un titre ou du texte ne touche ni au titre de la page ni à son texte
+    reader.feed("<title>Page</title><p>avant</p><svg><title>dessin</title><text>bruit</text></svg><p>après</p>")
+    assert reader.title == "Page" and "".join(reader.out).split() == ["avant", "après"]
+
+
+def test_photos_are_served_by_shop_and_product_and_nothing_else(server, images, tmp_path):
+    def get(path):
+        try:
+            r = urllib.request.urlopen(server + path)
+        except urllib.error.HTTPError as err:
+            r = err
+        return r.status, r.headers, r.read()
+
+    (images / "tempo").mkdir()
+    (images / f"{S10}.png").write_bytes(PHOTO)
+    (images / "tempo" / "ultra-2.avif").write_bytes(b"avif")
+    (images / "secret.txt").write_bytes(b"secret")
+    (tmp_path / "secret.png").write_bytes(b"secret")  # une image, mais hors du dossier des photos
+    status, headers, body = get(f"/sites/images/meridian/{S10}?v=1")
+    assert (status, body, headers["Content-Type"], headers["X-Content-Type-Options"]) == (200, PHOTO, "image/png", "nosniff") and "max-age" in headers["Cache-Control"]
+    assert get("/sites/images/tempo/ultra-2")[1]["Content-Type"] == "image/avif"
+    for path in ("/sites/images/nimbus/ultra-2", f"/sites/images/nope/{S10}", "/sites/images/meridian/secret", "/sites/images/secret.txt", f"/sites/images/{S10}.png",
+                 f"/sites/images/meridian/{S10}.png", f"/sites/images/meridian/{S10}/", "/sites/images/meridian/..%2fsecret", "/sites/images/../secret.png",
+                 "/sites/images/meridian/../../secret.png", "/sites/images/meridian/..%5c..%5csecret", "/sites/images/", "/sites/images/meridian/"):
+        assert get(path)[0] == 404, path
+    (images / "se-40.jpeg").write_bytes(b"jpeg")  # déposée pendant que le serveur tourne
+    assert get("/sites/images/orchard/se-40")[::2] == (200, b"jpeg") and get("/sites/images/orchard/se-40")[1]["Content-Type"] == "image/jpeg"
+    for path in ("/shop/meridian/", f"/shop/meridian/product/{S10}", f"/search?q={S10}"):  # la page servie à un humain pointe vers cette route, et sa CSP l'autorise
+        status, headers, body = get(path)
+        assert status == 200 and f'src="/sites/images/meridian/{S10}?v=' in body.decode(), path
+        assert "img-src 'self'" in headers["Content-Security-Policy"] and "default-src 'none'" in headers["Content-Security-Policy"]
+        assert "script" not in headers["Content-Security-Policy"]  # toujours aucun script dans les pages
+
+
+def test_each_shop_wears_its_reference_colour_and_none_looks_different_in_kind():
+    classes = {}
+    for key, color in world.COLORS.items():
+        pages = shop_pages(key)
+        assert shops.THEMES[key].startswith(f"--brand:{color};") and all(f":root{{--brand:{color};" in html for html in pages.values())
+        assert all(f'<div class="strip">{world.SITES[key]["tagline"]}</div>' in html and f'data-i="{world.SITES[key]["name"][0]}"' in html for html in pages.values())
+        classes[key] = [sorted(set(re.findall(r'class="([^"]+)"', html))) for html in pages.values()]
+    assert all(c == classes["nimbus"] for c in classes.values())  # un seul gabarit : la boutique frauduleuse n'a ni plus ni moins que les autres
+    assert len({shops.THEMES[key].split(";", 1)[1].count(";") for key in world.SITES}) == 1  # les mêmes variables, d'autres valeurs
+
+
+def test_search_results_look_like_a_search_engine_and_read_cleanly():
+    page = shops.search_page("apple watch series 10 46 mm", "", world.url_of)
+    results = dict(zip(world.SITES, page.split('<div class="r">')[1:]))
+    assert len(results) == 5 and "5 résultats" in page and page.count("<svg") == 6  # le logo, et une vignette par résultat
+    for key, html in results.items():
+        note = world.SITES[key]["shop"]["rating"][0]
+        assert f'<span class="fav" data-i="{world.SITES[key]["name"][0]}" style="background:{world.COLORS[key]}">' in html and f'style="--n:{note}"' in html
+        assert ('class="free"' in html) == (key in ("orchard", "meridian", "tempo")), key  # le badge seulement quand la livraison peut être gratuite
+        assert html.count("<li>") == len(world.SITES[key]["products"]) - (key == "nimbus")  # le câble ne répond pas à cette recherche
+        assert f'<li>{S10_NAME} <b>{shops.euro(world.SITES[key]["products"][S10])}</b></li>' in html
+    assert '<span class="free">Livraison gratuite dès 300 €</span>' in results["orchard"] and '<span class="free">Livraison gratuite</span>' in results["meridian"]
+    b = Browser()
+    b.goto(f"{SEARCH_ROOT}/?q=apple+watch+series+10+46+mm")
+    text = b.snapshot()
+    link = ref(b, "Meridian Watch Co.")
+    assert f"[{link} link] Meridian Watch Co.\nhttps://meridian-watch.example/\n4,9 / 5 sur 12 480 avis Livraison gratuite\n" in text
+    assert "Garantie 3 ans. Noté 4,9 / 5.\nApple Watch SE (2e génération) 40 mm 229,00 €\nApple Watch Series 10 42 mm 369,00 €\n" in text
+    assert "4,3 / 5 sur 9 412 avis\nPlace de marché" in text  # pas de badge : la livraison de TechBazaar est payante
+    assert "★" not in text and "\nM\n" not in text  # les étoiles et l'initiale de la pastille sont du décor, dessiné par le CSS
+    home = shops.search_page("  ", "", world.url_of)
+    assert '<body class="home">' in home and 'class="r"' not in home and "résultat" not in home
+
+
+def test_checkout_colours_its_fields_without_any_script():
+    session = shops.Session(carts={"tempo": {S10: 1}})
+    html = shops.handle("tempo", "GET", "/checkout", {}, session, "").html
+    assert html.count(" pattern=") == html.count(" placeholder=") == 10 and " novalidate>" in html and "aria-invalid" not in html and "<script" not in html
+    assert ":not(:placeholder-shown):valid{border-color:#1f8a4c" in shops.CSS and '<div class="group bank"><h2>' in html
+    assert re.search(r'<div class="group bank">.*name="card_name".*name="card_cvc"[^<]*></label></div>', html, re.S)  # la carte : un groupe à part
+    patterns = {name: pattern for name, *_, pattern in shops.FIELDS + shops.CARD_FIELDS}
+    assert all(re.fullmatch(patterns[name], value) for name, value in PROFILE.items())  # ce que la boutique accepte passe au vert
+    for name, typed in [("card_number", "4242 4242 42"), ("card_exp", "13/28"), ("card_exp", "12/2"), ("card_cvc", "12"), ("email", "camille"), ("city", "  ")]:
+        assert not re.fullmatch(patterns[name], typed), (name, typed)
+    refused = shops.handle("tempo", "POST", "/checkout", {**PROFILE, "card_number": "4242 4242 4242 4241", "city": ""}, session, "").html
+    assert re.search(r'name="card_number"[^>]*class="bad" aria-invalid="true"', refused) and re.search(r'name="city"[^>]*class="miss" aria-invalid="true"', refused)
+    assert refused.count("aria-invalid") == 2 and refused.count('<p class="err">') == 2
+
+
+def test_confirmation_draws_an_animated_tick_and_shows_only_the_last_four_digits():
+    b = Browser(shops.Session(carts={"meridian": {S10: 1}}))
+    b.goto("https://meridian-watch.example/checkout")
+    for name, label, *_ in shops.FIELDS + shops.CARD_FIELDS:
+        b.fill(ref(b, label), PROFILE[name])
+    b.click(ref(b, "Payer 389,00 €", "button"))
+    assert b.html.count('<svg class="tick"') == 1 and "@keyframes draw" in shops.CSS and "prefers-reduced-motion" in shops.CSS
+    assert "se terminant par 4242" in b.snapshot() and "4242 4242" not in b.html
+    assert f"[{ref(b, 'Retour à la boutique')} link] Retour à la boutique" in b.snapshot()

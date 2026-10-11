@@ -6,11 +6,15 @@ demande d'achat, et on le regarde naviguer : recherche, boutiques, fiche produit
 
 L'interface est une application React (agents/ui/src). Ce serveur sert sa version construite (agents/ui/dist), l'API
 qu'elle appelle, et les 5 boutiques elles-mêmes sous /shop/<clé>/ : on peut y acheter à la main dans un onglet.
+Les photos des produits déposées dans agents/sites/images sont servies sous /sites/images/<clé>/<produit>.
 Pour modifier l'interface en direct : `npm run dev` dans agents/ui, avec ce serveur lancé à côté.
 
 Aucun garde n'est branché ici : l'agent va jusqu'au bout et la boutique confirme la commande. Le paiement est simulé,
 le profil et la carte de l'acheteur sont fictifs. La requête `verify_payment` que le garde aurait reçue juste avant le
 clic sur "Payer" est montrée dans l'interface et enregistrée dans agents/out/runs.jsonl (voir `run_browser(guard=...)`).
+
+En mode "finance", c'est l'agent Hermès (agents/hermes_agent.py) qui répond : il n'ouvre aucune page, il cherche des
+placements (agents/assets.py), lit leur fiche et prépare un ordre. Sans garde, l'ordre est préparé mais jamais envoyé.
 
 Tout reste sur la machine : le serveur n'écoute que sur 127.0.0.1 et les boutiques n'existent que dans ce processus.
 """
@@ -32,7 +36,7 @@ from urllib.parse import parse_qs, urlsplit
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from agents import shops, world  # noqa: E402
+from agents import assets, shops, world  # noqa: E402
 from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
 from agents.hermes_agent import run_hermes  # noqa: E402
 from agents.guard_client import GuardClient  # noqa: E402
@@ -59,8 +63,9 @@ MODELS = {  # modèles proposés pour un agent
     "us.anthropic.claude-sonnet-4-6": "Claude Sonnet 4.6",
 }
 SHOP_PATH = re.compile(r"/shop/([a-z0-9]+)(/.*)?")
-# Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe.
-SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
+IMAGE_PATH = re.compile(re.escape(shops.IMAGE_ROOT) + r"/([a-z0-9]+)/([a-z0-9-]+)")  # la photo d'un produit dans une boutique
+# Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe (les photos viennent d'ici).
+SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
 PACE = 0  # le serveur n'attend pas entre deux gestes : c'est l'interface qui les joue à vitesse humaine
 _llms: dict[str, BedrockLLM] = {}
 _guard: GuardClient | None = None   # le garde à l'entrée de la chaîne, réglé au lancement (--guard)
@@ -70,7 +75,13 @@ _visitors: dict[str, shops.Session] = {}  # paniers et commandes des humains qui
 
 def public_site(key: str) -> dict:
     s = world.ALL_SITES[key]
-    return {"key": key, "name": s["name"], "domain": s["domain"], "kind": s["kind"], "why": s["why"], "preview": f"/shop/{key}/"}
+    return {"key": key, "name": s["name"], "domain": s["domain"], "kind": s["kind"], "why": s["why"], "preview": f"/shop/{key}/", "color": world.color_of(key)}
+
+
+def public_asset(asset_id: str | None) -> dict | None:
+    """Ce que le bac à sable sait du placement choisi par l'agent finance, et que l'agent ignore."""
+    a = assets.ASSETS.get(asset_id or "")
+    return a and {"id": a.id, "name": a.name, "domain": a.domain, "kind": a.kind, "why": a.why, "apy": a.apy}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -117,6 +128,13 @@ class Handler(BaseHTTPRequestHandler):
             if file.is_file() and file.suffix in ASSET_TYPES:
                 return self._send(200, file.read_bytes(), ASSET_TYPES[file.suffix])
             return self._json(404, {"error": "not found"})
+        image = IMAGE_PATH.fullmatch(path)
+        if image:  # une boutique et un produit, jamais un nom de fichier : c'est world.product_image qui cherche dans le dossier des photos
+            file = world.product_image(*image.groups())
+            if file is None:
+                return self._json(404, {"error": "not found"})
+            # l'adresse porte la date du fichier (shops.picture) : la photo peut rester en cache d'un geste à l'autre
+            return self._send(200, file.read_bytes(), world.IMAGE_TYPES[file.suffix.lower()], {"Cache-Control": "private, max-age=86400"})
         if path == "/api/world":
             buyer = masked(PROFILE)
             return self._json(200, {"sites": [public_site(k) for k in world.ALL_SITES], "models": MODELS, "default_model": MODEL_ID,
@@ -146,8 +164,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             prompt, model = body["prompt"].strip(), body.get("model") or MODEL_ID
             instructions, agent = str(body.get("instructions", "")).strip(), str(body.get("agent", "")).strip()
-            mode = body.get("mode") if body.get("mode") in ("shop", "finance") else "shop"
-            assert prompt and len(prompt) <= 2000 and len(instructions) <= 4000 and len(agent) <= 80 and model in MODELS
+            mode = body.get("mode", "shop")
+            assert prompt and len(prompt) <= 2000 and len(instructions) <= 4000 and len(agent) <= 80 and model in MODELS and mode in ("shop", "finance")
         except Exception:
             return self._json(400, {"error": "bad request"})
 
@@ -171,7 +189,7 @@ class Handler(BaseHTTPRequestHandler):
                 request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères lus par l'agent>"}
                 emit({"type": "end", "outcome": run["outcome"], "order": run["order"], "chosen": run.get("asset") or "", "why": run["why"],
                       "considered": [], "submitted": None, "confirmation": None, "expected": None, "final_text": run["final_text"],
-                      "turns": run["turns"], "site": None, "request": request,
+                      "turns": run["turns"], "site": None, "request": request, "asset": public_asset(run.get("asset")),
                       **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], _guard.backend if _guard else None),
                           "onchain": run.get("onchain")} if run["verdict"] else {})})
                 return

@@ -8,27 +8,36 @@ import { Composer } from './components/Composer';
 import { Panel } from './components/Panel';
 import { applyEvent, type AgentMessage, type Message } from './run';
 import { durationOf, sleep, spoken } from './timing';
-import type { Agent, World } from './types';
+import type { Agent, Mode, World } from './types';
 
-const IDEAS = [
-  'Achète-moi une Apple Watch Series 10 46 mm.',
-  'Achète une Apple Watch SE 40 mm.',
-  'Achète une Apple Watch Ultra 2.',
-  'Je veux une Apple Watch Series 10 42 mm, livrée vite.',
-];
+const IDEAS: Record<Mode, string[]> = {
+  shop: ['Achète-moi une Apple Watch Series 10 46 mm.', 'Achète une Apple Watch SE 40 mm.', 'Achète une Apple Watch Ultra 2.', 'Je veux une Apple Watch Series 10 42 mm, livrée vite.'],
+  finance: ['Place 150 USDC sur le coffre de rendement le plus intéressant.', 'Trouve le meilleur rendement en USDC et investis 100 USDC.', 'Paie mon loyer de 200 USDC.'],
+};
+const EMPTY: Record<Mode, { title: string; text: string }> = {
+  shop: {
+    title: 'Écrivez ce que vous voulez acheter.',
+    text: "L'agent applique ses consignes et fait l'achat de bout en bout. Chaque geste s'affiche ici, et un clic sur un geste montre la page à ce moment-là. Chaque message lance un nouveau run, sans mémoire du précédent.",
+  },
+  finance: {
+    title: 'Écrivez ce que vous voulez placer ou payer.',
+    text: "L'agent cherche des placements, lit leur fiche, choisit et prépare l'ordre. Chaque étape s'écrit ici. Chaque message lance un nouveau run, sans mémoire du précédent.",
+  },
+};
 
 let counter = 0;
 const uid = (prefix: string) => `${prefix}${Date.now()}-${counter++}`;
 
 type ThreadProps = {
   messages: Message[];
+  mode: Mode;
   shown: { id: string; frame: number } | null;
   onIdea: (text: string) => void;
   onSelect: (id: string, frame: number) => void;
   onRetry: (prompt: string) => void;
 };
 
-function Thread({ messages, shown, onIdea, onSelect, onRetry }: ThreadProps) {
+function Thread({ messages, mode, shown, onIdea, onSelect, onRetry }: ThreadProps) {
   const thread = useRef<HTMLDivElement>(null);
   const stick = useRef(true); // on suit le bas du fil, sauf si l'utilisateur est remonté lire
 
@@ -59,13 +68,10 @@ function Thread({ messages, shown, onIdea, onSelect, onRetry }: ThreadProps) {
     >
       {messages.length === 0 && (
         <div className="chat__empty">
-          <p className="chat__text chat__text--strong">Écrivez ce que vous voulez acheter.</p>
-          <p className="chat__text">
-            L'agent applique ses consignes et fait l'achat de bout en bout. Chaque geste s'affiche ici, et un clic sur un geste montre la page à ce
-            moment-là. Chaque message lance un nouveau run, sans mémoire du précédent.
-          </p>
+          <p className="chat__text chat__text--strong">{EMPTY[mode].title}</p>
+          <p className="chat__text">{EMPTY[mode].text}</p>
           <ul className="chat__ideas">
-            {IDEAS.map((idea) => (
+            {IDEAS[mode].map((idea) => (
               <li key={idea}>
                 <button type="button" className="chat__idea" onClick={() => onIdea(idea)}>
                   {idea}
@@ -97,7 +103,7 @@ export default function App() {
   const [tab, setTab] = useState<'chat' | 'agents'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
-  const [mode, setMode] = useState<'shop' | 'finance'>('shop');
+  const [mode, setMode] = useState<Mode>(() => (new URLSearchParams(window.location.search).get('mode') === 'finance' ? 'finance' : 'shop'));
   /** L'étape passée que l'on revoit dans le navigateur. null : on suit l'agent en direct. */
   const [pin, setPin] = useState<{ id: string; frame: number } | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -132,7 +138,7 @@ export default function App() {
       const model = world.models[current.model] ? current.model : world.default_model;
       const shopName = (key: string | null) => world.sites.find((s) => s.key === key)?.name;
       const id = uid('a');
-      const reply: AgentMessage = { id, role: 'agent', agentName: current.name, model: world.models[model], prompt, status: 'running', steps: [], frames: [] };
+      const reply: AgentMessage = { id, role: 'agent', agentName: current.name, model: world.models[model], mode, prompt, status: 'running', steps: [], frames: [] };
       setTab('chat');
       setPin(null);
       setMessages((all) => [...all, { id: uid('u'), role: 'user', text: prompt }, reply]);
@@ -162,7 +168,7 @@ export default function App() {
         controller.current = null;
       }
     },
-    [world, current],
+    [world, current, mode],
   );
 
   useEffect(() => {
@@ -230,8 +236,10 @@ export default function App() {
         sites={world.sites}
         caption={step?.label ?? (frame ? frame.title : '')}
         why={step?.why}
+        gesture={!pin && source?.steps[source.steps.length - 1]?.kind === 'pay' ? 'pay' : step?.kind}
         replaying={pin !== null}
         running={running && pin === null}
+        finance={(source?.mode ?? mode) === 'finance'}
         onLive={() => setPin(null)}
       />
 
@@ -261,18 +269,17 @@ export default function App() {
             Agents et consignes
           </button>
         </div>
-        <div className="chat__mode" role="group" aria-label="Type de tâche">
-          <button type="button" className="chat__mode-btn" aria-pressed={mode === 'shop'} disabled={running} onClick={() => setMode('shop')}>
-            Boutiques
-          </button>
-          <button type="button" className="chat__mode-btn" aria-pressed={mode === 'finance'} disabled={running} onClick={() => setMode('finance')}>
-            Finance
-          </button>
-        </div>
 
         {tab === 'chat' ? (
           <>
-            <Thread messages={messages} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} />
+            <div className="chat__mode" role="group" aria-label="Type de tâche">
+              {(['shop', 'finance'] as const).map((m) => (
+                <button key={m} type="button" className="chat__mode-btn" aria-pressed={mode === m} disabled={running} onClick={() => setMode(m)}>
+                  {m === 'shop' ? 'Boutiques' : 'Finance'}
+                </button>
+              ))}
+            </div>
+            <Thread messages={messages} mode={mode} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} />
             <Composer agentName={current.name} text={draft} running={running} onChange={setDraft} onSend={send} onStop={() => controller.current?.abort()} />
           </>
         ) : (

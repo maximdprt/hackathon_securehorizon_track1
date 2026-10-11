@@ -83,9 +83,10 @@ test('the browser shows what the agent does, step by step, up to the confirmed o
   const bodies = server();
   render(<App />);
   await ready();
-  // avant tout run : un nouvel onglet avec les boutiques, que l'on peut visiter soi-même
+  // avant tout run : une invitation à lancer la conversation, sans aucune boutique affichée
   expect(screen.getByText('Nouvel onglet')).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /Meridian Watch Co\./ })).toHaveAttribute('href', '/shop/meridian/');
+  expect(screen.getByRole('heading', { name: 'Commencez une conversation avec un agent' })).toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /Meridian Watch Co\./ })).toBeNull();
   expect(page()).toBeNull();
 
   await ask('Achète une Apple Watch Series 10 46 mm');

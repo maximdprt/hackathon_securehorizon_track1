@@ -1,4 +1,4 @@
-import type { RunEvent, World } from './types';
+import type { Mode, RunEvent, World } from './types';
 
 export async function fetchWorld(): Promise<World> {
   const res = await fetch('/api/world');
@@ -6,7 +6,7 @@ export async function fetchWorld(): Promise<World> {
   return res.json();
 }
 
-export type RunRequest = { prompt: string; agent: string; instructions: string; model: string; mode?: 'shop' | 'finance' };
+export type RunRequest = { prompt: string; agent: string; instructions: string; model: string; mode?: Mode };
 
 /** Lance un run et rend ses étapes au fil de l'eau. `signal` permet de l'interrompre. */
 export async function* streamRun(body: RunRequest, signal: AbortSignal): AsyncGenerator<RunEvent> {
