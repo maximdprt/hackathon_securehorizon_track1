@@ -5,6 +5,7 @@ import { ArrowDownUp, Check, Copy, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LIVE_CONFIGURED, protectedOf, useAudit } from "@/data/source";
 import { explorerUrl } from "@/data/sentinel";
+import { signalLabel } from "@/data/signals";
 import { setViewFilter, setViewTx } from "@/sim/nav";
 import { sim, useSim, type ViewFilter } from "@/sim/store";
 import { CHECK_LABEL, CHECK_ORDER, STATE, fmtAmount, shortAddr, type AuditTx } from "@/sim/types";
@@ -15,8 +16,8 @@ import { SourceBadge } from "./ViewHost";
    for each its audit: the score and its five checks against the KPMG thresholds, the authority chain, the contract,
    the on-chain proof, the frameworks. The rows come from data/source.ts (the simulation now, the MCP agent next). */
 
-export const LABEL = "font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500";
-export const CARD = "rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900/60";
+export const LABEL = "text-[11.5px] font-semibold text-slate-500 dark:text-zinc-400";
+export const CARD = "rounded-2xl border border-slate-200/80 bg-white shadow-[0_12px_32px_-24px_rgba(30,41,59,0.35)] dark:border-zinc-800 dark:bg-zinc-900/60";
 
 export const STATUS: Record<AuditTx["status"], { word: string; hex: string; icon: "ok" | "bad" | "warn" | "wait" }> = {
   ALLOW: { word: "Visa", hex: STATE.allow.hex, icon: "ok" },
@@ -31,10 +32,10 @@ export function Kpi({ label, value, sub, tone }: { label: string; value: ReactNo
   return (
     <div className={cn(CARD, "flex min-w-0 flex-col gap-1 px-4 py-3")}>
       <span className={LABEL}>{label}</span>
-      <span className="font-mono text-[22px] font-semibold tabular-nums leading-tight text-zinc-900 dark:text-zinc-50" style={tone ? { color: tone } : undefined}>
+      <span className="text-[24px] font-semibold tabular-nums leading-tight text-slate-900 dark:text-zinc-50" style={tone ? { color: tone } : undefined}>
         {value}
       </span>
-      <span className="truncate font-mono text-[10.5px] text-zinc-500 dark:text-zinc-400">{sub}</span>
+      <span className="truncate text-[11.5px] text-slate-500 dark:text-zinc-400">{sub}</span>
     </div>
   );
 }
@@ -294,7 +295,15 @@ export function TransactionsView() {
                       </>
                     )}
                   </td>
-                  <td className="px-3">{t.partial ? <span className="font-mono text-[11px] text-zinc-400" title="Score non publié on-chain">verdict seul</span> : <ScoreBar tx={t} />}</td>
+                  <td className="px-3">
+                    {t.partial ? (
+                      <span className="font-mono text-[11px] text-zinc-500" title="Les signaux de l'agent MCP inscrits on-chain (leur poids arrive avec le verdict complet)">
+                        {t.signals?.length ? `${t.signals.length} signal${t.signals.length > 1 ? "s" : ""} MCP` : "verdict seul"}
+                      </span>
+                    ) : (
+                      <ScoreBar tx={t} />
+                    )}
+                  </td>
                   <td className="px-3 text-zinc-600 dark:text-zinc-400">{t.status === "PENDING" ? "…" : t.status === "HUMAN" ? "en attente" : t.via}</td>
                   <td className="px-3 font-mono text-[11.5px] text-zinc-500">{t.onchain && t.status !== "PENDING" && t.status !== "HUMAN" ? `#${t.onchain.block.toLocaleString("fr-FR")}` : "…"}</td>
                   <td className="px-3 font-mono text-[11.5px] text-zinc-500">{when(t.created_at)}</td>
@@ -412,9 +421,31 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
                     <StatusPill status={tx.status} />
                     <span className="font-mono text-[11px] text-zinc-500">verdict on-chain : {(tx.raw as { verdict?: string })?.verdict ?? tx.decision}</span>
                   </div>
-                  <p className="mt-1.5">{tx.reasons[0] ?? "Sans raison publiée."}</p>
-                  <p className="mt-2 text-[11px] text-zinc-500">
-                    La chaîne publie le verdict, sa raison et sa preuve. Les scores des 5 contrôles arrivent avec le verdict complet du cerveau (flux /avaguard/events) : ils s&apos;afficheront ici pour les décisions reçues en direct.
+                  <ul className="mt-2.5 flex flex-col gap-2">
+                    {CHECK_ORDER.map((k) => {
+                      const fired = (tx.signals ?? []).filter((x) => x.check === k);
+                      return (
+                        <li key={k} className="flex items-start gap-2">
+                          <span className={cn("mt-1 h-2 w-2 shrink-0 rounded-full", fired.length ? (tx.status === "ALLOW" ? "bg-amber-400" : "bg-rose-500") : "bg-emerald-500")} />
+                          <div className="min-w-0">
+                            <div className="text-[12.5px] font-medium text-zinc-900 dark:text-zinc-100">
+                              {CHECK_LABEL[k]} <span className="font-normal text-zinc-500">{fired.length ? `· ${fired.length} signal${fired.length > 1 ? "s" : ""}` : "· rien à signaler"}</span>
+                            </div>
+                            {fired.map((x) => (
+                              <div key={x.id} className="mt-0.5 text-[11.5px] leading-snug">
+                                <span className="font-medium text-zinc-800 dark:text-zinc-200">{signalLabel(x.id)}</span>
+                                {x.text && <span className="text-zinc-500"> : {x.text}</span>}
+                                <span className="ml-1 font-mono text-[10px] text-zinc-400">{x.id}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {!tx.signals?.length && <p className="mt-1.5">{tx.reasons[0] ?? "Sans raison publiée."}</p>}
+                  <p className="mt-2.5 text-[11px] text-zinc-500">
+                    Les signaux de l&apos;agent MCP, tels qu&apos;il les a inscrits on-chain dans la raison de sa décision. Leurs poids et le score de confiance arrivent avec son verdict complet (flux /avaguard/events), pour les décisions reçues en direct.
                   </p>
                 </div>
               ) : (

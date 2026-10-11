@@ -1,6 +1,7 @@
 import { createPublicClient, defineChain, http, parseAbiItem, type Hex } from "viem";
 import { AVAGUARD_NAME, SENTINEL_EVM_CHAIN_ID } from "@/components/explorer-v2/network/avaguard";
-import type { AuditTx, Decision } from "@/sim/types";
+import { CHECK_ORDER, type AuditTx, type Decision } from "@/sim/types";
+import { parseReason, signalLabel } from "./signals";
 import type { BannedEntry } from "./source";
 
 /* The audit screens' live source: SentinelL1 itself, through the team's API (api/server.py on main, CLAUDE.md 11.4 and
@@ -8,8 +9,9 @@ import type { BannedEntry } from "./source";
      GET  {api}/cars?sinceBlock=N   the decisions (DecisionRecorded, with VisaGranted's recipient and amount)
      POST {api}/rpc                 eth_getLogs ThreatFlagged (the hackers' registry) and the blocks' times
    Read-only, no key. Configure in .env.local (never committed): NEXT_PUBLIC_SENTINEL_API, NEXT_PUBLIC_REGISTRY_ADDRESS,
-   NEXT_PUBLIC_EXPLORER_URL. The chain publishes the verdict, its reason and its proof, not the five checks' scores:
-   those come whole only through the verdict stream (/avaguard/events), and a row says so when it has none. */
+   NEXT_PUBLIC_EXPLORER_URL. The chain publishes the verdict, its reason and its proof: the reason is the MCP agent's own
+   signals (data/signals.ts reads them back into the five checks); their weights and the trust score come whole only
+   through the verdict stream (/avaguard/events, joined in data/source.ts), and a row says so when it has none. */
 
 export const sentinelConfig = {
   api: process.env.NEXT_PUBLIC_SENTINEL_API?.replace(/\/$/, ""),
@@ -34,9 +36,19 @@ export const idOfPayment = (paymentId: string) => paymentId.slice(0, 10);
 function carToTx(c: Car, at: number | undefined, recipientOf: (c: Car) => string | null): AuditTx {
   const d = DECISION[c.verdict] ?? "HUMAN";
   const to = c.recipient ?? recipientOf(c);
-  const value = c.amount ? Number(BigInt(c.amount) / 10n ** 12n) / 1e6 : 0;
-  const unknown = { score: 0, reason: "non publié on-chain" };
+  // the MCP agent's signals, as it wrote them in the reason; a refusal's amount is in its mandate signal's evidence
+  const { signals, notes } = parseReason(c.reason ?? "");
+  const said = signals.find((s) => s.id === "amount_within_mandate" || s.id === "amount_over_onchain_cap")?.text.match(/amount ([\d.]+)/)?.[1];
+  const value = c.amount ? Number(BigInt(c.amount) / 10n ** 12n) / 1e6 : said ? Number(said) : 0;
+  // the five checks name the signals that fired in them; the chain does not publish their weights (no score here)
+  const checks = Object.fromEntries(
+    CHECK_ORDER.map((k) => {
+      const fired = signals.filter((s) => s.check === k).map((s) => signalLabel(s.id));
+      return [k, { score: 0, reason: fired.length ? fired.join(" · ") : "aucun signal" }];
+    }),
+  ) as AuditTx["checks"];
   const iso = new Date(at ? at * 1000 : Date.now()).toISOString();
+  const injected = signals.find((s) => s.layer === "content");
   return {
     tx_id: idOfPayment(c.paymentId),
     created_at: iso,
@@ -47,15 +59,18 @@ function carToTx(c: Car, at: number | undefined, recipientOf: (c: Car) => string
     amount: { value, token: "SEC" },
     contract: { method: c.verdict === "allow" ? "grantVisa()" : c.verdict === "block" ? "flagThreat()" : "recordDecision()", line: `recordDecision(${idOfPayment(c.paymentId)}…, "${c.verdict}")`, risky: c.verdict === "block" },
     authority_chain: [],
-    checks: { authority: unknown, beneficiary: unknown, mandate: unknown, intent_ai: unknown, contract: unknown },
+    checks,
+    injection_excerpt: injected?.text.match(/'([^']+)'/)?.[1],
     score: SCORE[c.verdict] ?? 55,
-    thresholds: { allow_below: 40, block_from: 70 },
+    // the MCP agent's own thresholds (guard/scoring.py DEFAULT_THRESHOLDS: risk below 0.30 allows, from 0.70 refuses)
+    thresholds: { allow_below: 30, block_from: 70 },
     decision: d,
-    reasons: c.reason ? [c.reason] : [],
+    reasons: signals.length ? [...signals.map((s) => `${signalLabel(s.id)} : ${s.text}`), ...notes] : c.reason ? [c.reason] : [],
+    signals,
     frameworks: d === "BLOCK" ? ["DORA (incident)", "OWASP ASI03", "ASI07"] : d === "HUMAN" ? ["AI Act art. 14"] : ["MiCA", "DORA"],
     timings_ms: { decide: 0 },
     onchain: { chain: AVAGUARD_NAME, block: c.block, tx_hash: c.txHash, visa_id: c.verdict === "allow" ? `visa ${idOfPayment(c.paymentId)}` : undefined },
-    registry_hit: false,
+    registry_hit: signals.some((s) => s.id === "recipient_flagged_onchain" || s.id === "issuer_flagged_onchain"),
     source: "live",
     raw: c,
     status: d === "HUMAN" ? "HUMAN" : d,
@@ -157,7 +172,8 @@ export function createSentinelFeed(onChange: () => void) {
           label: `sévérité ${f.severity}`,
           key_fingerprint: `0x${k.slice(2, 6)}${k.slice(-12)}`,
           first_tx: decision ? idOfPayment(decision.paymentId) : "",
-          reason: f.reason,
+          // the MCP agent's first signal, in words; the raw reason stays on the chain (and in the explorer)
+          reason: ((sig) => (sig ? `${signalLabel(sig.id)} : ${sig.text}` : f.reason))(parseReason(f.reason).signals[0]),
           attempted: { value: 0, token: "SEC" },
           hits: 1,
           banned_at: at,

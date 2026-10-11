@@ -16,7 +16,9 @@ import { SourceBadge } from "./ViewHost";
 const day = (iso: string) => new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
 
 /** the check that weighed most in a refusal */
-const lead = (t: AuditTx): CheckKey => CHECK_ORDER.reduce((a, k) => (t.checks[k].score > t.checks[a].score ? k : a), CHECK_ORDER[0]);
+/** the check that weighed most: by score, or for a decision read on-chain alone, its first MCP signal's check */
+const lead = (t: AuditTx): CheckKey =>
+  t.partial && t.signals?.some((s) => s.check) ? t.signals.find((s) => s.check)!.check! : CHECK_ORDER.reduce((a, k) => (t.checks[k].score > t.checks[a].score ? k : a), CHECK_ORDER[0]);
 
 export function AuditView() {
   const { txs, banned } = useAudit();
@@ -27,9 +29,12 @@ export function AuditView() {
     const stopped = attacks.filter((t) => t.status === "BLOCK");
     const escalated = final.filter((t) => t.decision === "HUMAN");
     const escalatedOk = escalated.filter((t) => t.status === "ALLOW");
-    const firstSeen = stopped.filter((t) => t.via !== "registre");
-    const immune = stopped.filter((t) => t.via === "registre");
-    const incidents = final.filter((t) => t.dora_incident);
+    // refused at once because the registry already held the address: the city's own, or the MCP agent's on-chain signal
+    const isImmune = (t: AuditTx) => t.via === "registre" || !!t.registry_hit;
+    const firstSeen = stopped.filter((t) => !isImmune(t));
+    const immune = stopped.filter(isImmune);
+    // every refusal on SentinelL1 is an incident record (DORA), with its ThreatFlagged proof
+    const incidents = final.filter((t) => t.dora_incident || (t.source === "live" && t.status === "BLOCK"));
     const prot = protectedOf(final);
     const avg = (xs: AuditTx[]) => (xs.length ? xs.reduce((a, t) => a + t.timings_ms.decide, 0) / xs.length : 0);
     const byCheck = Object.fromEntries(CHECK_ORDER.map((k) => [k, firstSeen.filter((t) => lead(t) === k).length])) as Record<CheckKey, number>;
@@ -46,6 +51,9 @@ export function AuditView() {
     return { final, attacks, stopped, escalated, escalatedOk, immune, incidents, prot, avgAll: avg(final), avgFirst: avg(firstSeen), avgImmune: avg(immune), byCheck, days: [...days.entries()] };
   }, [txs, banned]);
 
+  // the thresholds the decisions were taken on: the MCP agent's (30 / 70 risk) on the chain, the demo's otherwise
+  const lo = txs[0]?.thresholds.allow_below ?? 40;
+  const hi = txs[0]?.thresholds.block_from ?? 70;
   const detection = m.attacks.length ? Math.round((m.stopped.length / m.attacks.length) * 100) : 100;
   const maxDay = Math.max(1, ...m.days.map(([, v]) => v.allow + v.block + v.human));
   const maxCheck = Math.max(1, ...Object.values(m.byCheck));
@@ -130,19 +138,21 @@ export function AuditView() {
       <div className="grid grid-cols-2 gap-4">
         <section className={cn(CARD, "p-5")}>
           <h2 className={cn(LABEL, "mb-3")}>Seuils (recommandation KPMG : décider par seuils)</h2>
-          <div className="relative mt-6 h-3 rounded-full" style={{ background: `linear-gradient(to right, ${STATE.allow.hex} 0 40%, ${STATE.human.hex} 40% 70%, ${STATE.block.hex} 70% 100%)` }}>
-            {[40, 70].map((v) => (
+          <div className="relative mt-6 h-3 rounded-full" style={{ background: `linear-gradient(to right, ${STATE.allow.hex} 0 ${lo}%, ${STATE.human.hex} ${lo}% ${hi}%, ${STATE.block.hex} ${hi}% 100%)` }}>
+            {[lo, hi].map((v) => (
               <span key={v} className="absolute -top-6 -translate-x-1/2 font-mono text-[11px] text-zinc-500" style={{ left: `${v}%` }}>
                 {v}
               </span>
             ))}
           </div>
           <div className="mt-3 grid grid-cols-3 text-[12px]">
-            <span className="text-[#2FB57B] dark:text-[#3FD08F]">0 à 39 : visa signé</span>
-            <span className="text-center text-[#D99A1E] dark:text-[#F2B33D]">40 à 69 : un humain tranche</span>
-            <span className="text-right text-[#E5483F] dark:text-[#FF5D57]">70 à 100 : refus, registre</span>
+            <span className="text-[#2FB57B] dark:text-[#3FD08F]">0 à {lo - 1} : visa signé</span>
+            <span className="text-center text-[#D99A1E] dark:text-[#F2B33D]">
+              {lo} à {hi - 1} : un humain tranche
+            </span>
+            <span className="text-right text-[#E5483F] dark:text-[#FF5D57]">{hi} à 100 : refus, registre</span>
           </div>
-          <p className="mt-3 text-[11.5px] text-zinc-500">Le score est la synthèse des 5 contrôles (autorité, bénéficiaire, mandat, intention IA, contrat). Une adresse au registre est refusée sans calcul.</p>
+          <p className="mt-3 text-[11.5px] text-zinc-500">Le score de risque est la synthèse des 5 contrôles (autorité, bénéficiaire, mandat, intention IA, contrat). Une adresse au registre est refusée sans calcul.{LIVE_CONFIGURED ? " Seuils de l'agent MCP, resserrés quand le montant approche du plafond." : ""}</p>
         </section>
 
         <section className={cn(CARD, "p-5")}>
@@ -177,7 +187,7 @@ export function AuditView() {
           Décisions humaines
         </button>
       </div>
-      <p className="font-mono text-[10.5px] text-zinc-400">Indicateurs calculés sur les données de la source · simulation tant que le MCP agent n&apos;est pas branché</p>
+      <p className="font-mono text-[10.5px] text-zinc-400">{LIVE_CONFIGURED ? "Indicateurs calculés sur Sentinel L1 : les décisions de l'agent MCP (DecisionRecorded), ses signaux et le registre ThreatFlagged" : "Indicateurs calculés sur la simulation locale (données fictives)"}</p>
     </div>
   );
 }

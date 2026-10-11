@@ -14,7 +14,7 @@ const W = plan.width ?? 1920
 const H = plan.height ?? 1080
 const port = 9333 + Math.floor(Math.random() * 400)
 // an absolute profile path: a relative one makes Chrome open an error dialog on the desktop
-const profile = resolve('tools/.chrome-profile')
+const profile = resolve(plan.profile ?? 'tools/.chrome-profile')
 const chrome = spawn('C:/Program Files/Google/Chrome/Application/chrome.exe', [
   '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check',
   `--window-size=${W},${H}`, '--use-angle=d3d11', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--js-flags=--expose-gc', 'about:blank',

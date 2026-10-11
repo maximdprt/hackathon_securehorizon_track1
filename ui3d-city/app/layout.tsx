@@ -9,10 +9,10 @@ export const metadata: Metadata = {
   description: "Concept Sentinel · simulation. City 3D d'après le code open source Avalanche Builder Hub (BSD-3).",
 };
 
-/* dark by default, as the demo; the City's day palette still works when the class is removed (theme button) */
+/* light by default, for a jury in a bright room; the night city stays one click away (theme button) */
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr" className={`dark ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+    <html lang="fr" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="h-full overflow-hidden font-sans antialiased">{children}</body>
     </html>
   );

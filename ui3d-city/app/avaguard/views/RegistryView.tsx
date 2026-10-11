@@ -63,7 +63,7 @@ export function RegistryView() {
 
         <div className="grid grid-cols-4 gap-3">
           <Kpi label="Adresses bannies" value={banned.length} sub={`${banned.filter((b) => b.by === "humain").length} par un humain`} tone={STATE.block.hex} />
-          <Kpi label="Refus par immunité" value={immune} sub="tentatives répétées, refusées en 0,3 s" />
+          <Kpi label="Refus par immunité" value={immune} sub={LIVE_CONFIGURED ? "tentatives répétées, refusées d'office (ThreatFlagged)" : "tentatives répétées, refusées en 0,3 s"} />
           <Kpi label="Montant tenté" value={tried || !onChain ? fmtAmount(tried) : "n.p."} sub={tried || !onChain ? "USDC, toutes tentatives" : "non publié par ThreatFlagged"} />
           <Kpi label="Dernière entrée" value={banned[0] ? shortAddr(banned[0].address) : "…"} sub={banned[0] ? when(banned[0].last_at) : "aucune"} />
         </div>
@@ -155,7 +155,7 @@ export function RegistryView() {
           </table>
           {rows.length === 0 && <p className="py-16 text-center font-mono text-[12px] text-zinc-400">Aucune adresse ne correspond</p>}
         </div>
-        <p className="font-mono text-[10.5px] text-zinc-400">{rows.length} adresses · {LIVE_CONFIGURED ? "lues sur Sentinel L1 (AuthorityRegistry.ThreatFlagged), lignes de démo simulées" : "les empreintes de clé et les adresses sont fictives · Données synthétiques"}</p>
+        <p className="font-mono text-[10.5px] text-zinc-400">{rows.length} adresses · {LIVE_CONFIGURED ? "lues sur Sentinel L1 (AuthorityRegistry.ThreatFlagged), signalées par l'agent MCP" : "les empreintes de clé et les adresses sont fictives · Données synthétiques"}</p>
       </div>
 
       {current && (

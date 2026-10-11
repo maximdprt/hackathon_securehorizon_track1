@@ -1,3 +1,5 @@
+import type { GuardSignal } from "@/data/signals";
+
 // Section 8 contract. The team's detection/verdict.schema.json is mapped onto it by adapters/verdictToTx.ts;
 // the schema itself is never modified here.
 
@@ -31,6 +33,10 @@ export type TxEvent = {
   dora_incident?: string;
   source?: "scenario" | "live";
   raw?: unknown;
+  /** the MCP agent's own signals (guard engine), from its full verdict or read back from the on-chain reason */
+  signals?: GuardSignal[];
+  /** the MCP agent's trust score 0..100 (100 - risk), when its full verdict came */
+  trust?: number;
 };
 
 /** a transaction as the audit screens read it: the event, where it stands, who decided it and when */

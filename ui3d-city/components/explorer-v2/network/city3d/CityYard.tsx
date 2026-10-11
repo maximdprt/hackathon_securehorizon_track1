@@ -10,9 +10,9 @@
 // (podCar.ts), in its very materials, so the hand-over at PICK does not show. Doors: the gantry, the baler, the skip.
 import { useEffect, useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Group, type Material, type Mesh, type Object3D } from "three";
+import { Group, Vector3, type Material, type Mesh, type Object3D } from "three";
 import { buildBaler } from "@/components/guard-yard/three/baler";
-import { BALE_GRIP, CAR_GRIP, CHX, CHZ, CZ, FLOOR, LID_OPEN, PICK, RAM_OPEN, SIDE_OPEN, SKIP_LAND, SX } from "@/components/guard-yard/three/constants";
+import { BALE_GRIP, CAR_GRIP, CHX, CHZ, CZ, FLOOR, KX, KZ, LID_OPEN, PICK, RAM_OPEN, SIDE_OPEN, SKIP_LAND, SX } from "@/components/guard-yard/three/constants";
 import { buildCrane } from "@/components/guard-yard/three/crane";
 import { createKit } from "@/components/guard-yard/three/materials";
 import { buildPodCar } from "@/components/guard-yard/three/podCar";
@@ -173,24 +173,28 @@ export function CityYard({ geo, theme, podMats }: { geo: GuardGeo; theme: Theme;
   });
 
   const k = geo.k;
+  // the gantry's word over its source tower (the yard's z = -3.95), off the lane, so the verdict plate over the car never
+  // meets it; the gantry's local z runs along (-sin yaw, 0, cos yaw) in the world
+  const gantryWord = geo.toll.p.clone().add(new Vector3(-Math.sin(geo.toll.yaw), 0, Math.cos(geo.toll.yaw)).multiplyScalar(-3.95 * k)).setY(geo.toll.p.y + 7.1 * k);
   return (
     <group>
       <Door name="guard:toll" at={[geo.toll.p.x, geo.toll.p.y + 5.8 * k, geo.toll.p.z]} tip={<TollTip />} onOpen={OPEN.toll}>
         <primitive object={gantry} />
       </Door>
-      <Word at={[geo.toll.p.x, geo.toll.p.y + 6.6 * k, geo.toll.p.z]} tone={AVAGUARD3.band[theme]} small>
+      <Word at={gantryWord} tone={AVAGUARD3.band[theme]} small>
         Contrôle Sentinel · radiographie
       </Word>
       <Door name="guard:scrapyard" at={geo.scrapyard.crusher.toArray() as [number, number, number]} tip={<ScrapTip />} onOpen={OPEN.scrapyard}>
         <primitive object={yardRoot} />
       </Door>
-      <Word at={geo.scrapyard.W(CHX, 3.2, CZ).toArray() as [number, number, number]} tone={AVAGUARD3.gate[theme]} small>
+      {/* behind the fixed wall, over the open lids (they stand up to about 4 m) */}
+      <Word at={geo.scrapyard.W(CHX, 6.0, CZ - 1.9).toArray() as [number, number, number]} tone={AVAGUARD3.gate[theme]} small>
         Presse à épaves
       </Word>
       <Door name="guard:registry" at={geo.scrapyard.skip.toArray() as [number, number, number]} tip={<RegistryTip />} onOpen={OPEN.registry}>
         <primitive object={skipRoot} />
       </Door>
-      <Word at={geo.scrapyard.W(15.5, 2.9, -1.8).toArray() as [number, number, number]} tone={AVAGUARD3.registry[theme]} small>
+      <Word at={geo.scrapyard.W(KX, 3.1, KZ).toArray() as [number, number, number]} tone={AVAGUARD3.registry[theme]} small>
         Registre des hackers
       </Word>
     </group>

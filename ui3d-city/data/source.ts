@@ -2,7 +2,9 @@ import { useSyncExternalStore } from "react";
 import { sim } from "@/sim/store";
 import type { AuditTx } from "@/sim/types";
 import { HISTORY } from "./history";
-import { createSentinelFeed, sentinelConfig } from "./sentinel";
+import { createSentinelFeed, idOfPayment, sentinelConfig } from "./sentinel";
+import { parseMessage } from "@/sim/liveFeed";
+import type { TxEvent } from "@/sim/types";
 
 /* The one data layer the audit screens read (Transactions, Registre, Validation humaine, Audit). With the team's API
    configured (NEXT_PUBLIC_SENTINEL_API, main's api/server.py) it is SentinelL1 itself: the decisions the brain sent to
@@ -91,8 +93,56 @@ export const simSource: AuditSource = {
   subscribe: (f) => sim.subscribe(f),
 };
 
-/** SentinelL1 live (data/sentinel.ts): the chain's decisions and flags, with the city's own plays (the verdict stream's
-    and the demo's) in front, whole; a decision the city played and the chain recorded shows once, with the chain's proof */
+/** the MCP agent's full verdicts, as /avaguard/events streams them (one per decision POSTed to /authorize), by the
+    short payment id the chain's rows carry. The stream does not replay the past: this browser keeps what it heard. */
+function createVerdictStream(onChange: () => void) {
+  const KEY = "sentinel.verdicts.v1";
+  const byId = new Map<string, TxEvent>();
+  try {
+    for (const [k, v] of JSON.parse(localStorage.getItem(KEY) ?? "[]") as [string, TxEvent][]) byId.set(k, v);
+  } catch {
+    /* no storage: the stream alone */
+  }
+  const url = process.env.NEXT_PUBLIC_AVAGUARD_SSE_URL ?? (sentinelConfig.api ? `${sentinelConfig.api}/avaguard/events` : "");
+  let es: EventSource | null = null;
+  const save = () => {
+    try {
+      localStorage.setItem(KEY, JSON.stringify([...byId].slice(-200)));
+    } catch {
+      /* full or blocked: kept in memory */
+    }
+  };
+  return {
+    get: (id: string) => byId.get(id),
+    get size() {
+      return byId.size;
+    },
+    start() {
+      if (es || !url || typeof EventSource === "undefined") return;
+      es = new EventSource(url);
+      es.onmessage = (m) => {
+        try {
+          const d = JSON.parse(m.data) as { proof?: { payment_id?: string } };
+          const tx = parseMessage(d);
+          if (!tx) return;
+          byId.set(d.proof?.payment_id ? idOfPayment(d.proof.payment_id) : tx.tx_id, tx);
+          save();
+          onChange();
+        } catch {
+          /* a message we do not read */
+        }
+      };
+    },
+    stop() {
+      es?.close();
+      es = null;
+    },
+  };
+}
+
+/** SentinelL1 live (data/sentinel.ts): the chain's decisions and flags, each joined to the MCP agent's full verdict when
+    this browser heard it (scores, the five checks, the time to decide), with the verdicts the city played in front. The
+    demo's own plays (synthetic scenarios) stay in the city: every row here is on the chain. */
 function sentinelSourceOf(): AuditSource {
   const subs = new Set<() => void>();
   let version = 0;
@@ -101,14 +151,21 @@ function sentinelSourceOf(): AuditSource {
     subs.forEach((f) => f());
   };
   const feed = createSentinelFeed(bump);
-  if (typeof window !== "undefined") (window as unknown as { __sentinel?: unknown }).__sentinel = feed;
+  const verdicts = createVerdictStream(bump);
+  if (typeof window !== "undefined") (window as unknown as { __sentinel?: unknown }).__sentinel = { feed, verdicts };
   let cache: { v: number; ledger: AuditTx[]; txs: AuditTx[]; banned: BannedEntry[] } | null = null;
   const build = () => {
     const ledger = sim.get().ledger;
     if (cache && cache.v === version && cache.ledger === ledger) return cache;
-    const chain = feed.transactions();
+    // a chain row with the MCP agent's verdict: its analysis whole, the chain's proof, time and outcome
+    const chain = feed.transactions().map((c): AuditTx => {
+      const full = verdicts.get(c.tx_id);
+      if (!full) return c;
+      return { ...full, tx_id: c.tx_id, created_at: c.created_at, decided_at: c.decided_at, onchain: c.onchain, status: c.status, decision: c.decision, via: c.via, signals: full.signals ?? c.signals, raw: full.raw, partial: false };
+    });
     const byId = new Map(chain.map((t) => [t.tx_id, t]));
-    const played = ledger.map((l) => {
+    // the city's plays from the verdict stream only (source "live"): the demo's scenarios are not on the chain
+    const played = ledger.filter((l) => l.source === "live").map((l) => {
       const c = byId.get(l.tx_id);
       return c ? { ...l, onchain: c.onchain, partial: false } : l;
     });
@@ -131,11 +188,17 @@ function sentinelSourceOf(): AuditSource {
     subscribe(f) {
       subs.add(f);
       const off = sim.subscribe(f);
-      if (subs.size === 1) feed.start();
+      if (subs.size === 1) {
+        feed.start();
+        verdicts.start();
+      }
       return () => {
         off();
         subs.delete(f);
-        if (!subs.size) feed.stop();
+        if (!subs.size) {
+          feed.stop();
+          verdicts.stop();
+        }
       };
     },
   };

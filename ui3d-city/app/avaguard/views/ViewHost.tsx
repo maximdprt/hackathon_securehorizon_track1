@@ -54,7 +54,7 @@ export function ViewHost({ screens }: { screens: Partial<Record<Exclude<View, nu
       aria-modal="true"
       aria-label={VIEW_LABEL[view]}
       data-view={view}
-      className="absolute inset-0 z-[60] flex flex-col bg-white/[0.97] outline-none backdrop-blur-xl animate-in fade-in-0 duration-200 motion-reduce:animate-none dark:bg-zinc-950/[0.96]"
+      className="absolute inset-0 z-[60] flex flex-col bg-slate-50/[0.97] outline-none backdrop-blur-xl animate-in fade-in-0 duration-200 motion-reduce:animate-none dark:bg-zinc-950/[0.96]"
     >
       <div className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-zinc-200 px-6 dark:border-zinc-800">
         <nav aria-label="Fil d'Ariane" className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px] text-zinc-500 dark:text-zinc-400">
@@ -70,18 +70,6 @@ export function ViewHost({ screens }: { screens: Partial<Record<Exclude<View, nu
             </>
           )}
         </nav>
-        <div className="flex items-center gap-1">
-          {ORDER.map((v) => (
-            <button
-              key={v}
-              type="button"
-              onClick={() => openView(v)}
-              className={cn("rounded-lg px-2.5 py-1 text-[12.5px] transition-colors", v === view ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50" : "text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100")}
-            >
-              {VIEW_LABEL[v]}
-            </button>
-          ))}
-        </div>
         <button type="button" onClick={closeView} className="flex items-center gap-1.5 rounded-lg border border-zinc-200 px-2.5 py-1 text-[12.5px] text-zinc-600 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:text-zinc-50">
           <ArrowLeft className="h-3.5 w-3.5" />
           Retour à la ville

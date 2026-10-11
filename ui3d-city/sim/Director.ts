@@ -265,13 +265,19 @@ async function human(tx: TxEvent) {
   humanAnswer = null;
   sim.set({ human: null });
   toast(`${tx.tx_id} · ${approve ? "approuvée" : "refusée"} par un humain`, approve ? "allow" : "block");
+  // out of the bay and round the block to the toll: the camera takes the whole parcel in, so the car's way back reads
+  const back = () =>
+    run((t) => {
+      t.call(() => fly("security"));
+      leg(t, "fromParking", TIMINGS.fromParking);
+    });
   if (approve) {
     motion.tone = "allow";
-    await run((t) => leg(t, "fromParking", TIMINGS.fromParking));
+    await back();
     await allow(tx, "humain", "toCChain");
   } else {
     // back out to the toll, then the same way as a refusal there: the U-turn, the scrapyard
-    await run((t) => leg(t, "fromParking", TIMINGS.fromParking));
+    await back();
     await block(tx, "humain", true);
   }
 }

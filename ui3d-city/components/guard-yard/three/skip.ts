@@ -54,7 +54,7 @@ export function buildSkip(scene: Object3D, kit: Kit) {
     ] as [string, number, number, number, number][]
   ).forEach(([c, x, y, z, r]) => {
     const g = new Group();
-    B(1.9, 0.72, 1.05, kit.track(new MeshStandardMaterial({ color: raw(c), metalness: 0.5, roughness: 0.45 })), 0, 0, 0, g);
+    B(1.9, 0.72, 1.05, kit.track(new MeshStandardMaterial({ color: raw(c), metalness: 0.2, roughness: 0.5 })), 0, 0, 0, g);
     B(0.9, 0.24, 1.07, glassMat, -0.2, 0.2, 0, g, false);
     B(0.4, 0.3, 1.09, mats.rubber, 0.65, -0.2, 0, g, false);
     g.position.set(x, y, z);

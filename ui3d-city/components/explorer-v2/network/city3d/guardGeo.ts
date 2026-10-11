@@ -143,7 +143,9 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   while (iDoor < n - 1 && !away(laneOut, iDoor)) iDoor++;
   let iExit = iDoor;
   while (iExit < n - 1 && inBlock(laneOut.x[iExit], laneOut.z[iExit])) iExit++;
-  const iToll = Math.min(n - 2, Math.max(iDoor + Math.round(carL * 1.6), iExit));
+  // the gantry stands a good two car lengths out of the HQ's door (on the ring road, past the turn), so the car is seen
+  // leaving the tower and driving up to it
+  const iToll = Math.min(n - 2, Math.max(iDoor + Math.round(carL * 2.2), iExit));
   // the X-ray gantry's beam stands at iToll: the car waits before it, drives through it while scanned, stops past it
   // (the yard's SX - 3.3 and SX + 3.4), as the customs portals work
   const iPre = Math.max(iDoor + 1, iToll - Math.round(3.3 * k));
@@ -182,17 +184,25 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   const x1 = depth / 2 + edge;
   const z1 = 3 * bay + edge;
   // a ward that holds the whole circle (the Sentinel-only city): the human lot and the scrapyard stand either side of the
-  // HQ's block, at its radius, a service lane between; a narrow ward: beyond the block, a central lane between them
+  // HQ's block, in its block row, served by the ring road downtown's side of it; a narrow ward: beyond the block, a
+  // central lane between them
   const beside = ward.a1 - ward.a0 > Math.PI;
-  const rP = beside ? lot.r : rLat + carL * 0.75 + z1;
-  const aP = beside ? blockMid - runSide * (blockHalf + (2 * corridor - x0) / rP) : lot.a - runSide * ((corridor - x0) / rP);
-  const radial = new Vector3(Math.cos(aP), 0, Math.sin(aP));
+  // the ring road the HQ's block fronts on: its centre and its outer kerb (city.ts rings, ROAD = 0.5 lot)
+  const ringR = city.rings.find((r) => r < lot.r) ?? lot.r - S;
+  const ringKerb = ringR + S * 0.25;
   const tangent = (a: number) => new Vector3(-Math.sin(a), 0, Math.cos(a));
-  // the frame: +x away from the central lane, +z a quarter turn from it (outward or inward, as the side falls)
-  const xHat = tangent(aP).multiplyScalar(-runSide);
+  // beside: the lot's long side runs along the ring, its gate on the ring road's kerb, its bays' noses outward (the lot
+  // is deeper than a block row, so its bays stand over the row's mid lane rather than over the ring road)
+  const rP = beside ? ringKerb + carW * 0.4 - x0 : rLat + carL * 0.75 + z1;
+  const aP = beside ? blockMid - runSide * (blockHalf + (corridor + z1) / rP) : lot.a - runSide * ((corridor - x0) / rP);
+  const radial = new Vector3(Math.cos(aP), 0, Math.sin(aP));
+  // the frame: +x away from the lane the car comes by (outward, beside; away from the central lane otherwise), +z a
+  // quarter turn from it
+  const xHat = beside ? radial.clone() : tangent(aP).multiplyScalar(-runSide);
   const slotYaw = Math.atan2(xHat.z, xHat.x);
   const zHat = new Vector3(-Math.sin(slotYaw), 0, Math.cos(slotYaw));
-  const inward = -Math.sign(zHat.dot(radial)) || -1;
+  // the gate's end of the row: toward the HQ's block (beside), else the inward end
+  const inward = beside ? runSide : -Math.sign(zHat.dot(radial)) || -1;
   const pc = polar(rP, aP, 0);
   const py = yAt(pc.x, pc.z);
   pc.y = py;
@@ -222,8 +232,9 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   };
 
   // the Guard Yard (baler, crane, skip) across the service lane from the human lot, in its own metres scaled by k: its x
-  // runs away from the HQ along the ring (the car comes in along it to PICK), its z a quarter turn from it
-  const r0 = beside ? lot.r : rLat + carL + 3.5 * k;
+  // runs away from the HQ along the ring (the car comes in along it to PICK), its z a quarter turn from it, inward.
+  // Beside: its lane (z = 0) runs on the ring road's outer half, the baler and the skip in the block row behind it
+  const r0 = beside ? ringR + carW * 0.45 + 2.75 * k : rLat + carL + 3.5 * k;
   const a0 = beside ? blockMid + runSide * (blockHalf + (2 * corridor) / lot.r) : lot.a + runSide * (corridor / r0);
   const sideS = blockMid + runSide * (blockHalf + corridor / lot.r);
   const yx = tangent(a0).multiplyScalar(runSide);

@@ -2,7 +2,6 @@ import {
   BoxGeometry,
   CanvasTexture,
   Color,
-  LinearSRGBColorSpace,
   CylinderGeometry,
   type Material,
   Mesh,
@@ -18,9 +17,10 @@ import {
 
 export type Kit = ReturnType<typeof createKit>;
 
-/** a colour as three r128 (the reference) read a hex: its sRGB components taken as linear values. r155+ converts hex to
-    linear properly, which darkens every material and light of the reference; ColorManagement stays on for the City */
-export const raw = (c: string) => new Color().setStyle(c, LinearSRGBColorSpace);
+/** a colour from a hex, in the City's own colour management (sRGB in, linear out), as every paint of the City is read.
+    The reference (three r128) took a hex's components as linear values, which lit the yard brighter than the City round
+    it; the hexes below are tuned for the City's lights instead (Lighting.tsx: a hemisphere and a sun, no reflection). */
+export const raw = (c: string) => new Color(c);
 
 export function createKit() {
   let s = 7;
@@ -71,8 +71,8 @@ export function createKit() {
     }
   }, [10, 6]);
   const concreteTex = canvasTex(256, 256, (g, w, h) => {
-    noise(g, w, h, "#5d6066", 0.16, 9000, 1.5);
-    g.strokeStyle = "rgba(0,0,0,.25)";
+    noise(g, w, h, "#9aa0a8", 0.12, 9000, 1.5);
+    g.strokeStyle = "rgba(0,0,0,.18)";
     for (let i = 0; i < 6; i++) {
       g.beginPath();
       let x = rnd() * w;
@@ -87,7 +87,7 @@ export function createKit() {
     }
   }, [1, 1]);
   const yellowTex = canvasTex(256, 256, (g, w, h) => {
-    noise(g, w, h, "#c8961f", 0.14, 6000, 2);
+    noise(g, w, h, "#d1a233", 0.12, 6000, 2);
     for (let i = 0; i < 40; i++) {
       g.fillStyle = `rgba(40,25,10,${0.08 + rnd() * 0.2})`;
       g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 3, 6 + rnd() * 40);
@@ -96,7 +96,7 @@ export function createKit() {
     g.fillRect(0, h - 26, w, 26);
   }, [1, 1]);
   const greenTex = canvasTex(256, 256, (g, w, h) => {
-    noise(g, w, h, "#2d4a3a", 0.14, 6000, 2);
+    noise(g, w, h, "#3f6350", 0.12, 6000, 2);
     for (let i = 0; i < 30; i++) {
       g.fillStyle = `rgba(120,70,30,${0.1 + rnd() * 0.25})`;
       g.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 4 + rnd() * 30);
@@ -130,19 +130,21 @@ export function createKit() {
     return m;
   };
   const std = (p: ConstructorParameters<typeof MeshStandardMaterial>[0]) => track(new MeshStandardMaterial(p));
+  // little metalness: the City reflects no environment, and a bare metal with none goes black under its lights
   const mats = {
-    steelDark: std({ color: raw("#2b3038"), metalness: 0.75, roughness: 0.45 }),
-    steel: std({ color: raw("#8a919c"), metalness: 0.9, roughness: 0.3 }),
-    chrome: std({ color: raw("#e6e9ee"), metalness: 1, roughness: 0.12 }),
+    steelDark: std({ color: raw("#3a4049"), metalness: 0.3, roughness: 0.55 }),
+    steel: std({ color: raw("#9aa2ad"), metalness: 0.35, roughness: 0.45 }),
+    chrome: std({ color: raw("#e6e9ee"), metalness: 0.5, roughness: 0.25 }),
     concrete: std({ map: concreteTex, roughness: 0.95 }),
-    yellow: std({ map: yellowTex, metalness: 0.35, roughness: 0.55 }),
-    panelW: std({ map: panelTex, metalness: 0.2, roughness: 0.5 }),
+    yellow: std({ map: yellowTex, metalness: 0.1, roughness: 0.6 }),
+    panelW: std({ map: panelTex, metalness: 0.05, roughness: 0.55 }),
     hazard: std({ map: hazardTex, roughness: 0.6 }),
-    rubber: std({ color: raw("#0d0f12"), roughness: 0.9 }),
-    skip: std({ map: greenTex, metalness: 0.4, roughness: 0.6 }),
+    rubber: std({ color: raw("#1a1d22"), roughness: 0.9 }),
+    skip: std({ map: greenTex, metalness: 0.15, roughness: 0.65 }),
     asphalt: std({ map: asphaltTex, roughness: 0.92, metalness: 0 }),
   };
-  const glow = (c: string, i = 3) => std({ color: raw("#111"), emissive: raw(c), emissiveIntensity: i });
+  // the lamps' hexes read as sRGB now: a little more intensity keeps them as bright as the reference's
+  const glow = (c: string, i = 3) => std({ color: raw("#111"), emissive: raw(c), emissiveIntensity: i * 1.5 });
   const paint = (c: string) => std({ color: raw(c), roughness: 0.8 });
 
   /** a box resting centred at (x, y, z) in its parent; small details cast no shadow */
