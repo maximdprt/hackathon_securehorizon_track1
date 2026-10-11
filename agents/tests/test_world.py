@@ -355,7 +355,7 @@ def test_server_reports_llm_failures_and_refuses_what_it_should(server, monkeypa
     assert err.value.code == 403
     with urllib.request.urlopen(server + "/api/world") as r:
         w = json.loads(r.read())
-    assert len(w["sites"]) == 8 and w["default_model"] in w["models"] and "wallet" not in w["sites"][0] and w["sites"][0]["preview"] == "/shop/nimbus/"
+    assert len(w["sites"]) == 17 and w["default_model"] in w["models"] and "wallet" not in w["sites"][0] and w["sites"][0]["preview"] == "/shop/nimbus/"
     assert [s["color"] for s in w["sites"][:5]] == list(world.COLORS.values()) and all(s["color"].startswith("#") for s in w["sites"])
     assert w["profile"] == {"name": "Camille Martin", "city": "Lyon", "card": "•••• •••• •••• 4242"}
 
