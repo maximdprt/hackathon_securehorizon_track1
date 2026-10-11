@@ -229,6 +229,7 @@ export default function App() {
         sites={world.sites}
         caption={step?.label ?? (frame ? frame.title : '')}
         why={step?.why}
+        gesture={!pin && source?.steps[source.steps.length - 1]?.kind === 'pay' ? 'pay' : step?.kind}
         replaying={pin !== null}
         running={running && pin === null}
         onLive={() => setPin(null)}
