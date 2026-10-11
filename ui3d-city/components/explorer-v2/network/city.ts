@@ -341,7 +341,7 @@ export function planCity(chains: CityChain[], g: CityGeometry): City {
   const ours = lots.get(AVAGUARD_ID);
   const ourBlock = ours && blocks.find((b) => ours.r > b.r0 && ours.r < b.r1);
   if (SENTINEL_ONLY && ours && ourBlock) {
-    const r = ourBlock.r1 - lot * 0.4;
+    const r = ourBlock.r1 - lot * 0.2;
     const [x, y] = screen(r, ours.a);
     lots.set(AVAGUARD_ID, { ...ours, x, y, r });
   }
