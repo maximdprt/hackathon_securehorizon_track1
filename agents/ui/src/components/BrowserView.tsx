@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import type { Frame, Step } from '../run';
 import { easeMove, fillTime, ms, paced, sleep, T, travelTime, typingTime } from '../timing';
 import type { Site } from '../types';
-import { Card, Globe, Lock, Pen, Pointer } from './Icons';
+import { Card, Chart, Globe, Lock, Pen, Pointer } from './Icons';
 
 type Props = {
   /** L'image à montrer, ou null tant qu'aucun agent n'a navigué. */
@@ -404,8 +404,8 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
         </>
       ) : (
         <div className="browser__start">
-          <span className="browser__start-mark" aria-hidden="true">
-            <Arrow className="browser__start-pointer" />
+          <span className={`browser__start-mark${finance ? ' browser__start-mark--finance' : ''}`} aria-hidden="true">
+            {finance ? <Chart /> : <Arrow className="browser__start-pointer" />}
           </span>
           <h2 className="browser__start-title">Commencez une conversation avec un agent</h2>
           <p className="browser__start-text">

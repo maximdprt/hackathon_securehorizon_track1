@@ -71,3 +71,21 @@ export const Check = () => (
     <path d="M3.6 8.4l2.9 2.9 6-6.6" />
   </Icon>
 );
+export const Bag = () => (
+  <Icon size={18}>
+    <path d="M2.8 5.2h10.4l-.8 8.6H3.6z" />
+    <path d="M5.6 5.2V4a2.4 2.4 0 0 1 4.8 0v1.2" />
+  </Icon>
+);
+export const Chart = () => (
+  <Icon size={18}>
+    <path d="M2 13.8h12" />
+    <path d="M2.8 10.6l3.4-3.6 2.6 2.2 4.4-5" />
+    <path d="M10.6 4.2h2.6v2.6" />
+  </Icon>
+);
+export const ArrowRight = () => (
+  <Icon size={14} width={1.8}>
+    <path d="M3 8h10M9 4l4 4-4 4" />
+  </Icon>
+);

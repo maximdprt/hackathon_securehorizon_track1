@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { initials, loadAgents, saveAgents } from './agents';
 import { fetchWorld, streamRun } from './api';
 import { AgentEditor } from './components/AgentEditor';
 import { AgentReply } from './components/AgentReply';
 import { BrowserView } from './components/BrowserView';
 import { Composer } from './components/Composer';
+import { ArrowRight, Bag, Chart } from './components/Icons';
 import { Panel } from './components/Panel';
 import { applyEvent, type AgentMessage, type Message } from './run';
 import { durationOf, sleep, spoken } from './timing';
@@ -17,12 +18,17 @@ const IDEAS: Record<Mode, string[]> = {
 const EMPTY: Record<Mode, { title: string; text: string }> = {
   shop: {
     title: 'Écrivez ce que vous voulez acheter.',
-    text: "L'agent applique ses consignes et fait l'achat de bout en bout. Chaque geste s'affiche ici, et un clic sur un geste montre la page à ce moment-là. Chaque message lance un nouveau run, sans mémoire du précédent.",
+    text: "L'agent parcourt les boutiques, choisit et paie de bout en bout. Chaque geste s'affiche ici ; un clic sur un geste montre la page à ce moment-là.",
   },
   finance: {
     title: 'Écrivez ce que vous voulez placer ou payer.',
-    text: "L'agent cherche des placements, lit leur fiche, choisit et prépare l'ordre. Chaque étape s'écrit ici. Chaque message lance un nouveau run, sans mémoire du précédent.",
+    text: "L'agent cherche des placements, lit leur fiche, choisit et prépare l'ordre en USDC. Chaque étape de son raisonnement s'écrit ici.",
   },
+};
+/** Les deux types de tâche : le libellé est le nom accessible du bouton, l'aide n'est que visuelle. */
+const MODES: Record<Mode, { label: string; icon: ReactNode }> = {
+  shop: { label: 'Boutiques', icon: <Bag /> },
+  finance: { label: 'Finance', icon: <Chart /> },
 };
 
 let counter = 0;
@@ -68,17 +74,25 @@ function Thread({ messages, mode, shown, onIdea, onSelect, onRetry }: ThreadProp
     >
       {messages.length === 0 && (
         <div className="chat__empty">
-          <p className="chat__text chat__text--strong">{EMPTY[mode].title}</p>
-          <p className="chat__text">{EMPTY[mode].text}</p>
+          <span className="chat__empty-mark" aria-hidden="true">
+            {MODES[mode].icon}
+          </span>
+          <p className="chat__empty-title">{EMPTY[mode].title}</p>
+          <p className="chat__empty-text">{EMPTY[mode].text}</p>
+          <p className="chat__ideas-title">Exemples à essayer</p>
           <ul className="chat__ideas">
             {IDEAS[mode].map((idea) => (
               <li key={idea}>
                 <button type="button" className="chat__idea" onClick={() => onIdea(idea)}>
-                  {idea}
+                  <span className="chat__idea-text">{idea}</span>
+                  <span className="chat__idea-go">
+                    <ArrowRight />
+                  </span>
                 </button>
               </li>
             ))}
           </ul>
+          <p className="chat__empty-note">Chaque message lance un nouveau run, sans mémoire du précédent.</p>
         </div>
       )}
       {messages.map((m) =>
@@ -272,15 +286,19 @@ export default function App() {
 
         {tab === 'chat' ? (
           <>
-            <div className="chat__mode" role="group" aria-label="Type de tâche">
-              {(['shop', 'finance'] as const).map((m) => (
-                <button key={m} type="button" className="chat__mode-btn" aria-pressed={mode === m} disabled={running} onClick={() => setMode(m)}>
-                  {m === 'shop' ? 'Boutiques' : 'Finance'}
-                </button>
-              ))}
+            <div className="chat__mode-row">
+              <p className="chat__mode-title" aria-hidden="true">Type de tâche</p>
+              <div className={`chat__mode chat__mode--${mode}`} role="group" aria-label="Type de tâche">
+                {(['shop', 'finance'] as const).map((m) => (
+                  <button key={m} type="button" className="chat__mode-btn" aria-pressed={mode === m} disabled={running} onClick={() => setMode(m)}>
+                    {MODES[m].icon}
+                    {MODES[m].label}
+                  </button>
+                ))}
+              </div>
             </div>
             <Thread messages={messages} mode={mode} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} />
-            <Composer agentName={current.name} text={draft} running={running} onChange={setDraft} onSend={send} onStop={() => controller.current?.abort()} />
+            <Composer agentName={current.name} mode={mode} text={draft} running={running} onChange={setDraft} onSend={send} onStop={() => controller.current?.abort()} />
           </>
         ) : (
           <div className="chat__panel">

@@ -1,8 +1,10 @@
 import { type FormEvent, type KeyboardEvent, useEffect, useRef } from 'react';
+import type { Mode } from '../types';
 import { ArrowUp, Stop } from './Icons';
 
 type Props = {
   agentName: string;
+  mode: Mode;
   text: string;
   running: boolean;
   onChange: (text: string) => void;
@@ -10,7 +12,7 @@ type Props = {
   onStop: () => void;
 };
 
-export function Composer({ agentName, text, running, onChange, onSend, onStop }: Props) {
+export function Composer({ agentName, mode, text, running, onChange, onSend, onStop }: Props) {
   const input = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -42,26 +44,31 @@ export function Composer({ agentName, text, running, onChange, onSend, onStop }:
 
   return (
     <form className="chat__composer" onSubmit={submit}>
-      <textarea
-        className="chat__input"
-        ref={input}
-        rows={1}
-        value={text}
-        disabled={running}
-        aria-label="Demande pour l'agent"
-        placeholder={`Donnez une consigne à ${agentName}`}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
-      />
-      {running ? (
-        <button type="button" className="chat__send chat__send--stop" aria-label="Arrêter" onClick={onStop}>
-          <Stop />
-        </button>
-      ) : (
-        <button type="submit" className="chat__send" aria-label="Envoyer" disabled={!text.trim()}>
-          <ArrowUp />
-        </button>
-      )}
+      <div className="chat__box">
+        <textarea
+          className="chat__input"
+          ref={input}
+          rows={1}
+          value={text}
+          disabled={running}
+          aria-label="Demande pour l'agent"
+          placeholder={mode === 'finance' ? `Que doit placer ou payer ${agentName} ?` : `Que doit acheter ${agentName} ?`}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+        />
+        {running ? (
+          <button type="button" className="chat__send chat__send--stop" aria-label="Arrêter" onClick={onStop}>
+            <Stop />
+          </button>
+        ) : (
+          <button type="submit" className="chat__send" aria-label="Envoyer" disabled={!text.trim()}>
+            <ArrowUp />
+          </button>
+        )}
+      </div>
+      <p className="chat__hint" aria-hidden="true">
+        {running ? `${agentName} travaille : vous pouvez l'arrêter à tout moment.` : 'Entrée pour envoyer · Maj + Entrée pour aller à la ligne'}
+      </p>
     </form>
   );
 }

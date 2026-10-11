@@ -188,7 +188,7 @@ function Sentinel({ verdict, onchain }: { verdict: Verdict; onchain?: Onchain | 
     <section className={`sentinel sentinel--${v.tone}`} aria-label="Vérification SentinelL1">
       <div className="sentinel__head">
         <span className="sentinel__tag">SentinelL1</span>
-        <span className={`pill pill--${v.tone === 'ok' ? 'ok' : 'warn'}`}>{v.label}</span>
+        <span className={`pill pill--${v.tone}`}>{v.label}</span>
         {verdict.trust_score != null && <span className="sentinel__trust">confiance {verdict.trust_score}/100</span>}
       </div>
       <p className="chat__text">{v.effect}</p>

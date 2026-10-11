@@ -4,7 +4,7 @@
   --danger: #D64545; --danger-soft: #FBE9E9;   /* bloqué, erreur */
   --warn: #C77700; --warn-soft: #FFF1D6;       /* validation humaine, attention */
   --k-search: #2F6FDB; --k-search-soft: #E6EEFB; /* geste : recherche et navigation */
-  --k-click: #0F9D8A; --k-click-soft: #E0F4F1;   /* geste : clic */
+  --k-click: #8C1D33; --k-click-soft: #F8EBEE;   /* geste : clic */
   --k-type: #7A4FD6; --k-type-soft: #EEE8FB;     /* geste : saisie */
   --k-pay: #C77700; --k-pay-soft: #FFF1D6;       /* geste : paiement */
   --ease: cubic-bezier(.22, .8, .26, 1);       /* sortie douce : ce qui apparaît ou arrive */

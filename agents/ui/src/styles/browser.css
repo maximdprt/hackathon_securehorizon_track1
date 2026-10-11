@@ -1,6 +1,6 @@
 /* La vue : le navigateur de l'agent à gauche, l'assistant à droite. Changer --accent ici change tout l'accent de la vue. */
 .agentic {
-  --accent: #0F9D8A;
+  --accent: #8C1D33; --accent-soft: #F8EBEE; --accent-ring: rgba(140, 29, 51, .16); /* bordeaux */
   display: flex;
   height: 100%;
   background: #F7F8FA;
@@ -134,6 +134,7 @@
 .browser__start-mark::after { content: ''; position: absolute; inset: 0; border-radius: 18px; border: 2px solid var(--accent); opacity: 0;
   animation: browser-start-ring 0.9s var(--ease) 0.45s; }
 .browser__start-pointer { width: 26px; height: 26px; margin: 3px 0 0 3px; }
+.browser__start-mark--finance > svg { width: 28px; height: 28px; }
 .browser__start-title { margin: 0 0 10px; font-size: 22px; font-weight: 700; animation: browser-rise var(--t-slow) var(--ease) 0.08s backwards; }
 .browser__start-text { max-width: 52ch; margin: 0; font-size: 15px; line-height: 1.55; color: #44505E; animation: browser-rise var(--t-slow) var(--ease) 0.16s backwards; }
 .browser__start-wait { display: inline-flex; align-items: center; margin: 22px 0 0; padding: 6px 14px; border-radius: 999px; background: var(--k-click-soft);

@@ -213,7 +213,7 @@ test('creating, selecting and deleting an agent', async () => {
   expect(screen.queryByRole('button', { name: /Testeur/ })).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /Chasseur de prix/, pressed: true })).toBeInTheDocument();
   await userEvent.click(screen.getByRole('tab', { name: 'Conversation' }));
-  expect(prompt()).toHaveAttribute('placeholder', 'Donnez une consigne à Chasseur de prix');
+  expect(prompt()).toHaveAttribute('placeholder', 'Que doit acheter Chasseur de prix ?');
 });
 
 test('a legitimate shop, an agent that buys nothing, and a failed run that can be relaunched', async () => {
