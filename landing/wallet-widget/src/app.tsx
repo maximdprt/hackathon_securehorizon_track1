@@ -215,9 +215,54 @@ function Agents({ agents, add, update, remove, mine, walletAddress }: { agents: 
   );
 }
 
+// the open-source MCP guard, installed with uvx straight from the repo
+const GUARD_PKG = 'git+https://github.com/walidb212/sentinel-guard';
+
+/** a stable per-agent key (FNV-1a over id+wallet), shown for connected mode. Enforcement is rolling out server-side. */
+function apiKey(a: Agent) {
+  const s = `${a.id}:${(a.issuer || '').toLowerCase()}`;
+  const fnv = (seed: number, rev: boolean) => {
+    let h = seed >>> 0;
+    const idx = rev ? [...s].map((_, i) => s.length - 1 - i) : [...s].map((_, i) => i);
+    for (const i of idx) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(16).padStart(8, '0');
+  };
+  return `sk_sentinel_${fnv(0x811c9dc5, false)}${fnv(0x811c9dc5, true)}`;
+}
+
+/** step 1: write the agent's mandate (its limits) once, so Sentinel enforces exactly what the dashboard shows */
+function initCmd(a: Agent) {
+  const parts = [
+    `uvx --from "${GUARD_PKG}" sentinel-guard init`,
+    `  --issuer ${a.issuer || '0xYourAgentWallet'}`,
+    `  --max-amount ${a.perPayment} --max-daily ${a.daily} --currency ${a.currency}`,
+    `  --actions ${(a.actions.length ? a.actions : ['pay']).join(',')}`,
+  ];
+  if (a.recipients.length) parts.push(`  --recipients ${a.recipients.join(',')}`);
+  return parts.join(' \\\n');
+}
+
+/** step 2: plug the guard into the agent's MCP client, carrying its key and binding it to its wallet */
 function mcpConfig(a: Agent) {
-  if (a.framework === 'claude') return `// claude_desktop_config.json\n{\n  "mcpServers": {\n    "sentinel": {\n      "command": "python",\n      "args": ["mcp_server.py"],\n      "env": { "SENTINEL_AGENT": "${a.id}" }\n    }\n  }\n}`;
-  return `# ${a.framework === 'hermes' ? 'Hermès · config.yaml' : 'your MCP client'}\nmcp_servers:\n  sentinel:\n    command: "python"\n    args: ["mcp_server.py"]   # Sentinel's MCP server\n    env:\n      SENTINEL_AGENT: "${a.id}"`;
+  const key = apiKey(a);
+  const issuer = a.issuer || '0xYourAgentWallet';
+  if (a.framework === 'claude')
+    return `claude mcp add sentinel -s user \\\n`
+      + `  -e SENTINEL_API_KEY=${key} \\\n`
+      + `  -e SENTINEL_ISSUER=${issuer} \\\n`
+      + `  -- uvx --from "${GUARD_PKG}" sentinel-guard`;
+  if (a.framework === 'hermes')
+    return `# Hermès · config.yaml\n`
+      + `mcp_servers:\n  sentinel:\n    command: "uvx"\n`
+      + `    args: ["--from", "${GUARD_PKG}", "sentinel-guard"]\n`
+      + `    env:\n      SENTINEL_API_KEY: "${key}"\n      SENTINEL_ISSUER: "${issuer}"\n`
+      + `    timeout: 60\n    connect_timeout: 120\n`
+      + `    tools:\n      include: [screen_payment, authorize_payment, explain_decision]`;
+  return `// .mcp.json (any MCP client)\n{\n  "mcpServers": {\n    "sentinel": {\n`
+    + `      "command": "uvx",\n`
+    + `      "args": ["--from", "${GUARD_PKG}", "sentinel-guard"],\n`
+    + `      "env": { "SENTINEL_API_KEY": "${key}", "SENTINEL_ISSUER": "${issuer}" }\n`
+    + `    }\n  }\n}`;
 }
 
 function AgentEditor({ agent, walletAddress, onClose, onSave, onDelete }: { agent: Agent | null; walletAddress?: string; onClose: () => void; onSave: (a: Agent) => void; onDelete?: () => void }) {
@@ -269,9 +314,16 @@ function AgentEditor({ agent, walletAddress, onClose, onSave, onDelete }: { agen
       </>)}
 
       {tab === 'connect' && (<>
-        <p className="lede sm">Give your agent its prompt, and add Sentinel to its MCP servers: every payment then goes through Sentinel before it leaves.</p>
+        <p className="lede sm">Two lines to copy: set this agent's limits, then plug the Sentinel guard into {FRAMEWORK[f.framework]}. Every payment then goes through Sentinel before it leaves. Needs <a href="https://docs.astral.sh/uv/" target="_blank" rel="noreferrer">uv</a>.</p>
+        <label>This agent's API key<div className="row g8"><input className="mono" readOnly value={apiKey(f)} onFocus={(e) => e.target.select()} /><Copy text={apiKey(f)} label="Copy key" /></div>
+          <small>For connected mode: shared threat registry + on-chain proof on SentinelL1. Local screening works without it.</small></label>
+        <p className="eb">1 · Set its limits (once)</p>
+        <pre className="code">{initCmd(f)}</pre>
+        <div className="row g8"><Copy text={initCmd(f)} label="Copy" /><span className="mute">Writes the same limits Sentinel enforces, whatever the prompt says.</span></div>
+        <p className="eb">2 · Plug it into {FRAMEWORK[f.framework]}</p>
         <pre className="code">{mcpConfig(f)}</pre>
-        <div className="row g8"><Copy text={mcpConfig(f)} label="Copy config" /><span className="mute">A hosted endpoint with your API key is coming; this runs Sentinel's MCP server next to your agent.</span></div>
+        <div className="row g8"><Copy text={mcpConfig(f)} label="Copy config" /><a className="btn sm ghost" href="https://github.com/walidb212/sentinel-guard" target="_blank" rel="noreferrer">Docs &amp; source</a></div>
+        <p className="note">The guard is open source (MIT). Connected-mode key enforcement is rolling out; local screening works today.</p>
       </>)}
 
       <footer className="row">
