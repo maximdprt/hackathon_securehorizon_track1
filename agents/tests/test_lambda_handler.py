@@ -55,3 +55,8 @@ def test_a_held_payment_is_settled_by_a_human_once(lam):
     assert code == 200 and out["verdict"] == "allow" and out["approved_by"].startswith("humain") and out["onchain"] is None
     assert call(lam, "/api/decide", {"instruction_id": iid, "decision": "block"})[0] == 409  # tranché une fois
     assert call(lam, "/api/decide", {"instruction_id": iid, "decision": "maybe"})[0] == 400
+
+
+def test_the_city_may_call_the_hosted_sandbox_from_its_page(lam):
+    res = lam.handler({"rawPath": "/api/decide", "requestContext": {"http": {"method": "OPTIONS"}}}, None)
+    assert res["statusCode"] == 204 and res["headers"]["Access-Control-Allow-Origin"] == "*" and "POST" in res["headers"]["Access-Control-Allow-Methods"]

@@ -152,6 +152,9 @@ def handler(event, context):
     method = (event.get("requestContext", {}).get("http", {}) or {}).get("method", "GET")
     path = event.get("rawPath") or event.get("path") or "/"
     try:
+        if method == "OPTIONS":  # préflight du navigateur : la ville 3D appelle /api/decide depuis son bouton Valider / Refuser
+            return {"statusCode": 204, "headers": {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+                                                   "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "600"}, "body": ""}
         if path == "/" or path == "":
             index = DIST / "index.html"
             return _resp(200, index.read_text(encoding="utf-8"), "text/html; charset=utf-8") if index.is_file() \
