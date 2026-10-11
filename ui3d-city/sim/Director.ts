@@ -22,7 +22,13 @@ export function registerScene(h: SceneHooks) {
 let tl: gsap.core.Timeline | null = null;
 let busy = false;
 const pendingTx: TxEvent[] = [];
-let humanAnswer: ((approve: boolean) => void) | null = null;
+/** who answers a parked car: the operator in the city, the guard (a human settled it in the sandbox's chat), or the
+    clock (no answer: refused here, the safe default, and the guard's queue is left to its own humans) */
+type By = "ville" | "garde" | "délai";
+let humanAnswer: ((approve: boolean, by: By) => void) | null = null;
+/** answers the guard sent before their car reached the post, by instruction id */
+const early = new Map<string, boolean>();
+const idOf = (tx: TxEvent | null | undefined) => (tx?.raw as { instruction_id?: string } | undefined)?.instruction_id;
 
 const still = () => hooks.still();
 const fly = (s: Shot) => hooks.fly(s);
@@ -35,6 +41,42 @@ export function enqueue(tx: TxEvent) {
 }
 export const playScene = (k: SceneKey) => enqueue({ ...SCENARIO[k], created_at: new Date().toISOString() });
 
+/** a live message: a new transaction, or a human's answer to one the city already shows (the guard sends the settled
+    verdict on, approved_by set). That answer moves the parked car on instead of starting a second one. */
+export function receive(tx: TxEvent) {
+  const raw = tx.raw as { instruction_id?: string; approved_by?: string } | undefined;
+  const id = raw?.instruction_id;
+  if (raw?.approved_by && id) {
+    const s = sim.get();
+    if (idOf(s.tx) === id && s.phase !== "idle" && s.phase !== "home") {
+      if (humanAnswer && s.human) humanAnswer(tx.decision === "ALLOW", "garde");
+      else early.set(id, tx.decision === "ALLOW");
+      return;
+    }
+    if (pendingTx.some((t) => idOf(t) === id) || s.ledger.some((l) => idOf(l) === id)) return; // already in the city
+  }
+  enqueue(tx);
+}
+
+/** the operator's answer on a live car goes to the guard that holds it (the sandbox's /api/decide): it settles its
+    queue, flags or clears the recipient, and writes the decision on SentinelL1 */
+async function settle(tx: TxEvent, approve: boolean) {
+  const id = idOf(tx);
+  if (!tx.decide_url || !id) return;
+  try {
+    const res = await fetch(`${tx.decide_url}/api/decide`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ instruction_id: id, decision: approve ? "allow" : "block" }),
+    });
+    const out = (await res.json().catch(() => ({}))) as { error?: string; onchain?: { ok?: boolean } | null };
+    if (!res.ok) toast(`${tx.tx_id} : le garde n'a pas enregistré la décision (${out.error ?? res.status})`, "block");
+    else toast(`${tx.tx_id} : décision transmise au garde${out.onchain?.ok ? " · inscrite sur SentinelL1" : ""}`, approve ? "allow" : "block");
+  } catch {
+    toast(`${tx.tx_id} : garde injoignable, décision gardée dans la ville seulement`, "block");
+  }
+}
+
 /** a click on the car, or F: the camera follows the protocol to its end (city3d/AvaGuardRun.tsx flies its shots) */
 export function followCar() {
   if (sim.get().tx && sim.get().phase !== "idle") sim.set({ follow: true });
@@ -46,7 +88,7 @@ export function stopFollow() {
 
 /** the human's answer for the parked car (Valider / Refuser, or A / R) */
 export function answerHuman(approve: boolean) {
-  humanAnswer?.(approve);
+  humanAnswer?.(approve, "ville");
 }
 
 export function setPaused(p: boolean) {
@@ -58,6 +100,7 @@ export function resetAll() {
   tl?.kill();
   tl = null;
   humanAnswer = null;
+  early.clear();
   pendingTx.length = 0;
   busy = false;
   gsap.globalTimeline.paused(false);
@@ -268,18 +311,24 @@ async function human(tx: TxEvent) {
   });
   if (!busy) return;
   sim.set((s) => ({ human: { tx_id: tx.tx_id, deadline: Date.now() + TIMINGS.humanTimeout * 1000 }, ledger: s.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: "HUMAN" as const } : l)) }));
-  const approve = await new Promise<boolean>((resolve) => {
-    const tick = gsap.delayedCall(TIMINGS.humanTimeout, () => resolve(false)); // no answer: refused, the safe default
-    humanAnswer = (a) => {
+  const id = idOf(tx);
+  const { approve, by } = await new Promise<{ approve: boolean; by: By }>((resolve) => {
+    // the guard may have been answered in the sandbox's chat while the car drove to the post
+    if (id && early.has(id)) return resolve({ approve: early.get(id)!, by: "garde" });
+    const tick = gsap.delayedCall(TIMINGS.humanTimeout, () => resolve({ approve: false, by: "délai" })); // no answer: refused, the safe default
+    humanAnswer = (a, b) => {
       tick.kill();
-      resolve(a);
+      resolve({ approve: a, by: b });
     };
   });
   humanAnswer = null;
+  if (id) early.delete(id);
   if (!busy) return;
+  if (by === "ville") void settle(tx, approve);
   const at = new Date().toISOString();
-  sim.set({ human: null, review: { tx_id: tx.tx_id, approve, by: "opérateur Sentinel", at, protocol: approve ? "visa" : "déchetterie" } });
-  toast(`${tx.tx_id} ${approve ? "validée" : "refusée"} par l'opérateur à ${new Date(at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · protocole ${approve ? "visa vers la C-Chain" : "déchetterie"}`, approve ? "allow" : "block");
+  const who = by === "garde" ? "un humain (chat de la sandbox)" : "opérateur Sentinel";
+  sim.set({ human: null, review: { tx_id: tx.tx_id, approve, by: who, at, protocol: approve ? "visa" : "déchetterie" } });
+  toast(`${tx.tx_id} ${approve ? "validée" : "refusée"} ${by === "délai" ? "sans réponse (refus par défaut, dans la ville)" : `par ${who}`} à ${new Date(at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · protocole ${approve ? "visa vers la C-Chain" : "déchetterie"}`, approve ? "allow" : "block");
   // repainted, then straight out of the post by its exit gate, the way of its new colour
   await run((t) => {
     t.call(() => {

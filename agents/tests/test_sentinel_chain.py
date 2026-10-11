@@ -71,3 +71,14 @@ def test_chain_failure_never_raises_and_says_no_visa(api):
     assert proof["ok"] is False and "500" in proof["error"] and "nonce too low" in proof["error"]
     down = SentinelChain("http://127.0.0.1:9", timeout=2).authorize(verdict("allow"), None)
     assert down["ok"] is False and down["error"]
+
+
+def test_a_held_decision_tells_the_city_where_a_human_settles_it(api):
+    base, seen, _ = api
+    chain = SentinelChain(base, decide_url="http://127.0.0.1:8765/")
+    chain.authorize(verdict("needs_approval"), None)
+    chain.authorize(verdict("block"), None)
+    assert seen[0]["body"]["context"]["decide_url"] == "http://127.0.0.1:8765"
+    assert "decide_url" not in seen[1]["body"]["context"]  # tranché : rien à trancher dans la ville
+    SentinelChain(base).authorize(verdict("needs_approval"), None)
+    assert "decide_url" not in seen[2]["body"]["context"]

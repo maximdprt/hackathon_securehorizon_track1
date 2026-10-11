@@ -72,6 +72,8 @@ IMAGE_PATH = re.compile(re.escape(shops.IMAGE_ROOT) + r"/([a-z0-9]+)/([a-z0-9-]+
 # Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe (les photos viennent d'ici).
 SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
 PACE = 0  # le serveur n'attend pas entre deux gestes : c'est l'interface qui les joue à vitesse humaine
+# la ville 3D, en ligne et en développement : son bouton Valider / Refuser tranche une attente par /api/decide
+CITY_ORIGINS = {"https://city.petroi.fr", "http://localhost:3000", "http://127.0.0.1:3000"}
 _llms: dict[str, BedrockLLM] = {}
 _guard: GuardClient | None = None   # le garde à l'entrée de la chaîne, réglé au lancement (--guard)
 _chain: SentinelChain | None = None  # l'API authorize de SentinelL1, réglée au lancement (--chain)
@@ -100,7 +102,22 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _json(self, status: int, data: dict) -> None:
-        self._send(status, json.dumps(data, ensure_ascii=False).encode(), "application/json; charset=utf-8")
+        extra = self._city() if self.path == "/api/decide" else None
+        self._send(status, json.dumps(data, ensure_ascii=False).encode(), "application/json; charset=utf-8", extra)
+
+    def _city(self) -> dict:
+        """La ville 3D (et elle seule) peut trancher une attente par /api/decide depuis son bouton Valider / Refuser."""
+        origin = self.headers.get("Origin", "")
+        if origin not in CITY_ORIGINS:
+            return {}
+        return {"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Methods": "POST", "Access-Control-Allow-Headers": "Content-Type",
+                "Access-Control-Allow-Private-Network": "true", "Vary": "Origin"}
+
+    def do_OPTIONS(self):
+        cors = self._city()
+        if self.path != "/api/decide" or not cors or not self._local():
+            return self._json(403, {"error": "forbidden"})
+        self._send(204, b"", "text/plain", cors)
 
     def _local(self) -> bool:
         """Refuse les requêtes qui ne visent pas explicitement ce serveur local (rebinding DNS)."""
@@ -163,7 +180,8 @@ class Handler(BaseHTTPRequestHandler):
         if shop and shop.group(1) in world.ALL_SITES and length <= 20_000:
             fields = parse_qs(self.rfile.read(length).decode("utf-8", "replace"), keep_blank_values=True)
             return self._shop("POST", shop.group(1), shop.group(2) or "/", {k: v[0] for k, v in fields.items()})
-        # Content-Type JSON exigé : une page web tierce ne peut pas l'envoyer sans préflight CORS, que l'on n'accorde pas
+        # Content-Type JSON exigé : une page web tierce ne peut pas l'envoyer sans préflight CORS, accordé à la seule ville
+        # 3D pour /api/decide (CITY_ORIGINS)
         if self.path not in ("/api/run", "/api/decide") or not self.headers.get("Content-Type", "").startswith("application/json"):
             return self._json(404, {"error": "not found"})
         if self.path == "/api/decide":  # un humain tranche une décision en attente (outil approve_pending du garde)
@@ -261,7 +279,7 @@ if __name__ == "__main__":
             _guard = GuardClient(a.guard)
         except Exception as exc:  # dépendances du garde absentes, serveur MCP qui ne démarre pas...
             print(f"  GARDE INDISPONIBLE ({type(exc).__name__}: {exc}) : les paiements partiront sans vérification")
-        _chain = SentinelChain(a.chain) if _guard and a.chain != "off" else None
+        _chain = SentinelChain(a.chain, decide_url=f"http://127.0.0.1:{a.port}") if _guard and a.chain != "off" else None
     url = f"http://127.0.0.1:{a.port}/"
     server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     print(f"Sandbox -> {url}   boutiques : {url}search   (Ctrl+C pour arrêter)")

@@ -13,7 +13,7 @@ import type { District } from "@/components/explorer-v2/network/districts";
 import type { Height } from "@/components/explorer-v2/network/city-app";
 import type { PchainNetwork } from "@/lib/pchain-explorer";
 import { AVAGUARD_ID } from "@/components/explorer-v2/network/avaguard";
-import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused, stopFollow } from "@/sim/Director";
+import { answerHuman, enqueue, followCar, playScene, receive, resetAll, setPaused, stopFollow } from "@/sim/Director";
 import { parseMessage, startLiveFeed } from "@/sim/liveFeed";
 import { motion, sim, useSim, type View } from "@/sim/store";
 import { closeView, listenUrl, openView } from "@/sim/nav";
@@ -251,7 +251,7 @@ export default function CityShell() {
   useEffect(() => {
     if (mode !== "live") return;
     return startLiveFeed(
-      (t) => enqueue(t),
+      (t) => receive(t),
       (p) => sim.set((s) => (s.tx && s.tx.raw && (s.tx.raw as { instruction_id?: string }).instruction_id === p.instruction_id ? { tx: { ...s.tx, onchain: { chain: "Fuji", block: p.block, tx_hash: p.tx_hash } } } : {})),
       (status) => sim.set({ liveStatus: status }),
     );
@@ -259,7 +259,7 @@ export default function CityShell() {
 
   // a test and debug handle for tools/capture.mjs and the Playwright suite
   useEffect(() => {
-    (window as unknown as { __ag: unknown }).__ag = { sim, motion, playScene, resetAll, answerHuman, setPaused, enqueue, parseMessage };
+    (window as unknown as { __ag: unknown }).__ag = { sim, motion, playScene, resetAll, answerHuman, setPaused, enqueue, receive, parseMessage };
   }, []);
 
   // the search's box: centred on the window, kept clear of the corner cards at the left and the card at the right

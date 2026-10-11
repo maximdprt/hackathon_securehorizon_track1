@@ -34,8 +34,11 @@ def short_reason(reasons: list[str], limit: int = 200) -> str:
 
 
 class SentinelChain:
-    def __init__(self, base: str = API, explorer: str = EXPLORER, city: str = CITY, timeout: float = 60):
+    def __init__(self, base: str = API, explorer: str = EXPLORER, city: str = CITY, timeout: float = 60, decide_url: str | None = None):
+        """`decide_url` : la sandbox qui a jugé (son /api/decide). La ville le reçoit avec une décision en attente : son bouton
+        Valider / Refuser y tranche la file humaine du garde, qui inscrit à son tour la décision ici."""
         self.base, self.explorer, self.city, self.timeout = base.rstrip("/"), explorer.rstrip("/"), city, timeout
+        self.decide_url = decide_url.rstrip("/") if decide_url else None
 
     def authorize(self, verdict: dict, site: dict | None, item: str = "", ttl: int = 300) -> dict:
         """Envoie le verdict à POST /authorize. Rend la preuve on-chain, ou {"ok": False, "error"} sans lever."""
@@ -48,7 +51,8 @@ class SentinelChain:
             "ttl": ttl,
             "full": json.loads(json.dumps(verdict, default=str)),
             "context": {"issuer_label": "shopping-agent", "recipient_label": (site or {}).get("name") or verdict["recipient"],
-                        "merchant_domain": (site or {}).get("domain"), "item": item, "source": "sandbox-chat"},
+                        "merchant_domain": (site or {}).get("domain"), "item": item, "source": "sandbox-chat",
+                        **({"decide_url": self.decide_url} if self.decide_url and verdict["verdict"] == "needs_approval" else {})},
         }
         req = urllib.request.Request(f"{self.base}/authorize", data=json.dumps(body).encode(), method="POST",
                                      headers={"Content-Type": "application/json", "User-Agent": "sentinel-sandbox/1.0"})

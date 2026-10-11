@@ -78,7 +78,7 @@ def _world():
                                   "guard": guard.backend, "chain": chain.base if chain else None}, ensure_ascii=False))
 
 
-def _run(body: dict):
+def _run(body: dict, base: str | None = None):
     prompt = str(body.get("prompt", "")).strip()
     model = body.get("model") if body.get("model") in MODELS else DEFAULT_MODEL
     instructions, agent = str(body.get("instructions", "")).strip(), str(body.get("agent", "")).strip()
@@ -86,6 +86,8 @@ def _run(body: dict):
     if not prompt or len(prompt) > 2000 or len(instructions) > 4000 or mode not in ("shop", "finance"):
         return _resp(400, json.dumps({"error": "bad request"}))
     guard, chain = _guard_chain()
+    if chain:  # la ville tranche une attente sur cette même sandbox (son /api/decide)
+        chain.decide_url = base
     if not body.get("guard", True):  # l'interface peut couper le garde pour un run : rien n'est vérifié ni inscrit
         guard, chain = None, None
     backend = guard.backend if guard else None
@@ -159,7 +161,8 @@ def handler(event, context):
         if path == "/api/world":
             return _world()
         if path == "/api/run" and method == "POST":
-            return _run(_body(event))
+            domain = (event.get("requestContext") or {}).get("domainName")
+            return _run(_body(event), f"https://{domain}" if domain else None)
         if path == "/api/decide" and method == "POST":
             return _decide(_body(event))
         return _resp(404, json.dumps({"error": "not found"}))

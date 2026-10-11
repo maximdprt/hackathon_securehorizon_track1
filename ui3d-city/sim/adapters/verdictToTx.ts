@@ -5,6 +5,8 @@ import { CHECK_ORDER, type Check, type CheckKey, type Decision, type TxEvent } f
 export type AgenticPaymentVerdict = {
   instruction_id: string;
   issuer: string;
+  /** set once a human settled it (the guard's approve_pending): the city's parked car takes that answer */
+  approved_by?: string;
   action: "pay" | "approve" | "transfer" | "swap";
   amount: number;
   currency?: string;
@@ -34,6 +36,8 @@ export type VerdictContext = {
   mandate_limit?: number;
   timings_ms?: { detect?: number; decide?: number };
   source_excerpt?: string;
+  /** the sandbox's own address, on a verdict held for a human: where its /api/decide is (agents/sentinel_chain.py) */
+  decide_url?: string;
 };
 
 const DECISION: Record<AgenticPaymentVerdict["verdict"], Decision> = { allow: "ALLOW", needs_approval: "HUMAN", block: "BLOCK" };
@@ -109,5 +113,6 @@ export function verdictToTx(v: AgenticPaymentVerdict, ctx: VerdictContext = {}):
     raw: v,
     signals,
     trust: typeof v.trust_score === "number" ? v.trust_score : undefined,
+    decide_url: v.verdict === "needs_approval" && typeof ctx.decide_url === "string" && /^https?:\/\//.test(ctx.decide_url) ? ctx.decide_url : undefined,
   };
 }

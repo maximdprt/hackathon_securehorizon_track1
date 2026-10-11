@@ -37,6 +37,9 @@ export type TxEvent = {
   signals?: GuardSignal[];
   /** the MCP agent's trust score 0..100 (100 - risk), when its full verdict came */
   trust?: number;
+  /** a live car held for a human: the sandbox that judged it, whose /api/decide settles the guard's queue (and then
+      SentinelL1) when the city's Valider / Refuser is pressed */
+  decide_url?: string;
 };
 
 /** a transaction as the audit screens read it: the event, where it stands, who decided it and when */
