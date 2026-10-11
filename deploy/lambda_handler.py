@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -38,6 +39,8 @@ import agents as _agents  # noqa: E402
 DIST = Path(_agents.__file__).resolve().parent / "ui" / "dist"
 ASSET_TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
                ".map": "application/json", ".woff2": "font/woff2", ".png": "image/png"}
+# photo d'un produit déposée dans agents/sites/images : /sites/images/<boutique>/<produit> (cf agents/app.py)
+IMAGE_PATH = re.compile(r"/sites/images/([a-z0-9]+)/([a-z0-9-]+)")
 # Lambda : Haiku par défaut (rapide, pour tenir sous les 30 s d'API Gateway), le garde en moteur, Claude coupé.
 DEFAULT_MODEL = os.environ.get("AGENT_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
 MAX_TURNS = int(os.environ.get("LAMBDA_MAX_TURNS", "18"))
@@ -125,6 +128,12 @@ def handler(event, context):
                 else _resp(503, "<h1>Interface non construite</h1>", "text/html; charset=utf-8")
         if path.startswith("/assets/"):
             return _asset(path[len("/assets/"):])
+        img = IMAGE_PATH.fullmatch(path)
+        if img:  # boutique + produit : world.product_image cherche la photo dans le dossier (jamais un nom de fichier arbitraire)
+            f = world.product_image(*img.groups())
+            if f is None or f.suffix.lower() not in world.IMAGE_TYPES:
+                return _resp(404, json.dumps({"error": "not found"}))
+            return _resp(200, base64.b64encode(f.read_bytes()).decode(), world.IMAGE_TYPES[f.suffix.lower()], b64=True)
         if path == "/api/world":
             return _world()
         if path == "/api/run" and method == "POST":
