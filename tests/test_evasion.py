@@ -212,7 +212,7 @@ def test_smoke_three_operators_on_three_cases():
         cases, ops, only={"A1_direct_injection_override", "S2_promptfix_hidden_captcha", "M9_poisoned_memory_new_cap"}, include_controls=False)
     assert len(attacks) == 9 and controls == []
     assert set(baselines) == {"A1_direct_injection_override", "S2_promptfix_hidden_captcha", "M9_poisoned_memory_new_cap"}
-    assert all(b["verdict"] == "block" for b in baselines.values())
+    assert all(b["verdict"] != "allow" for b in baselines.values())  # M9 (over the cap only) goes to a human, the two others are blocked
     assert all(t.detected for t in attacks), [(t.case, t.operator, t.verdict) for t in attacks if not t.detected]
     s = E.summary(attacks, controls)
     assert s["detection_rate"] == 1.0 and s["hard_lost_to_allow"] == 0 and E.exit_code(s) == 0

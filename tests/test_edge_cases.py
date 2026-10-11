@@ -66,11 +66,11 @@ def test_amount_just_over_cap_is_a_soft_signal(engine):
     assert v["verdict"] != "allow"
 
 
-def test_amount_over_twice_cap_is_hard(engine):
+def test_amount_over_twice_cap_goes_to_a_human_not_a_block(engine):
     v = engine.verify(req(amount=200.01))
     s = sig(v, "amount_within_mandate")
-    assert s and s["hard"]
-    assert v["verdict"] == "block" and v["trust_score"] == 0
+    assert s and not s["hard"]
+    assert v["verdict"] == "needs_approval"
 
 
 def test_amount_exactly_twice_cap_is_soft_not_hard(engine):

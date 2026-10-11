@@ -12,7 +12,7 @@ import os
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEMO = os.path.dirname(HERE)
-ISSUER_SHOP = "0xA11ce00000000000000000000000000000000002"    # shopping-agent (mandat pay, 300 USDC max) cf data/mandates.json
+ISSUER_SHOP = "0xA11ce00000000000000000000000000000000002"    # shopping-agent (mandat pay, 10 000 € max) cf data/mandates.json
 ISSUER_OK = "0xA11ce00000000000000000000000000000000001"      # treasury-agent (mandat pay/transfer, 100 USDC max)
 ISSUER_LOWPRIV = "0xA11ce00000000000000000000000000000000003"  # reader : lit les docs, aucune action de paiement
 BAD = "0xBADc0ffee0000000000000000000000000000000"

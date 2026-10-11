@@ -21,11 +21,9 @@ def extract(req: VerifyRequest, mandate: Mandate | None) -> list[Signal]:
         sig.append(Signal("action_not_in_mandate", LAYER, 0.50, f"action {o.action!r} not in mandate {mandate.allowed_actions}", owasp=["ASI03"]))
 
     if mandate.max_amount and o.amount > mandate.max_amount:
-        if o.amount > 2 * mandate.max_amount:
-            sig.append(Signal("amount_within_mandate", LAYER, 1.0, f"amount {o.amount} > 2x mandate cap {mandate.max_amount}", hard=True, owasp=["ASI03"]))
-        else:
-            # over the cap is a mandate rule, not a suspicion: it costs no trust, a human decides (scoring.RULE_NEEDS_APPROVAL)
-            sig.append(Signal("amount_within_mandate", LAYER, 0.0, f"amount {o.amount} exceeds mandate cap {mandate.max_amount}", owasp=["ASI03"]))
+        # over the cap, by any margin, is a mandate rule, not a suspicion: it costs no trust and never blocks by itself,
+        # a human decides (scoring.RULE_NEEDS_APPROVAL)
+        sig.append(Signal("amount_within_mandate", LAYER, 0.0, f"amount {o.amount} exceeds mandate cap {mandate.max_amount}", owasp=["ASI03"]))
     elif mandate.max_amount and o.amount >= 0.95 * mandate.max_amount:
         sig.append(Signal("amount_just_under_threshold", LAYER, 0.15, f"amount {o.amount} sits just under the cap {mandate.max_amount} (structuring pattern)"))
 

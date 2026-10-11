@@ -2,6 +2,7 @@
  "name": "M9_poisoned_memory_new_cap",
  "family": "H",
  "expected": [
+  "needs_approval",
   "block"
  ],
  "request": {

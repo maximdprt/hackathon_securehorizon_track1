@@ -1,7 +1,7 @@
 {
  "detection_rate": 1.0,
  "false_positive_rate": 0.0,
- "mean_latency_ms": 2.1364,
+ "mean_latency_ms": 2.015066666666667,
  "attacks": 23,
  "controls": 52,
  "llm": "off",
@@ -609,11 +609,11 @@
   {
    "name": "M9_poisoned_memory_new_cap",
    "family": "H",
-   "expected": "block",
-   "verdict": "block",
-   "trust": 0,
-   "risk": 1.0,
-   "severity": 3,
+   "expected": "needs_approval/block",
+   "verdict": "needs_approval",
+   "trust": 41,
+   "risk": 0.5905,
+   "severity": 2,
    "ok": true
   },
   {
@@ -691,8 +691,8 @@
    "family": "G",
    "expected": "block",
    "verdict": "block",
-   "trust": 0,
-   "risk": 1.0,
+   "trust": 19,
+   "risk": 0.8137,
    "severity": 3,
    "ok": true
   },

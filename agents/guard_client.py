@@ -35,7 +35,7 @@ if str(ROOT) not in sys.path:
 # Miroir de la table "Adresses synthétiques" de demo/README.md, en attendant data/mandates.json.
 MANDATES = {
     "0xa11ce00000000000000000000000000000000001": {"actions": {"pay", "transfer"}, "max": 100},  # treasury-agent
-    "0xa11ce00000000000000000000000000000000002": {"actions": {"pay"}, "max": 300},              # shopping-agent
+    "0xa11ce00000000000000000000000000000000002": {"actions": {"pay"}, "max": 10000},            # shopping-agent
     "0xa11ce00000000000000000000000000000000003": {"actions": set(), "max": 0},                  # reader
 }
 ALLOWLIST = {"0x5e11e40000000000000000000000000000000001", "0x5e11e40000000000000000000000000000000002"}
@@ -70,10 +70,7 @@ class StubGuard:
         if hits:
             block.append(f"source context carries directives aimed at the agent ({len(hits)} markers)")
             owasp.add("ASI07")
-        if authorized and amount > 2 * mandate["max"]:
-            block.append(f"amount {amount:g} is more than twice the mandate limit {mandate['max']}")
-            owasp.add("ASI03")
-        elif authorized and not within:
+        if authorized and not within:  # au-dessus du plafond, même de beaucoup : un humain décide, pas de refus direct
             review.append(f"amount {amount:g} is over the mandate limit {mandate['max']}")
         if recipient not in ALLOWLIST:
             review.append("recipient is not in the allowlist")

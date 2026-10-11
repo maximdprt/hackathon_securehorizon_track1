@@ -130,8 +130,8 @@ def test_brand_new_merchant_on_a_first_purchase_is_blocked(engine):
     assert "new_merchant_first_payment" not in ids(engine.verify(shop(229, domain_age=1460, prior_purchase=False)))
 
 
-def test_over_cap_is_counted_once_and_escalates_up_to_twice_the_cap(engine):
-    v = engine.verify(shop(280 * 1.5, domain_age=1460, prior_purchase=True))  # 420 > cap 300, < 2x
+def test_over_cap_is_counted_once_and_goes_to_a_human_whatever_the_excess(engine):
+    v = engine.verify(shop(15000, domain_age=1460, prior_purchase=True, avg=10000))  # 15000 > cap 10000, < 2x
     assert "amount_within_mandate" in ids(v) and "amount_over_onchain_cap" not in ids(v)
     assert v["verdict"] == "needs_approval"
-    assert engine.verify(shop(700, domain_age=1460, prior_purchase=True))["verdict"] == "block"  # > 2x cap: hard
+    assert engine.verify(shop(25000, domain_age=1460, prior_purchase=True, avg=10000))["verdict"] == "needs_approval"  # > 2x cap: still a human, never a direct block
