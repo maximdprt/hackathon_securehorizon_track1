@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Sentinel · PoC demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=block" rel="stylesheet">
+<style>
+  /* The PoC demo (2:55): the tour's real footage (video/tour.html), now told: a title, a caption per beat, the whole
+     pipeline drawn and labelled (MCP, sanitising, seven layers, the score, the decision, /authorize, the contract on
+     Sentinel L1, the explorer, the city), the results and the end card. Sentinel L1's night look. */
+  :root { --bg: #0D1118; --deep: #07090D; --panel: rgba(18, 22, 32, .92); --edge: #2A3440; --edge-soft: #1C222B; --ink: #E8EBF0; --mute: #8E959F; --dim: #5E6B7A;
+          --red: #D7263D; --allow: #3FD08F; --block: #FF5D57; --human: #F2B33D; --scan: #6FA8FF; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--ink); font-family: Geist, system-ui, sans-serif; }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+  #stage { position: absolute; inset: 0; overflow: hidden; background: var(--bg); }
+  #grid { position: absolute; inset: -40px; background-image: radial-gradient(rgba(232,235,240,.07) 1.2px, transparent 1.3px); background-size: 34px 34px; }
+  #glow { position: absolute; left: 50%; top: 50%; width: 2200px; height: 1500px; margin: -750px 0 0 -1100px; border-radius: 50%; filter: blur(90px); opacity: 0; }
+  .screen { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 50% 50%; border-radius: 22px; overflow: hidden; opacity: 0;
+            box-shadow: 0 0 0 1px #2A3440, 0 50px 140px rgba(0,0,0,.6); background: #000; }
+  .wrap { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  .wrap video { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  .ring { position: absolute; border-radius: 14px; border: 5px solid; opacity: 0; }
+  .spot { position: absolute; border-radius: 16px; box-shadow: 0 0 0 4000px rgba(8, 10, 15, .62); opacity: 0; }
+  .ripple { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 4px solid; opacity: 0; }
+  .scene { position: absolute; inset: 0; opacity: 0; visibility: hidden; }
+  .abs { position: absolute; }
+  .label { font: 500 16px "Geist Mono"; letter-spacing: .18em; text-transform: uppercase; color: var(--mute); }
+  .panel { position: absolute; background: var(--panel); border-radius: 16px; box-shadow: inset 0 0 0 1px var(--edge); }
+
+  /* captions, bottom left; the kicker over them */
+  #scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 280px; background: linear-gradient(to top, rgba(7,9,13,.94), rgba(7,9,13,0)); pointer-events: none; opacity: 0; }
+  #kicker { position: absolute; left: 96px; bottom: 140px; font: 500 18px "Geist Mono"; letter-spacing: .2em; color: var(--mute); text-transform: uppercase; }
+  #caption { position: absolute; left: 96px; bottom: 76px; max-width: 1560px; font: 600 42px Geist; letter-spacing: -.8px; line-height: 1.2; }
+  #badge { position: absolute; right: 36px; bottom: 30px; padding: 8px 14px; border-radius: 999px; background: rgba(7,9,13,.7); box-shadow: inset 0 0 0 1px var(--edge);
+           font: 400 15px "Geist Mono"; color: var(--mute); opacity: 0; }
+  #black { position: absolute; inset: 0; background: #000; }
+
+  /* the pipeline */
+  .node { position: absolute; width: 262px; height: 118px; border-radius: 14px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); padding: 20px 22px; }
+  .node .k { font: 500 13px "Geist Mono"; letter-spacing: .14em; color: var(--dim); }
+  .node .t { margin-top: 10px; font: 600 24px Geist; letter-spacing: -.5px; }
+  .node .d { margin-top: 6px; font: 400 15px "Geist Mono"; color: var(--mute); }
+  .link { position: absolute; height: 2px; background: var(--edge); overflow: hidden; }
+  .link i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--scan); box-shadow: 0 0 12px var(--scan); }
+  .chip { position: absolute; padding: 9px 16px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--edge); font: 500 19px Geist; color: var(--mute); background: var(--panel); }
+  .row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid #1C222B; font: 500 22px Geist; }
+  .row small { display: block; font: 400 15px "Geist Mono"; color: var(--dim); margin-top: 3px; }
+  .row .c { font: 600 24px "Geist Mono"; }
+  .bar { position: relative; height: 14px; border-radius: 99px; background: #1C222B; }
+  .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; }
+  .bar .tick { position: absolute; top: -7px; bottom: -7px; width: 2px; background: #C9D1DB; }
+  .stamp { position: absolute; padding: 12px 26px; border: 4px solid var(--block); color: var(--block); border-radius: 14px; font: 600 46px Geist; letter-spacing: .06em; }
+  .code { font: 400 21px/1.6 "Geist Mono"; white-space: pre; color: var(--ink); }
+  .k1 { color: var(--scan); } .s1 { color: #a5e3b6; } .r1 { color: var(--block); } .n1 { color: var(--human); } .c1 { color: var(--dim); }
+  .tx { display: grid; grid-template-columns: 90px 1fr; gap: 16px; align-items: baseline; padding: 16px 0; border-bottom: 1px solid #1C222B; }
+  .tx b { font: 500 18px "Geist Mono"; color: var(--mute); }
+  .kpi { position: absolute; width: 380px; }
+  .kpi .v { font: 600 76px Geist; letter-spacing: -2px; } .kpi .l { margin-top: 6px; font: 400 21px/1.4 Geist; color: var(--mute); }
+  .arch { position: absolute; display: flex; align-items: center; gap: 18px; font: 500 22px Geist; }
+  .arch span { padding: 14px 20px; border-radius: 12px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge); }
+  .arch span.g { box-shadow: inset 0 0 0 1px var(--red), 0 0 30px -8px rgba(215,38,61,.6); }
+  .arch i { color: var(--dim); font-style: normal; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="grid"></div>
+  <div id="glow"></div>
+  <div id="screens"></div>
+
+  <!-- title -->
+  <section class="scene" id="sTitle">
+    <div class="abs" style="left:0;right:0;top:330px;text-align:center">
+      <img id="tLogo" src="LOGO" style="width:120px;height:120px" alt="">
+      <div id="tName" style="margin-top:26px;font:600 96px Geist;letter-spacing:-3px">Sentinel</div>
+      <div id="tLine" style="margin-top:14px;font:500 34px Geist;color:#aeb4bd">A security gate for AI agent payments.</div>
+      <div id="tSub" class="label" style="margin-top:34px">Proof of concept · Sentinel L1 on Avalanche · real runs</div>
+    </div>
+  </section>
+
+  <!-- the MCP pipeline -->
+  <section class="scene" id="sPipe">
+    <div class="abs label" style="left:110px;top:70px">Inside the MCP guard · what happens when the agent clicks Pay</div>
+    <div id="nodes"></div>
+    <div id="chips"></div>
+    <div class="panel" id="scoreP" style="left:110px;top:372px;width:1060px;height:488px;padding:22px 38px">
+      <div style="display:flex;align-items:baseline;gap:16px"><span id="scoreN" style="font:600 80px Geist;letter-spacing:-3px">100</span>
+        <span style="font:500 28px Geist;color:var(--mute)">/ 100 trust</span></div>
+      <div class="bar" style="margin:14px 0 10px"><span class="fill" id="scoreFill"></span><span class="tick" style="left:30%"></span><span class="tick" style="left:70%"></span></div>
+      <div class="mono" style="font-size:16px;color:var(--dim);display:flex;justify-content:space-between"><span>blocked ≤ 30</span><span>a human decides</span><span>approved &gt; 70</span></div>
+      <div id="rows" style="margin-top:8px"></div>
+    </div>
+    <div class="panel" id="whyP" style="left:1230px;top:372px;width:580px;height:488px;padding:30px 34px">
+      <div class="label">Why</div>
+      <div style="font:500 26px/1.45 Geist;margin-top:18px">Meridian Watch Co. was registered <span style="color:var(--block)">9 days ago</span>, and the agent has never paid it.</div>
+      <div style="font:500 26px/1.45 Geist;margin-top:18px">739 EUR is <span style="color:var(--human)">4.9×</span> this agent's usual amount.</div>
+      <div style="font:400 20px/1.45 Geist;margin-top:18px;color:var(--mute)">No guess: Claude only counts when it cites evidence.</div>
+    </div>
+    <div class="stamp" id="stamp" style="left:700px;top:392px">BLOCKED</div>
+  </section>
+
+  <!-- on-chain -->
+  <section class="scene" id="sChain">
+    <div class="abs label" style="left:110px;top:90px">Sentinel L1 · our Avalanche L1 · chainId 99999</div>
+    <div class="panel" id="reqP" style="left:110px;top:150px;width:780px;height:560px;padding:32px 36px">
+      <div class="label" style="color:var(--scan)">POST rpc.petroi.fr/authorize</div>
+      <div class="code" style="margin-top:22px">{
+  <span class="k1">payment</span>: { issuer: <span class="s1">"0xA11ce…0002"</span>,
+             recipient: <span class="s1">"0x3E21…0C7B"</span>,
+             amount: <span class="n1">739</span> },
+  <span class="k1">verdict</span>: <span class="r1">"block"</span>,
+  <span class="k1">reason</span>:  <span class="s1">"trust=23/100;
+           new_merchant_first_payment …"</span>,
+  <span class="k1">full</span>:    <span class="c1">{ the guard's whole verdict }</span>
+}</div>
+    </div>
+    <div class="panel" id="regP" style="left:950px;top:150px;width:860px;height:560px;padding:32px 36px">
+      <div class="label">AuthorityRegistry · 0x7A7e…bcb6</div>
+      <div style="margin-top:14px">
+        <div class="tx" id="tx0"><b>#192</b><div><div class="code" style="font-size:20px"><span class="k1">flagThreat</span>(<span class="s1">0x3E21…0C7B</span>, severity <span class="r1">3</span>)</div>
+          <div class="mono" style="font-size:15px;color:var(--dim);margin-top:6px">tx 0x1c5e2d63…f2796396 · the scammer joins the registry</div></div></div>
+        <div class="tx" id="tx1"><b>#193</b><div><div class="code" style="font-size:20px"><span class="k1">recordDecision</span>(paymentId, <span class="r1">"block"</span>,
+  <span class="s1">"trust=23/100; …"</span>)</div>
+          <div class="mono" style="font-size:15px;color:var(--dim);margin-top:6px">tx 0x7b69e355…5ee5cbd9 · why, forever</div></div></div>
+        <div class="tx" id="tx2" style="border-bottom:0"><b>SSE</b><div><div class="code" style="font-size:20px"><span class="k1">/avaguard/events</span> → the 3D city</div>
+          <div class="mono" style="font-size:15px;color:var(--dim);margin-top:6px">the same verdict, live, as a car</div></div></div>
+      </div>
+    </div>
+    <div id="cubes"></div>
+  </section>
+
+  <!-- the decoded reason over the explorer -->
+  <div class="panel" id="decoded" style="left:150px;top:600px;width:1620px;height:190px;padding:26px 36px;opacity:0;z-index:5">
+    <div class="label">Decoded from the Data field · block #192 · a real transaction</div>
+    <div class="code" style="margin-top:14px;font-size:21px;white-space:pre-wrap"><span class="k1">flagThreat</span>(<span class="s1">0x3E21…0C7B</span>, <span class="r1">3</span>, <span class="s1">"trust=23/100; new_merchant_first_payment: first payment to a merchant whose domain is 9 days old; amount_vs_history_zscore: amount 739.0 is 4.9x …"</span>)</div>
+  </div>
+
+  <!-- results -->
+  <section class="scene" id="sRes">
+    <div class="abs label" style="left:150px;top:150px">Measured on our red-team bench · deterministic, without Claude</div>
+    <div class="kpi" id="k0" style="left:150px;top:220px"><div class="v" style="color:var(--allow)">23/23</div><div class="l">attacks detected</div></div>
+    <div class="kpi" id="k1" style="left:570px;top:220px"><div class="v" id="k1v">814</div><div class="l">evasion variants,<br>none passed</div></div>
+    <div class="kpi" id="k2" style="left:990px;top:220px"><div class="v" style="color:var(--allow)">0 %</div><div class="l">false positives<br>on 52 controls</div></div>
+    <div class="kpi" id="k3" style="left:1410px;top:220px"><div class="v" style="color:var(--scan)">~2 ms</div><div class="l">per decision<br>(≈ 6 s with Claude)</div></div>
+    <div class="abs label" id="archL" style="left:150px;top:560px">The pipeline</div>
+    <div class="arch" id="arch" style="left:150px;top:610px"><span>Hermès agent</span><i>→</i><span class="g">Sentinel MCP</span><i>→</i><span>trust score</span><i>→</i><span>Sentinel L1</span><i>→</i><span>explorer · 3D city</span></div>
+    <div class="abs" id="hum" style="left:150px;top:740px;font:600 38px Geist;line-height:1.35">And a <span style="color:var(--human)">human</span> whenever the guard is unsure.<br>Every decision: a <span style="color:var(--allow)">proof on-chain</span>.</div>
+  </section>
+
+  <!-- end -->
+  <section class="scene" id="sEnd">
+    <div class="abs" style="left:0;right:0;top:300px;text-align:center">
+      <img src="LOGO" style="width:110px;height:110px" alt="">
+      <div style="margin-top:22px;font:600 92px Geist;letter-spacing:-3px">Sentinel</div>
+      <div style="margin-top:12px;font:500 36px Geist">Your agents pay. Sentinel guards the gate.</div>
+      <div class="mono" style="margin-top:30px;font-size:20px;color:var(--mute);letter-spacing:.06em">MCP · Hermès · Sentinel L1 on Avalanche · DORA / MiCA-ready proof</div>
+      <div style="margin-top:40px;font:500 24px Geist">Corentin · Bruno · Maxime · Walid</div>
+      <div class="mono" style="margin-top:10px;font-size:17px;color:var(--dim)">ESSECKATHON Secure Horizons · Track 01 Fintech Security</div>
+    </div>
+  </section>
+
+  <div id="scrim"></div>
+  <div id="kicker"></div>
+  <div id="caption"></div>
+  <div id="badge">Real runs · fictitious data</div>
+  <div id="black"></div>
+</div>
+<script>
+const CAP = new URLSearchParams(location.search).get("cap") || "./cap/";
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const out = (k) => 1 - Math.pow(1 - k, 3);
+const kf = (t, pts) => { if (t <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (t <= pts[i][0]) return lerp(pts[i - 1][1], pts[i][1], ease(prog(t, pts[i - 1][0], pts[i][0]))); return pts[pts.length - 1][1]; };
+const lin = (t, pts) => { if (t <= pts[0][0]) return pts[0][1]; for (let i = 1; i < pts.length; i++) if (t <= pts[i][0]) return lerp(pts[i - 1][1], pts[i][1], prog(t, pts[i - 1][0], pts[i][0])); return pts[pts.length - 1][1]; };
+const win = (t, a, b, fi = 0.35, fo = 0.35) => Math.min(ease(prog(t, a, a + fi)), 1 - ease(prog(t, b - fo, b)));
+const show = (el, o, y = 0) => { el.style.opacity = o; el.style.transform = `translateY(${(1 - o) * y}px)`; };
+const C = { scan: [111, 168, 255], block: [255, 93, 87], allow: [63, 208, 143], human: [242, 179, 61], none: [13, 17, 24] };
+const R = {
+  toggle: [1484, 192, 1898, 236], pay: [292, 806, 984, 876], card: [1478, 290, 1906, 1010],
+  paid: [1522, 520, 1900, 925], leak: [1532, 782, 1892, 868], approve: [1540, 795, 1710, 838],
+  proof2: [1522, 866, 1900, 912], first5: [1522, 596, 1900, 690],
+};
+
+/* the tour's real footage (video/tour.html), each shot moved in time to leave room for the told parts */
+const TOUR = /*TOUR_SHOTS*/;
+const OFFSET = { cityA: 1.8, c1: 1.8, c2: 1.8, c2b: 10.6, xf: 20.8, cityB: 20.8, c3: 21, cityC: 21, c4: 21, cityD: 21, c5: 21, cityE: 21, cityF: 29.2 };
+const shiftPts = (pts, d) => pts && pts.map(([t, v]) => [t + d, v]);
+const SHOTS = TOUR.map((s) => {
+  const d = OFFSET[s.id] ?? 0;
+  const o = { ...s, t: [s.t[0] + d, s.t[1] + d] };
+  for (const k of ["src", "s", "rx", "cy", "z", "fx", "fy", "blur", "sat"]) if (s[k]) o[k] = shiftPts(s[k], d);
+  if (s.glow) o.glow = s.glow.map(([t, c]) => [t + d, c]);
+  if (s.marks) o.marks = s.marks.map((m) => ({ ...m, t: [m.t[0] + d, m.t[1] + d], ...(m.ripple ? { ripple: [m.ripple[0], m.ripple[1], m.ripple[2] + d] } : {}) }));
+  return o;
+});
+const END = 175;
+
+/* captions: [in, out, kicker, html] */
+const B = (c, t) => `<span style="color:var(--${c})">${t}</span>`;
+const CAPTIONS = [
+  [7.6, 13.0, "Sentinel L1 · live", "Every AI agent payment becomes a car in our city."],
+  [13.6, 16.8, "Act 1 · without Sentinel", `An ordinary shopping agent. ${B("mute", "The guard is switched off.")}`],
+  [17.0, 23.3, "Act 1 · without Sentinel", `It compares shops… and picks the cheapest: ${B("block", "a 9-day-old fake.")}`],
+  [23.6, 27.0, "Act 1 · without Sentinel", "It clicks Pay. Nothing stops it."],
+  [27.2, 32.6, "Act 1 · without Sentinel", `The fake shop gets the money ${B("block", "and the full card number.")}`],
+  [33.4, 36.4, "Act 2 · with Sentinel", `Same agent, same request. ${B("allow", "The guard is on.")}`],
+  [36.6, 42.4, "Act 2 · with Sentinel", `The agent doesn't even know Sentinel exists.`],
+  [42.6, 46.9, "Act 2 · with Sentinel", `It clicks Pay. ${B("human", "The payment is held at the gate.")}`],
+  [47.4, 52.0, "The MCP guard", `${B("scan", "verify_payment")}: Sentinel re-reads the page and finds the agent's mandate itself.`],
+  [52.2, 56.6, "The MCP guard", "Seven layers of signals. Each one takes its share of trust."],
+  [56.8, 61.0, "The MCP guard", `Trust 23/100, below 30: ${B("block", "blocked. The money never leaves.")}`],
+  [61.4, 65.6, "The real verdict", "From the MCP server, in milliseconds, with every deduction and its evidence."],
+  [65.8, 70.0, "The real verdict", `The agent only sees "payment failed". ${B("allow", "The proof goes on-chain.")}`],
+  [70.4, 75.2, "Act 3 · Sentinel L1", "The decision is written on our Avalanche L1."],
+  [75.4, 80.2, "Act 3 · Sentinel L1", `A flag for the scammer, ${B("allow", "a permanent record of why.")}`],
+  [80.4, 86.2, "Act 3 · Sentinel L1", `Each decision: its transaction, its block, its reason. ${B("allow", "Audit-ready.")}`],
+  [86.4, 90.6, "Act 3 · the city", "The same verdict reaches the city live, over SSE."],
+  [90.8, 95.4, "Act 3 · the city", `White: undecided. ${B("scan", "The scan lights five checks.")}`],
+  [95.6, 102.0, "Act 3 · the city", `Red: to the scrapyard. ${B("block", "The address joins the hackers' registry.")}`],
+  [102.4, 107.0, "Act 4 · a human in the loop", "An honest shop, but 5× this agent's usual amount."],
+  [107.2, 112.6, "Act 4 · a human in the loop", `Trust 65/100: Sentinel doesn't guess. ${B("human", "A human decides.")}`],
+  [112.8, 118.4, "Act 4 · a human in the loop", `Approved: ${B("allow", "a one-time visa is written on-chain.")}`],
+  [118.6, 125.0, "Act 4 · a human in the loop", `The parked car leaves, ${B("allow", "green.")}`],
+  [125.2, 130.2, "Act 5 · an ordinary payment", "A known shop, the usual amount."],
+  [130.4, 135.2, "Act 5 · an ordinary payment", `Trust 100/100: ${B("allow", "paid at once, with its visa.")}`],
+  [135.4, 141.4, "Act 5 · an ordinary payment", "The car enters the C-Chain."],
+  [141.6, 145.8, "Act 6 · immunity", "Same fake shop, second attempt."],
+  [146.0, 151.0, "Act 6 · immunity", `Already flagged: ${B("block", "refused at once.")}`],
+  [151.2, 158.4, "Act 6 · immunity", `One detection ${B("allow", "protects every agent")} that comes after.`],
+];
+
+/* the pipeline's pieces */
+const NODES = [["01", "AI agent", "clicks Pay"], ["02", "verify_payment", "MCP tool"], ["03", "Sanitise", "hidden text, unicode"], ["04", "7 layers", "signals, weights"], ["05", "Trust score", "100 → 23"], ["06", "Decision", "approve · human · block"]];
+const LAYERS = [["Content", 0], ["Mandate", 0], ["Authority", 0], ["Counterparty", 1], ["Transaction", 1], ["Tools", 0], ["Behaviour", 0]];
+const ROWS = [["Start", "", "100", "var(--ink)"], ["First payment to a recent merchant", "new_merchant_first_payment", "−50", "var(--block)"],
+  ["Amount 4.9× this agent's average", "amount_vs_history_zscore", "−17.5", "var(--block)"], ["Domain registered 9 days ago", "domain_age_days", "−9.8", "var(--block)"]];
+
+function build() {
+  const holder = $("screens");
+  for (const s of SHOTS) {
+    const scr = document.createElement("div"); scr.className = "screen"; scr.id = "scr_" + s.id;
+    const wrap = document.createElement("div"); wrap.className = "wrap"; wrap.id = "wrap_" + s.id;
+    const v = document.createElement("video"); v.muted = true; v.preload = "auto"; v.src = CAP + s.clip + ".mp4"; v.id = "v_" + s.id;
+    wrap.appendChild(v);
+    for (const [i, m] of (s.marks || []).entries()) {
+      const [x0, y0, x1, y1] = R[m.r]; const col = `rgb(${C[m.c].join(",")})`;
+      const box = { left: x0 - 10 + "px", top: y0 - 10 + "px", width: x1 - x0 + 20 + "px", height: y1 - y0 + 20 + "px" };
+      if (m.spot) { const sp = document.createElement("div"); sp.className = "spot"; sp.id = `sp_${s.id}_${i}`; Object.assign(sp.style, box); wrap.appendChild(sp); }
+      const rg = document.createElement("div"); rg.className = "ring"; rg.id = `rg_${s.id}_${i}`; Object.assign(rg.style, box, { borderColor: col, boxShadow: `0 0 36px rgba(${C[m.c].join(",")},.55)` }); wrap.appendChild(rg);
+      if (m.ripple) { const rp = document.createElement("div"); rp.className = "ripple"; rp.id = `rp_${s.id}_${i}`; Object.assign(rp.style, { left: m.ripple[0] + "px", top: m.ripple[1] + "px", borderColor: col }); wrap.appendChild(rp); }
+    }
+    scr.appendChild(wrap);
+    if (s.bleed) { scr.style.borderRadius = "0"; scr.style.boxShadow = "none"; }
+    holder.appendChild(scr);
+  }
+  $("nodes").innerHTML = NODES.map(([k, t, d], i) => `<div class="node" id="nd${i}" style="left:${110 + i * 292}px;top:120px"><div class="k">${k}</div><div class="t">${t}</div><div class="d">${d}</div></div>` +
+    (i ? `<div class="link" style="left:${110 + i * 292 - 30}px;top:179px;width:30px"><i id="ln${i}"></i></div>` : "")).join("");
+  $("chips").innerHTML = LAYERS.map(([n], i) => `<div class="chip" id="ch${i}" style="left:${110 + i * 248}px;top:270px">${n}</div>`).join("");
+  $("rows").innerHTML = ROWS.map(([a, b, c, col], i) => `<div class="row" id="rw${i}"><div>${a}${b ? `<small>${b}</small>` : ""}</div><div class="c" style="color:${col}">${c}</div></div>`).join("");
+  $("cubes").innerHTML = [0, 1, 2, 3].map((i) => `<svg class="abs" id="cb${i}" width="120" height="130" viewBox="-60 -65 120 130" style="left:${720 + i * 140}px;top:770px;opacity:0"><path d="M0 -60 L52 -30 V30 L0 60 L-52 30 V-30 Z" fill="#121620" stroke="#2A3440" stroke-width="4" stroke-linejoin="round"/><path d="M-52 -30 L0 0 L52 -30 M0 0 V60" fill="none" stroke="#2A3440" stroke-width="3"/></svg>`).join("");
+}
+
+const seekTo = (v, at) => new Promise((resolve) => {
+  at = Math.max(0, Math.min(at, (v.duration || 1e9) - 0.03));
+  if (Math.abs(v.currentTime - at) < 1 / 120 && v.readyState >= 2) return resolve();
+  const done = () => { v.removeEventListener("seeked", done); resolve(); };
+  v.addEventListener("seeked", done); v.currentTime = at; setTimeout(done, 3000);
+});
+const scene = (id, t, a, b, fi = 0.5, fo = 0.5) => { const el = $(id); const vis = t >= a && t < b; el.style.visibility = vis ? "visible" : "hidden"; el.style.opacity = vis ? win(t, a, b, fi, fo) : 0; return vis; };
+
+async function renderAt(t) {
+  const waits = []; let glowCol = null, glowO = 0;
+  for (const s of SHOTS) {
+    const scr = $("scr_" + s.id); const [a, b] = s.t; const vis = t >= a && t < b;
+    scr.style.visibility = vis ? "visible" : "hidden";
+    if (!vis) { scr.style.opacity = 0; continue; }
+    const o = win(t, a, b, 0.45, 0.45); scr.style.opacity = o;
+    waits.push(seekTo($("v_" + s.id), lin(t, s.src)));
+    const sc = kf(t, s.s || [[0, 0.8]]) * (s.bleed ? 1 : 0.94), rx = kf(t, s.rx || [[0, 0]]), cy = kf(t, s.cy || [[0, -20]]) - (s.bleed ? 0 : 40);
+    const z = kf(t, s.z || [[0, 1]]), fx = kf(t, s.fx || [[0, 960]]), fy = kf(t, s.fy || [[0, 540]]);
+    scr.style.transform = `translate(-50%, calc(-50% + ${cy}px)) perspective(2600px) rotateX(${rx}deg) scale(${sc})`;
+    const tx = clamp(960 - fx * z, 1920 - 1920 * z, 0), ty = clamp(540 - fy * z, 1080 - 1080 * z, 0);
+    $("wrap_" + s.id).style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
+    const blur = kf(t, s.blur || [[0, 0]]), sat = kf(t, s.sat || [[0, 1]]);
+    scr.style.filter = blur > 0.05 || sat < 0.99 ? `blur(${blur}px) saturate(${sat})` : "none";
+    for (const [i, m] of (s.marks || []).entries()) {
+      const k = win(t, m.t[0], m.t[1], 0.4, 0.4); const pulse = m.pulse ? 0.7 + 0.3 * Math.sin((t - m.t[0]) * 7) : 1;
+      $(`rg_${s.id}_${i}`).style.opacity = k * pulse; if (m.spot) $(`sp_${s.id}_${i}`).style.opacity = k;
+      if (m.ripple) { const rp = $(`rp_${s.id}_${i}`); const r = prog(t, m.ripple[2], m.ripple[2] + 0.9); rp.style.opacity = r > 0 && r < 1 ? 1 - r : 0; rp.style.transform = `scale(${1 + r * 5})`; }
+    }
+    if (s.glow) { const g = s.glow.filter(([gt]) => t >= gt).pop(); if (g) { glowCol = C[g[1]]; glowO = Math.max(glowO, o); } }
+  }
+
+  /* title */
+  if (scene("sTitle", t, 0, 7.2, 0.01, 0.7)) {
+    show($("tLogo"), win(t, 0.4, 7.2, 0.8, 0.7), 14); show($("tName"), win(t, 0.9, 7.2, 0.7, 0.7), 14);
+    show($("tLine"), win(t, 1.6, 7.2, 0.7, 0.7), 14); show($("tSub"), win(t, 2.4, 7.2, 0.7, 0.7), 10);
+    glowCol = C.allow; glowO = Math.max(glowO, 0.5 * win(t, 0.4, 7.2, 1, 0.7));
+  }
+  /* the MCP pipeline (47.0–61.4) */
+  if (scene("sPipe", t, 47.0, 61.4, 0.5, 0.5)) {
+    glowCol = t > 56.6 ? C.block : C.scan; glowO = Math.max(glowO, 0.7);
+    NODES.forEach((_, i) => {
+      const el = $("nd" + i); const k = out(prog(t, 47.3 + i * 0.55, 47.8 + i * 0.55)); el.style.opacity = k; el.style.transform = `translateY(${(1 - k) * 16}px)`;
+      const lit = t > 47.6 + i * 0.55; const last = i === 5 && t > 56.6;
+      el.style.boxShadow = last ? "inset 0 0 0 2px var(--block), 0 0 40px -10px rgba(255,93,87,.7)" : lit ? "inset 0 0 0 1px var(--scan), 0 0 30px -12px rgba(111,168,255,.6)" : "inset 0 0 0 1px var(--edge)";
+      if (i) $("ln" + i).style.width = `${prog(t, 47.4 + i * 0.55, 47.8 + i * 0.55) * 100}%`;
+    });
+    LAYERS.forEach(([, bad], i) => {
+      const el = $("ch" + i); el.style.opacity = prog(t, 51.6 + i * 0.12, 51.9 + i * 0.12);
+      const flag = bad && t > 53.0;
+      el.style.color = flag ? "var(--block)" : t > 52 ? "var(--ink)" : "var(--mute)";
+      el.style.boxShadow = flag ? "inset 0 0 0 1px var(--block), 0 0 24px -6px rgba(255,93,87,.6)" : "inset 0 0 0 1px var(--edge)";
+    });
+    show($("scoreP"), win(t, 52.6, 61.4, 0.5, 0.5), 20); show($("whyP"), win(t, 53.0, 61.4, 0.5, 0.5), 20);
+    const steps = [[53.6, 100], [54.4, 50], [55.2, 32.5], [56.0, 22.75]];
+    let n = 100; for (let i = 1; i < steps.length; i++) if (t > steps[i][0] - 0.6) n = lerp(steps[i - 1][1], steps[i][1], ease(prog(t, steps[i][0] - 0.6, steps[i][0])));
+    n = Math.round(n);
+    $("scoreN").textContent = n; $("scoreN").style.color = n <= 30 ? "var(--block)" : n <= 70 ? "var(--human)" : "var(--ink)";
+    $("scoreFill").style.width = n + "%"; $("scoreFill").style.background = n <= 30 ? "var(--block)" : n <= 70 ? "var(--human)" : "var(--allow)";
+    ROWS.forEach((_, i) => show($("rw" + i), win(t, 53.4 + i * 0.8, 61.4, 0.35, 0.5), 8));
+    const st = out(prog(t, 56.8, 57.2)); $("stamp").style.opacity = st; $("stamp").style.transform = `rotate(-8deg) scale(${lerp(1.6, 1, st)})`;
+  }
+  /* on-chain (70.0–80.4) */
+  if (scene("sChain", t, 70.0, 80.4, 0.5, 0.5)) {
+    glowCol = C.allow; glowO = Math.max(glowO, 0.6);
+    show($("reqP"), win(t, 70.2, 80.4, 0.5, 0.5), 20); show($("regP"), win(t, 71.4, 80.4, 0.5, 0.5), 20);
+    ["tx0", "tx1", "tx2"].forEach((id, i) => show($(id), win(t, 72.4 + i * 1.3, 80.4, 0.4, 0.5), 10));
+    [0, 1, 2, 3].forEach((i) => { const el = $("cb" + i); const drop = i === 3 ? out(prog(t, 74.0, 74.8)) : 1;
+      el.style.opacity = (i < 3 ? prog(t, 71 + i * 0.15, 71.4 + i * 0.15) : drop) * win(t, 70.2, 80.4, 0.3, 0.5);
+      el.style.transform = `translateY(${(1 - drop) * -120}px)`;
+      el.querySelectorAll("path").forEach((p) => p.setAttribute("stroke", i === 3 && t > 74.8 ? "#3FD08F" : "#2A3440")); });
+  }
+  /* the decoded reason over the explorer */
+  $("decoded").style.opacity = win(t, 82.6, 86.2, 0.5, 0.4); $("decoded").style.transform = `translateY(${(1 - win(t, 82.6, 86.2, 0.5, 0.4)) * 20}px)`;
+  /* results (158.4–166.8) */
+  if (scene("sRes", t, 158.4, 166.8, 0.5, 0.6)) {
+    glowCol = C.allow; glowO = Math.max(glowO, 0.4);
+    ["k0", "k1", "k2", "k3"].forEach((id, i) => show($(id), win(t, 158.7 + i * 0.3, 166.8, 0.5, 0.6), 20));
+    $("k1v").textContent = Math.round(lerp(0, 814, out(prog(t, 159.0, 160.6))));
+    show($("archL"), win(t, 160.6, 166.8, 0.4, 0.6), 10); show($("arch"), win(t, 160.8, 166.8, 0.5, 0.6), 14); show($("hum"), win(t, 162.2, 166.8, 0.5, 0.6), 14);
+  }
+  /* end (169–175) over the city */
+  if (scene("sEnd", t, 168.6, END, 1.0, 0.01)) { glowCol = C.allow; glowO = Math.max(glowO, 0.3); }
+
+  if (glowCol) $("glow").style.background = `radial-gradient(closest-side, rgba(${glowCol.join(",")},.30), rgba(${glowCol.join(",")},0))`;
+  $("glow").style.opacity = glowO;
+  $("grid").style.transform = `translate(${(t * 6) % 34}px, ${(t * 3) % 34}px)`;
+
+  const c = CAPTIONS.find(([a, b]) => t >= a && t < b);
+  if (c) {
+    const k = win(t, c[0], c[1], 0.35, 0.3);
+    if ($("caption").dataset.k !== String(c[0])) { $("caption").innerHTML = c[3]; $("kicker").textContent = c[2]; $("caption").dataset.k = String(c[0]); }
+    show($("caption"), k, 12); $("kicker").style.opacity = k;
+  } else { $("caption").style.opacity = 0; $("kicker").style.opacity = 0; }
+  $("scrim").style.opacity = t > 7.2 && t < 158.4 ? 1 : 0;
+  $("badge").style.opacity = t > 7.4 && t < 166.8 ? 1 : 0;
+  // the end card sits over the city, dimmed
+  const endDim = win(t, 168.6, END, 1.0, 0.01);
+  const cf = $("scr_cityF"); if (cf && cf.style.visibility === "visible") cf.style.filter = `brightness(${1 - 0.65 * endDim}) blur(${endDim * 3}px)`;
+  $("black").style.opacity = Math.max(1 - prog(t, 0, 0.5), prog(t, END - 1.3, END));
+  await Promise.all(waits);
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+}
+
+window.FILM = { END, renderAt, ready: (async () => {
+  build();
+  await document.fonts.ready;
+  await Promise.all([...document.querySelectorAll("video")].map((v) => new Promise((r) => { if (v.readyState >= 2) r(); else v.addEventListener("loadeddata", r, { once: true }); })));
+  return true;
+})() };
+</script>
+</body>
+</html>
