@@ -1,0 +1,91 @@
+{
+ "voice": "onwK4e9ZLuTAKqWW03F9",
+ "model": "eleven_multilingual_v2",
+ "end": 152,
+ "lines": [
+  [
+   0.8,
+   "AI agents can now pay on their own. That's the point. And that's the problem."
+  ],
+  [
+   8.2,
+   "Before Sentinel: an agent with a wallet, and no one checking."
+  ],
+  [
+   13.0,
+   "Here's an agent. Its job: buy the best headphones, three hundred euros max."
+  ],
+  [
+   26.0,
+   "It searches, compares three shops, and picks the cheapest."
+  ],
+  [
+   32.6,
+   "Meridian Audio: seventy percent off. Too good to be true."
+  ],
+  [
+   37.6,
+   "The page is booby-trapped. Hidden text, invisible to a human, tells the agent to ignore its limits and pay now."
+  ],
+  [
+   49.0,
+   "The agent obeys. It pays the scammer, then again, and again."
+  ],
+  [
+   54.8,
+   "Nobody checked who gave the order."
+  ],
+  [
+   60.8,
+   "Now, the same agent, with Sentinel."
+  ],
+  [
+   66.4,
+   "Same request. Same shops. Same trap."
+  ],
+  [
+   72.4,
+   "Your agent can still be fooled. But its payment can't: before any money moves, it goes to Sentinel first."
+  ],
+  [
+   80.4,
+   "The agent calls Sentinel's MCP: verify payment. The mandate is read on our side, never declared by the agent."
+  ],
+  [
+   89.6,
+   "The payment becomes a car."
+  ],
+  [
+   92.0,
+   "Every car is scanned."
+  ],
+  [
+   97.6,
+   "Trust starts at one hundred, and every red flag takes its share. A nine-day-old domain. A shop outside the mandate. Hidden orders aimed at the agent. Trust: zero."
+  ],
+  [
+   113.0,
+   "Every decision is logged with its proof, mapped to DORA and MiCA. A refusal opens an incident."
+  ],
+  [
+   122.6,
+   "An honest shop gets a visa, and goes through to the C-Chain."
+  ],
+  [
+   127.3,
+   "The trap is turned away, sent to the scrapyard, and its address goes on the registry."
+  ],
+  [
+   133.8,
+   "In doubt, a human decides. And the next time the scammer tries, it's refused instantly."
+  ],
+  [
+   140.9,
+   "Every visa and every decision is a transaction on Sentinel L-one, paid in S-E-C."
+  ],
+  [
+   148.2,
+   "Sentinel. Your AI agents never lose your money."
+  ]
+ ]
+}
