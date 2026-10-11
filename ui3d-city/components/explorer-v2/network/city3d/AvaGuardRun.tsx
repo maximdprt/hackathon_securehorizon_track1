@@ -4,7 +4,7 @@
 // (sim/Director.ts) tweens `motion`; this reads it every frame (no React state per frame) to drive our car along our
 // street's lanes, and plays the analysis at the toll. It registers how the Director moves the camera (their Rig, by a
 // Shot), flashes the C-Chain (their HubTower, HUB_KICK) and shakes. Mounted in City3D.tsx inside <Rise>.
-import { useEffect, useMemo, useRef, type RefObject } from "react";
+import { Suspense, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, Group, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, Vector3 } from "three";
@@ -22,7 +22,6 @@ import type { CityModel } from "./model";
 import { AVAGUARD3, FLEET, type Theme } from "./palette";
 import type { Shot } from "./Rig";
 import { TIME } from "./shaders";
-import { CANOPY_H, EQUATOR, PODS, ROOF, podGeometry } from "./Traffic";
 import { guardGeoOf, poseAt, type GuardGeo } from "./guardGeo";
 import { Crown, ProofStack, RegistryBin, Scrapyard, Toll } from "./Parcel";
 import { HumanLot } from "./HumanLot";
@@ -446,7 +445,10 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
       <Door name="guard:proof" at={[geo.proof.x, geo.S * 0.4, geo.proof.z]} tip={<ProofTip />} onOpen={OPEN.proof}>
         <ProofStack geo={geo} theme={theme} />
       </Door>
-      <GuardCar geo={geo} theme={theme} />
+      {/* the car's model loads apart (carModel.ts), the run stands meanwhile */}
+      <Suspense fallback={null}>
+        <GuardCar geo={geo} theme={theme} />
+      </Suspense>
       <ContractHolo geo={geo} />
       <AuthorityThread geo={geo} />
       <Snowball geo={geo} />

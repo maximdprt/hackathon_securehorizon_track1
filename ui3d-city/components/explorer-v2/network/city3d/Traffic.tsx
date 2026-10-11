@@ -14,6 +14,7 @@ import {
   InstancedBufferAttribute,
   InstancedMesh,
   Mesh,
+  MeshBasicMaterial,
   MeshLambertMaterial,
   MeshPhongMaterial,
   NearestFilter,
@@ -33,6 +34,7 @@ import { GLASS3, type Theme } from "./palette";
 import { BLOCK_H } from "./model";
 import { countOf, durOf, type RouteStreets } from "./lanes";
 import { TIME } from "./shaders";
+import { CAR_LENGTH, CAR_SCALE, useCarGeometries } from "./carModel";
 
 /* The city's ICM traffic in 3D, as the map's fleet drives it: each route's
    vehicles run sender to receiver in their lane, on the right, at the
@@ -82,6 +84,11 @@ export const SIZE = 1.1;
 /** the part of a pod's length it takes to leave its lot, and to settle into the receiver's */
 export const RAMP_OUT = 0.55;
 export const RAMP_IN = 0.9;
+
+// AVAGUARD: every vehicle is the small car of carModel.ts instead of the pod (PROMPT_voitures_City.md); the pods stay
+// built, hidden, for the kinds that would not be cars
+/** every transaction a car, the buses, trucks and vans too */
+const ALL_CARS = true;
 
 interface Vehicle {
   route: number;
@@ -492,6 +499,7 @@ export function Traffic({
   tint?: { key: string; color: string } | null;
 }) {
   const dark = theme === "dark";
+  const carGeos = useCarGeometries(); // AVAGUARD
   const scale = Math.min(1.25, Math.max(0.6, city.lot / LOT));
   // each route's pods: as many as it is busy, each leaving in turn, a turn of its loop apart; the whole city cruises at one speed
   const fleet = useMemo(() => {
@@ -558,6 +566,13 @@ export function Traffic({
     () => ({
       body: driven(new MeshLambertMaterial({ color: 0xffffff }), shared, "pod-body", ["VEH_POD"], strip),
       canopy: driven(new MeshPhongMaterial({ color: new Color("#EBF0FA"), specular: new Color("#5C6674"), shininess: 60 }), shared, "pod-canopy", ["VEH_POD"]),
+      // AVAGUARD: the car's six materials, driven as the pod's parts are, without VEH_POD: aDim is the car's scale
+      carPaint: driven(new MeshLambertMaterial({ color: 0xffffff }), shared, "car-paint"),
+      carDark: driven(new MeshLambertMaterial({ color: new Color("#15191F") }), shared, "car-dark"),
+      carGlass: driven(new MeshPhongMaterial({ color: new Color("#0E1520"), specular: new Color("#5C6674"), shininess: 80 }), shared, "car-glass"),
+      carMetal: driven(new MeshLambertMaterial({ color: new Color("#7D858F") }), shared, "car-metal"),
+      carFront: driven(new MeshBasicMaterial({ color: new Color("#FFF3DA") }), shared, "car-front"),
+      carRear: driven(new MeshBasicMaterial({ color: new Color("#FF2A1F") }), shared, "car-rear"),
       shadow: new ShaderMaterial({
         uniforms: { ...shared, uShade: { value: 0.26 } },
         defines: { VEH_SHADOW: "" },
@@ -573,6 +588,7 @@ export function Traffic({
   );
   // the canopy catches the sky, as the towers' glass does (Lighting.tsx)
   mats.canopy.userData.cityEnv = 0.35;
+  mats.carGlass.userData.cityEnv = 0.35;
   useEffect(
     () => () => {
       for (const m of Object.values(mats)) m.dispose();
@@ -612,23 +628,38 @@ export function Traffic({
       if (color) m.instanceColor = new InstancedBufferAttribute(new Float32Array(count * 3).fill(1), 3);
       return m;
     };
-    const body = make(podGeometry(), mats.body, 1, (v) => ({ box: [0, EQUATOR, 0, 0], dim: [PODS[v.kind].length, 1, 1] }), true);
+    // AVAGUARD: a car hides its pod (aDim.x 0, the VEH_POD shader's vehGone), and a pod hides its car
+    const isCar = (v: Vehicle) => ALL_CARS || v.kind === "car";
+    const carPart = (v: Vehicle) => ({ box: [0, 0, 0, 0], dim: isCar(v) ? [CAR_SCALE, CAR_SCALE, CAR_SCALE] : [0, 0, 0] });
+    const body = make(podGeometry(), mats.body, 1, (v) => ({ box: [0, EQUATOR, 0, 0], dim: isCar(v) ? [0, 1, 1] : [PODS[v.kind].length, 1, 1] }), true);
     body.geometry.setAttribute("aGlow", new InstancedBufferAttribute(new Float32Array(Math.max(1, n) * 3), 3));
     return {
       body,
-      shadow: make(new PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mats.shadow, 1, (v) => ({ box: [0, 0.012, 0, 0], dim: [PODS[v.kind].length * 1.1, 1, 1.3] }), false),
+      shadow: make(
+        new PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+        mats.shadow,
+        1,
+        (v) => ({ box: [0, 0.012, 0, 0], dim: isCar(v) ? [CAR_LENGTH * CAR_SCALE * 1.1, 1, 1.3 * CAR_SCALE] : [PODS[v.kind].length * 1.1, 1, 1.3] }),
+        false,
+      ),
       canopy: make(
         podGeometry(),
         mats.canopy,
         1,
         (v) => {
           const c = PODS[v.kind].canopy;
-          return { box: [c.x, ROOF - 0.055, 0, 0], dim: [c.length / c.width, CANOPY_H, c.width] };
+          return { box: [c.x, ROOF - 0.055, 0, 0], dim: isCar(v) ? [0, 1, 1] : [c.length / c.width, CANOPY_H, c.width] };
         },
         false,
       ),
+      carPaint: make(carGeos.Paint.clone(), mats.carPaint, 1, carPart, true),
+      carDark: make(carGeos.Dark.clone(), mats.carDark, 1, carPart, false),
+      carGlass: make(carGeos.Glass.clone(), mats.carGlass, 1, carPart, false),
+      carMetal: make(carGeos.Metal.clone(), mats.carMetal, 1, carPart, false),
+      carFront: make(carGeos.LightFront.clone(), mats.carFront, 1, carPart, false),
+      carRear: make(carGeos.LightRear.clone(), mats.carRear, 1, carPart, false),
     };
-  }, [fleet, mats]);
+  }, [fleet, mats, carGeos]);
   useEffect(
     () => () => {
       for (const m of Object.values(meshes)) {
@@ -662,8 +693,11 @@ export function Traffic({
       meshes.body.setColorAt(i, shell.clone().lerp(steel, bright ? 0 : 0.3));
       const g = glows[v.route].clone().lerp(steel, bright ? 0 : 0.7);
       glow.setXYZ(i, g.r, g.g, g.b);
+      // AVAGUARD: the strip's colour on the car's body, a little softened by the shell
+      meshes.carPaint.setColorAt(i, g.clone().lerp(shell, 0.2));
     });
     glow.needsUpdate = true;
+    if (meshes.carPaint.instanceColor) meshes.carPaint.instanceColor.needsUpdate = true;
     if (meshes.body.instanceColor) meshes.body.instanceColor.needsUpdate = true;
     mats.shadow.uniforms.uShade.value = dark ? 0.42 : 0.26;
   }, [fleet, meshes, mats, routes, city, blue, on, theme, dark, hovered, picked, tint]);
@@ -761,6 +795,12 @@ export function Traffic({
         <primitive object={meshes.shadow} />
         <primitive object={meshes.body} />
         <primitive object={meshes.canopy} />
+        <primitive object={meshes.carPaint} />
+        <primitive object={meshes.carDark} />
+        <primitive object={meshes.carGlass} />
+        <primitive object={meshes.carMetal} />
+        <primitive object={meshes.carFront} />
+        <primitive object={meshes.carRear} />
       </group>
       {/* beside the fleet, so a still reader's lanes still answer the cursor; keyed by the mesh, so new streets do too (Buildings.tsx) */}
       <primitive key={pick.uuid} object={pick} onPointerOver={over} onPointerMove={over} onPointerOut={out} onClick={click} />

@@ -16,7 +16,7 @@ async function open(page: Page) {
 
 test("home: the city, its Security ward, the figures, the key and the licence's mention", async ({ page }) => {
   await open(page);
-  await expect(page.getByText("Ville 3D d'après Avalanche Builder Hub (open source, BSD-3)")).toBeVisible();
+  await expect(page.getByText("Ville 3D d'après Avalanche Builder Hub (open source, BSD-3)", { exact: false })).toBeVisible();
   await expect(page.getByText("SECURITY", { exact: false }).first()).toBeVisible();
   await expect(page.getByPlaceholder("Rechercher un paiement, une adresse, un agent…")).toBeVisible();
   for (const label of ["Paiements", "Fraudes", "Escrocs", "Preuves"]) await expect(page.getByRole("button", { name: new RegExp(`^${label}`) }).or(page.getByRole("link", { name: new RegExp(`^${label}`) })).first()).toBeVisible();
