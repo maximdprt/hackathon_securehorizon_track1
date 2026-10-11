@@ -11,12 +11,13 @@ import type { TxEvent } from "./types";
      NEXT_PUBLIC_REGISTRY_ADDRESS=0x...                          (the deployed AuthorityRegistry, CLAUDE.md 11.3)
      NEXT_PUBLIC_CHAIN=l1     NEXT_PUBLIC_L1_CHAIN_ID=99999 */
 export const liveConfig = {
-  sse: process.env.NEXT_PUBLIC_AVAGUARD_SSE_URL,
+  // défauts de prod (SentinelL1) quand .env.local ne définit rien : la ville est live sans config supplémentaire
+  sse: process.env.NEXT_PUBLIC_AVAGUARD_SSE_URL || "https://rpc.petroi.fr/avaguard/events",
   ws: process.env.NEXT_PUBLIC_AVAGUARD_WS_URL,
-  rpc: process.env.NEXT_PUBLIC_RPC_URL,
-  registry: process.env.NEXT_PUBLIC_REGISTRY_ADDRESS as Hex | undefined,
-  chain: process.env.NEXT_PUBLIC_CHAIN === "l1" ? "Sentinel L1" : "Fuji",
-  l1ChainId: Number(process.env.NEXT_PUBLIC_L1_CHAIN_ID ?? 0),
+  rpc: process.env.NEXT_PUBLIC_RPC_URL || "https://rpc.petroi.fr/rpc",
+  registry: (process.env.NEXT_PUBLIC_REGISTRY_ADDRESS || "0x7A7e5F80BE65F588DF975C4Aa563BA442db8bcb6") as Hex,
+  chain: process.env.NEXT_PUBLIC_CHAIN === "fuji" ? "Fuji" : "Sentinel L1",
+  l1ChainId: Number(process.env.NEXT_PUBLIC_L1_CHAIN_ID ?? 99999),
 };
 
 // the event as AuthorityRegistry deploys it on SentinelL1 (contracts/AuthorityRegistry.sol on main)

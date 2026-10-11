@@ -44,6 +44,9 @@ MAX_TURNS = int(os.environ.get("LAMBDA_MAX_TURNS", "18"))
 # en Lambda, seul /tmp est inscriptible : le moteur du garde y écrit son état jetable
 import demo.golden_path as _gp  # noqa: E402
 _gp.OUT = Path("/tmp/guard_out")
+# le garde lit les menaces on-chain (refus direct d'une adresse déjà flaguée, même à froid)
+os.environ.setdefault("GUARD_CONTRACT_ADDRESS", "0x7A7e5F80BE65F588DF975C4Aa563BA442db8bcb6")
+os.environ.setdefault("AVAX_RPC_URL", "https://rpc.petroi.fr/rpc")
 _llms: dict[str, BedrockLLM] = {}
 _guard = None  # construits à la première requête (l'init Lambda reste légère, les erreurs remontent en 500 lisible)
 _chain = None

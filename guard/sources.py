@@ -119,7 +119,8 @@ class ChainSource:
         from web3 import Web3
         active, max_amount, role = self.contract.functions.authorities(Web3.to_checksum_address(issuer)).call()
         if not active and not role:
-            return None
+            # issuer not granted on-chain: use the local mandate registry (our agents are seeded there, not on-chain)
+            return self.fallback.get_authority(issuer) if self.fallback else None
         fl, sev, reason = self.is_flagged(issuer)
         return Authority(bool(active), float(max_amount) / 10 ** self.decimals, str(role), fl, sev, reason)
 
@@ -145,7 +146,8 @@ class ChainSource:
     def mark_threat(self, key: str, severity: int, reason: str) -> None:
         if self.fallback:  # local memory first: survives a failed or read-only chain write
             self.fallback.mark_threat(key, severity, reason)
-        self._send(self.contract.functions.flagThreat(subject_key(key), severity, reason[:200]))
+        if self.owner_key:  # read-only deployments never write: the chain write is done by the authorize API
+            self._send(self.contract.functions.flagThreat(subject_key(key), severity, reason[:200]))
 
     def nonce_seen(self, nonce: str) -> bool:
         # nonces stay local: the contract has no nonce store
