@@ -44,9 +44,9 @@ export type SimState = {
     test panel's too) drives in as a car; ?live=0 keeps the demo alone, ?live=1 forces the stream */
 function initialMode(): SimState["mode"] {
   const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("live") : null;
-  if (q === "0") return "demo";
+  if (q === "0") return "demo";  // ?live=0 force la démo scriptée (pitch hors-ligne)
   if (q === "1") return "live";
-  return process.env.NEXT_PUBLIC_AVAGUARD_SSE_URL || process.env.NEXT_PUBLIC_AVAGUARD_WS_URL ? "live" : "demo";
+  return "live";  // live par défaut : la ville montre les vraies transactions on-chain (SSE par défaut sur rpc.petroi.fr)
 }
 
 const initial = (): SimState => ({
