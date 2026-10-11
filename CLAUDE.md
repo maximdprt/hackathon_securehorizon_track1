@@ -83,6 +83,16 @@ Donner de la **crypto en récompense** quand un utilisateur fait une transaction
 - `contracts/AuthorityRegistry.sol` + `contracts/GuardedVault.sol` : contrats "visa" + vault gardé. ✅ (en cours de déploiement)
 - `api/authorize.py` : exécuteur on-chain (verdict → visa/flag/pending). ✅
 - Accès AWS OK, Bedrock + Claude OK. ✅
+- `guard/` + `mcp_server.py` : **le cerveau** (Corentin/Bruno). Serveur MCP avec 3 outils (`verify_payment`, `list_pending`, `approve_pending`). Pipeline : sanitisation (HTML caché, Unicode invisible, base64) → 7 couches de signaux (contenu, mandat, autorité, contrepartie, transaction, outils, comportement) → blocs durs → Claude Bedrock → **score de confiance dégressif** (part de 100, chaque signal retire une part, bloc dur = 0 ; allow ≥ 70, humain 30 à 70, block < 30) → sévérité → file humaine + log JSONL + registre menaces. Le mandat est résolu côté serveur (`data/mandates.json`), jamais déclaré par l'agent. ✅
+- `redteam/` : 21 scénarios (S1..S7, M1..M10, A1, I1, contrôles) + `demo/fixtures` (7). `python redteam/run.py` → detection rate 100 %, faux positifs 0 %, latence < 1 ms sans Claude, ~3 s avec. ✅
+- `detection/research/` : taxonomie, 71 features, scénarios, scrap. ✅
+- **Campagne de tests** (`docs/test-campaign.md`) : 47 cas bénins (faux positifs 38 % → 0 %), évasion 850 mutations, fuzzing 800 requêtes, protocole MCP, persistance, 3 passes Claude live stables. Lexique réécrit en précision. ✅
+- `agents/` : **les 2 agents** (shopping + x402), vrais agents Bedrock Haiku avec tool use, le garde devant le wallet. Hébergés sur **AWS Lambda** (image arm64, API Gateway) : https://yo6k6eid4h.execute-api.us-west-2.amazonaws.com/ (index HTML, `?agent=x402&scenario=premium&guard=on`, `&mode=async` + `?run=<id>` pour les runs longs). Déploiement : `deploy/deploy_lambda.py`. ✅
+- Spec : `docs/superpowers/specs/2026-10-10-guard-decision-engine-design.md`.
+- **Hermès sur AWS (navigateur agentique hébergé)** : le navigateur de Corentin + le garde + la chaîne tournent sur AWS Lambda (image arm64, API Gateway), servant l'UI React et `/api/run` (run complet en ndjson, rejoué animé). URL : https://yo6k6eid4h.execute-api.us-west-2.amazonaws.com/ . Modèle par défaut Haiku (rapide, run ~18 s < 30 s), garde moteur in-process, décision écrite sur SentinelL1 (voiture dans la ville). Handler `deploy/lambda_handler.py`, déploiement `deploy/deploy_lambda.py`. ✅ Testé live (bloc + flag + décision on-chain).
+- **Parcours complet branché** (chat sandbox de Corentin → SentinelL1) : l'agent est un agent ordinaire, **il ne connaît pas le garde**. Il cherche parmi 5 boutiques, choisit et **envoie sa transaction à SentinelL1**. C'est à l'entrée de la chaîne (`agents/sentinel_gateway.py`) que notre MCP `verify_payment` (vrai moteur) dit si la transaction est piégée ; `agents/sentinel_chain.py` inscrit la décision à `POST https://rpc.petroi.fr/authorize` (allow → visa, block → flag, needs_approval → `needs_human`) ; l'UI montre le verdict + les tx (explorer) + le lien ville 3D. Lancer : `cd agents/ui && npm install && npm run build` puis `set -a; source .env; set +a; .venv/bin/python agents/app.py --open` (`--guard engine|stub|off`, `--chain URL|off`, `GUARD_LLM=on` pour Claude). Démo : Nimbus SE 249 → allow (visa), Series 10 > 300 → humain, Meridian (domaine de 9 jours) → block puis refus direct. ✅ Testé on-chain le 2026-10-10. Reste : exécuter le paiement via `GuardedVault.pay` (wallet agent à allowlister + approvisionner, côté Walid).
+
+**Lancer le garde** : `uv venv --python 3.12 .venv && uv pip install -e ".[dev]"` puis `set -a; source .env; set +a; .venv/bin/python mcp_server.py` (stdio). `GUARD_LLM=off` pour tourner sans Bedrock. Tests : `.venv/bin/pytest`. Pour brancher Fuji (Walid) : `GUARD_CONTRACT_ADDRESS=0x... AVAX_RPC_URL=... GUARD_OWNER_KEY=...` + `uv pip install -e ".[chain]"`.
 
 ### 11.1 Déploiement L1 (Walid) — coordonnées
 - **EC2** : `i-086e4f697fb388d91` (Ubuntu 24.04), SSM online, SG `sg-04545b9eb3cb167d6` (ports 9650 RPC + 9651 staking ouverts).
@@ -146,7 +156,7 @@ Sur Fuji actuel (post-upgrade Granite), seul **avalanchego ≥ 1.15.x (RPCChainV
 - Reste : `platform-cli subnet convert-to-l1` (node up) → déployer les 2 contrats → `setVault` → MAJ `.env` (`L1_RPC_URL`, `REGISTRY_ADDRESS`).
 
 ## 12. Prochaines étapes (priorité)
-1. **Walid** : déployer la L1 / le contrat "visa" + coder le `mcp_server.py` (relie le scorer + la lecture on-chain + la décision).
+1. **Walid** : déployer la L1 / le contrat "visa", puis brancher `guard/sources.py:ChainSource` (lecture `authorities`/`threats`, écriture `recordDecision`/`flagThreat`) via les variables d'env. Le `mcp_server.py` est fait côté Corentin/Bruno. **Lire `docs/chain-e2e.md`** : test bout en bout sur le vrai contrat compilé (`tests/test_chain_e2e.py`, 3 actes on-chain), valeurs de seed Remix en 6 décimales, et l'écart restant (`maxAmount == 0` veut dire sans plafond on-chain mais jamais payer dans `mandates.json`). `ChainSource` est aligné sur le contrat déployé (`recordDecision` à verdict chaîne).
 2. **Corentin + Bruno** : monter les 2 agents sur AWS + les scénarios d'attaque + produire le scoring.
 3. **Maxime** : l'UI 3D + la slide compliance DORA/MiCA + le pitch.
 4. Tous : chemin doré Acte 1 (agent vidé) → Acte 2 (sauvé + visa refusé + log on-chain) → Acte 3 (2e agent immunisé).
@@ -156,4 +166,5 @@ Sur Fuji actuel (post-upgrade Granite), seul **avalanchego ≥ 1.15.x (RPCChainV
 - `.env` **jamais commité** (déjà dans `.gitignore`). Creds AWS temporaires = rafraîchir depuis la page event quand ça expire.
 - Données synthétiques + canary flags (`FLAG{team2-canary}`), jamais de vraie donnée.
 - Noter les adresses de contrat déployées ici.
+- Avant de rendre le repo public : `scripts/scrub_check.sh` (scan historique + working tree, exit 1 si secret), checklist dans `docs/scrub-report.md` (rafraîchir les creds AWS, supprimer `mcp_server.log`, activer Secret scanning sur GitHub). Audit du 2026-10-10 : aucun secret dans l'historique.
 - Livrables : PoC détection+réponse, response playbook, defense sheet (1 page), compliance slide (DORA/MiCA/AML/AI Act), pitch 4 min + vidéo démo, repo public (après scrub des secrets).
