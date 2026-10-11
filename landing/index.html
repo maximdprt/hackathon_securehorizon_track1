@@ -132,43 +132,6 @@
   .chainbox h3 { font: 600 clamp(22px, 2.4vw, 30px)/1.2 var(--sans); letter-spacing: -1px; max-width: 560px; }
   .chainbox .links { display: flex; gap: 10px; flex-wrap: wrap; }
 
-  /* the account window: log in, create an account, forgot password (wired to the auth provider later) */
-  dialog.acc { margin: auto; width: min(420px, calc(100vw - 32px)); padding: 0; border: 0; border-radius: 18px; background: var(--panel); color: var(--ink);
-    box-shadow: inset 0 0 0 1px var(--edge), 0 40px 120px -20px #000; }
-  dialog.acc::backdrop { background: rgba(4, 6, 9, .72); backdrop-filter: blur(6px); }
-  dialog.acc[open] { animation: pop .22s cubic-bezier(.2,.7,.2,1); }
-  @keyframes pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
-  .acc .in { padding: 32px 32px 28px; position: relative; }
-  .acc .x { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: none; color: var(--mute); cursor: pointer; font: 400 20px var(--sans); }
-  .acc .x:hover { background: #ffffff0d; color: var(--ink); }
-  .acc .logo { width: 36px; height: 36px; }
-  .acc h2 { margin-top: 18px; font: 600 24px/1.2 var(--sans); letter-spacing: -.8px; }
-  .acc .hint { margin-top: 6px; font: 400 14px/1.5 var(--sans); color: var(--mute); }
-  .acc .social { display: grid; gap: 8px; margin-top: 22px; }
-  .acc .soc { display: flex; align-items: center; justify-content: center; gap: 10px; height: 44px; border-radius: 10px; border: 0; cursor: pointer; background: var(--deep);
-    color: var(--ink); box-shadow: inset 0 0 0 1px var(--edge); font: 500 14px var(--sans); }
-  .acc .soc:hover { background: #ffffff08; }
-  .acc .soc svg { width: 18px; height: 18px; }
-  .acc .or { display: flex; align-items: center; gap: 12px; margin: 20px 0 6px; font: 500 11px var(--mono); letter-spacing: .16em; color: var(--dim); text-transform: uppercase; }
-  .acc .or::before, .acc .or::after { content: ""; flex: 1; height: 1px; background: var(--edge-soft); }
-  .acc form { display: grid; gap: 14px; margin-top: 14px; }
-  .acc label, .acc .field { display: grid; gap: 6px; font: 500 13px var(--sans); color: #c9ced6; }
-  .acc .row { display: flex; justify-content: space-between; align-items: baseline; }
-  .acc input[type=email], .acc input[type=password], .acc input[type=text] { height: 44px; padding: 0 14px; border-radius: 10px; border: 0; background: var(--deep); color: var(--ink);
-    box-shadow: inset 0 0 0 1px var(--edge); font: 400 15px var(--sans); outline: none; transition: box-shadow .15s; }
-  .acc input:focus { box-shadow: inset 0 0 0 1px var(--scan), 0 0 0 3px rgba(111, 168, 255, .18); }
-  .acc .check { display: flex; gap: 10px; align-items: flex-start; font: 400 13px/1.45 var(--sans); color: var(--mute); }
-  .acc .check input { margin-top: 2px; accent-color: var(--ink); }
-  .acc .link { color: var(--ink); font: 500 13px var(--sans); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--edge); cursor: pointer; background: none; border: 0; padding: 0; }
-  .acc .link:hover { text-decoration-color: var(--ink); }
-  .acc .go { height: 46px; border-radius: 100px; border: 0; cursor: pointer; background: var(--ink); color: var(--deep); font: 500 15px var(--sans); margin-top: 4px; }
-  .acc .go:hover { background: #fff; }
-  .acc .swap { margin-top: 18px; text-align: center; font: 400 14px var(--sans); color: var(--mute); }
-  .acc .done { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: rgba(63, 208, 143, .08); box-shadow: inset 0 0 0 1px rgba(63, 208, 143, .35);
-    font: 400 13px/1.5 var(--sans); color: #bfeedb; }
-  .acc .terms { margin-top: 16px; text-align: center; font: 400 12px/1.5 var(--sans); color: var(--dim); }
-  .acc [hidden] { display: none !important; }
-
   /* final */
   .final { text-align: center; padding: 96px 0 120px; border-top: 1px solid var(--edge-soft); }
   .final img { width: 52px; height: 52px; }
@@ -321,95 +284,15 @@
 </footer>
 
 
-<dialog class="acc" id="acc" aria-labelledby="acc-title">
-  <div class="in">
-    <button class="x" type="button" data-close aria-label="Close">×</button>
-    <img class="logo" src="assets/logo-white.png" alt="Sentinel">
-
-    <!-- log in -->
-    <div data-view="signin">
-      <h2 id="acc-title">Log in to Sentinel</h2>
-      <p class="hint">Welcome back. Your agents are waiting.</p>
-      <div class="social">
-        <button class="soc" type="button" data-provider="google"><svg viewBox="0 0 24 24"><path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.4-1.6 4.1-5.4 4.1-3.3 0-5.9-2.7-5.9-6s2.6-6 5.9-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.6 14.6 2.6 12 2.6 6.9 2.6 2.7 6.8 2.7 12s4.2 9.4 9.3 9.4c5.4 0 8.9-3.8 8.9-9.1 0-.6-.1-1.1-.2-1.6H12z"/></svg>Continue with Google</button>
-        <button class="soc" type="button" data-provider="github"><svg viewBox="0 0 24 24" fill="#E8EBF0"><path d="M12 2.5a9.5 9.5 0 0 0-3 18.5c.5.1.7-.2.7-.5v-1.7c-2.7.6-3.2-1.2-3.2-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.1-.2-4.4-1.1-4.4-4.7 0-1 .4-1.9 1-2.6-.1-.2-.4-1.2.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.4.2 2.4.1 2.6.6.7 1 1.5 1 2.6 0 3.7-2.3 4.5-4.4 4.7.3.3.6.9.6 1.8v2.7c0 .3.2.6.7.5A9.5 9.5 0 0 0 12 2.5z"/></svg>Continue with GitHub</button>
-      </div>
-      <div class="or">or</div>
-      <form data-form="signin">
-        <label>Email<input type="email" name="email" autocomplete="email" placeholder="you@company.com" required></label>
-        <div class="field"><div class="row"><label for="si-pw">Password</label><button class="link" type="button" data-go="forgot">Forgot password?</button></div>
-          <input id="si-pw" type="password" name="password" autocomplete="current-password" placeholder="••••••••" required></div>
-        <label class="check"><input type="checkbox" name="remember"> Keep me signed in</label>
-        <button class="go" type="submit">Log in</button>
-      </form>
-      <p class="swap">New to Sentinel? <button class="link" type="button" data-go="signup">Create an account</button></p>
-    </div>
-
-    <!-- create an account -->
-    <div data-view="signup" hidden>
-      <h2>Create your account</h2>
-      <p class="hint">Protect your agents' payments in minutes.</p>
-      <div class="social">
-        <button class="soc" type="button" data-provider="google"><svg viewBox="0 0 24 24"><path fill="#EA4335" d="M12 10.2v3.9h5.4c-.2 1.4-1.6 4.1-5.4 4.1-3.3 0-5.9-2.7-5.9-6s2.6-6 5.9-6c1.9 0 3.1.8 3.8 1.5l2.6-2.5C16.8 3.6 14.6 2.6 12 2.6 6.9 2.6 2.7 6.8 2.7 12s4.2 9.4 9.3 9.4c5.4 0 8.9-3.8 8.9-9.1 0-.6-.1-1.1-.2-1.6H12z"/></svg>Sign up with Google</button>
-        <button class="soc" type="button" data-provider="github"><svg viewBox="0 0 24 24" fill="#E8EBF0"><path d="M12 2.5a9.5 9.5 0 0 0-3 18.5c.5.1.7-.2.7-.5v-1.7c-2.7.6-3.2-1.2-3.2-1.2-.4-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.1-.2-4.4-1.1-4.4-4.7 0-1 .4-1.9 1-2.6-.1-.2-.4-1.2.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.4.2 2.4.1 2.6.6.7 1 1.5 1 2.6 0 3.7-2.3 4.5-4.4 4.7.3.3.6.9.6 1.8v2.7c0 .3.2.6.7.5A9.5 9.5 0 0 0 12 2.5z"/></svg>Sign up with GitHub</button>
-      </div>
-      <div class="or">or</div>
-      <form data-form="signup">
-        <label>Full name<input type="text" name="name" autocomplete="name" placeholder="Ada Lovelace" required></label>
-        <label>Work email<input type="email" name="email" autocomplete="email" placeholder="you@company.com" required></label>
-        <label>Password<input type="password" name="password" autocomplete="new-password" placeholder="At least 8 characters" minlength="8" required></label>
-        <label class="check"><input type="checkbox" name="terms" required> I agree to the <a href="terms.html" target="_blank" rel="noopener" style="color:var(--ink)">Terms of Service</a></label>
-        <button class="go" type="submit">Create account</button>
-      </form>
-      <p class="swap">Already have an account? <button class="link" type="button" data-go="signin">Log in</button></p>
-    </div>
-
-    <!-- forgot password -->
-    <div data-view="forgot" hidden>
-      <h2>Reset your password</h2>
-      <p class="hint">Enter your email and we'll send you a link to reset it.</p>
-      <form data-form="forgot">
-        <label>Email<input type="email" name="email" autocomplete="email" placeholder="you@company.com" required></label>
-        <button class="go" type="submit">Send reset link</button>
-      </form>
-      <p class="swap"><button class="link" type="button" data-go="signin">← Back to log in</button></p>
-    </div>
-
-    <p class="done" data-done hidden></p>
-    <p class="terms">Protected by Sentinel · your data never leaves our infrastructure</p>
-  </div>
-</dialog>
 <script>
   const nav = document.getElementById("nav");
   const onScroll = () => nav.classList.toggle("solid", window.scrollY > 24);
   addEventListener("scroll", onScroll, { passive: true }); onScroll();
   const io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && (e.target.classList.add("in"), io.unobserve(e.target))), { threshold: 0.12 });
   document.querySelectorAll(".rv").forEach((el) => io.observe(el));
-  // The account window. AUTH is where the auth provider gets wired later (sign in, sign up, reset, OAuth): until then
-  // each action only says it is on its way.
-  const AUTH = {
-    signin: async (data) => "Accounts open soon. We'll email you as soon as your workspace is ready.",
-    signup: async (data) => "Thanks! Accounts open soon: we'll email " + data.email + " with your access.",
-    forgot: async (data) => "If an account exists for " + data.email + ", a reset link is on its way.",
-    oauth: async (provider) => "Sign-in with " + provider + " opens soon.",
-  };
-  const acc = document.getElementById("acc");
-  const done = acc.querySelector("[data-done]");
-  const show = (view) => {
-    acc.querySelectorAll("[data-view]").forEach((v) => (v.hidden = v.dataset.view !== view));
-    done.hidden = true;
-    const first = acc.querySelector(`[data-view="${view}"] input`); if (first) setTimeout(() => first.focus(), 30);
-  };
-  document.querySelectorAll("[data-auth]").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); show(a.dataset.auth); acc.showModal(); }));
-  acc.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => show(b.dataset.go)));
-  acc.querySelector("[data-close]").addEventListener("click", () => acc.close());
-  acc.addEventListener("click", (e) => { if (e.target === acc) acc.close(); }); // a click on the backdrop closes it
-  const say = (text) => { done.textContent = text; done.hidden = false; };
-  acc.querySelectorAll("form").forEach((f) => f.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    say(await AUTH[f.dataset.form](Object.fromEntries(new FormData(f))));
-  }));
-  acc.querySelectorAll("[data-provider]").forEach((b) => b.addEventListener("click", async () => say(await AUTH.oauth(b.textContent.includes("GitHub") ? "GitHub" : "Google"))));
+  // Log in / Get started / Connect Hermès: Privy (sentinel-auth.js) wires every [data-auth] button: an email is enough,
+  // Privy creates the user's wallet. Without the script the buttons simply do nothing.
 </script>
+<script id="sentinel-auth" data-privy-app-id="cmv3iedam01wy0fia8oa685mj" src="sentinel-auth.js"></script>
 </body>
 </html>

@@ -9,9 +9,17 @@ La landing (`landing/index.html`) est en **HTML statique** et a déjà ses bouto
 <script id="sentinel-auth" data-privy-app-id="cmv3iedam01wy0fia8oa685mj" src="/sentinel-auth.js"></script>
 ```
 C'est tout. Le widget :
-- câble **tous** les `[data-auth]` de la page → clic = ouvre Privy (wallet externe ou email → wallet embarqué).
-- une fois connecté, remplace le libellé des boutons par l'**adresse** (et "Sign in" devient "Déconnexion").
-- thème sombre accordé au look Sentinel (accent rouge `#D7263D`, logo blanc).
+- câble **tous** les `[data-auth]` de la page : « Log in », « Get started », « Connect Hermès » ouvrent Privy.
+- **email d'abord** : l'utilisateur tape son email, reçoit un code, et Privy lui **crée un wallet** au premier login
+  (`embeddedWallets.ethereum.createOnLogin: 'users-without-wallets'`), sans extension ni phrase secrète. « Continue with
+  a wallet » reste possible (MetaMask, Rabby, WalletConnect…).
+- chaîne par défaut : **Sentinel L1** (chainId 99999, RPC `https://rpc.petroi.fr/rpc`), plus Fuji et Avalanche.
+- une fois connecté : « Log in » devient « Log out », les autres boutons « My wallet 0x12…ab », et une carte compte
+  s'ouvre (email, adresse du wallet à copier, lien explorer, déconnexion).
+- textes en anglais, lien vers `terms.html` dans la fenêtre Privy, thème sombre Sentinel (rouge `#D7263D`, logo blanc).
+
+Testé sur `http://localhost:5173` (`python -m http.server 5173 --directory landing`) : la fenêtre s'ouvre, l'email
+est accepté et Privy envoie le code. La page ne marche pas en `file://` (Privy refuse une origine nulle).
 
 ## ⚠️ Dashboard Privy (sinon le login échoue)
 Ajouter dans l'app Privy (`cmv3iedam01wy0fia8oa685mj`) les **domaines autorisés** : `http://localhost:*` (dev) + **`https://petroi.fr`** (prod).
