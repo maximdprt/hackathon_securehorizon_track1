@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terms of Service · Sentinel</title>
+<meta name="description" content="Sentinel's Terms of Service: what the service does and does not guarantee, what happens when a fraudulent payment gets through, and who is responsible for what.">
+<link rel="icon" href="assets/logo-white.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --night: #0D1118; --deep: #07090D; --panel: #121620; --edge: #2A3440; --edge-soft: #1C222B; --ink: #E8EBF0; --body: #b9bec7; --mute: #8E959F; --dim: #5E6B7A;
+          --red: #D7263D; --allow: #3FD08F; --human: #F2B33D; --block: #FF5D57; --scan: #6FA8FF;
+          --sans: Geist, Inter, system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, Menlo, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body { font-family: var(--sans); color: var(--ink); background: var(--night); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  .nav { height: 64px; display: flex; align-items: center; border-bottom: 1px solid var(--edge-soft); background: var(--deep); position: sticky; top: 0; z-index: 5; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; width: 100%; }
+  .nav .wrap { display: flex; justify-content: space-between; align-items: center; }
+  .brand { display: flex; align-items: center; gap: 10px; font: 600 18px var(--sans); letter-spacing: -.4px; text-decoration: none; }
+  .brand img { width: 26px; height: 26px; }
+  .back { font: 500 14px var(--sans); color: var(--mute); text-decoration: none; }
+  .back:hover { color: var(--ink); }
+  .layout { display: grid; grid-template-columns: 240px 1fr; gap: 56px; padding: 64px 0 96px; }
+  .layout > * { min-width: 0; }
+  .toc { position: sticky; top: 96px; align-self: start; display: grid; gap: 4px; }
+  .toc a { font: 400 14px var(--sans); color: var(--mute); text-decoration: none; padding: 6px 10px; border-radius: 8px; }
+  .toc a:hover { color: var(--ink); background: #ffffff08; }
+  .eyebrow { font: 500 12px var(--mono); letter-spacing: .2em; text-transform: uppercase; color: var(--mute); }
+  h1 { margin-top: 12px; font: 600 clamp(34px, 4vw, 48px)/1.08 var(--sans); letter-spacing: -2px; }
+  .meta { margin-top: 12px; font: 400 14px var(--mono); color: var(--dim); }
+  .draft { margin-top: 24px; padding: 14px 16px; border-radius: 12px; background: rgba(242, 179, 61, .08); box-shadow: inset 0 0 0 1px rgba(242, 179, 61, .35);
+    font: 400 14px/1.55 var(--sans); color: #f3d79b; }
+  .tldr { margin-top: 28px; padding: 22px 24px; border-radius: 14px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge-soft); }
+  .tldr ul { margin-top: 12px; display: grid; gap: 10px; list-style: none; }
+  .tldr li { display: flex; gap: 12px; font: 400 15px/1.55 var(--sans); color: var(--body); }
+  .tldr li::before { content: ""; flex: none; width: 6px; height: 6px; margin-top: 9px; border-radius: 50%; background: var(--ink); }
+  section { margin-top: 48px; scroll-margin-top: 90px; }
+  h2 { font: 600 24px/1.25 var(--sans); letter-spacing: -.6px; }
+  h2 span { font: 500 13px var(--mono); color: var(--dim); margin-right: 10px; letter-spacing: 0; }
+  h3 { margin-top: 22px; font: 600 17px var(--sans); letter-spacing: -.2px; }
+  p, li { font: 400 16px/1.7 var(--sans); color: var(--body); }
+  p { margin-top: 12px; }
+  ul.l, ol.l { margin-top: 12px; padding-left: 22px; display: grid; gap: 8px; }
+  b, strong { color: var(--ink); font-weight: 500; }
+  code { font: 400 14px var(--mono); color: var(--ink); background: var(--panel); padding: 2px 6px; border-radius: 6px; box-shadow: inset 0 0 0 1px var(--edge-soft); }
+  .steps { margin-top: 18px; display: grid; gap: 12px; }
+  .step { display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 18px 20px; border-radius: 14px; background: var(--panel); box-shadow: inset 0 0 0 1px var(--edge-soft); }
+  .step .n { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font: 500 13px var(--mono); box-shadow: inset 0 0 0 1px var(--edge); }
+  .step b { display: block; font: 600 17px var(--sans); color: var(--ink); }
+  .step p { margin-top: 4px; font-size: 15px; }
+  .record { margin-top: 14px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .record div { padding: 12px 14px; border-radius: 10px; background: var(--deep); box-shadow: inset 0 0 0 1px var(--edge-soft); font: 400 14px var(--sans); color: var(--body); }
+  .record div b { display: block; font: 500 12px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--mute); margin-bottom: 4px; }
+  footer { border-top: 1px solid var(--edge-soft); padding: 28px 0; }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font: 400 13px var(--sans); color: var(--dim); }
+  footer a { color: var(--dim); text-decoration: none; } footer a:hover { color: var(--ink); }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; gap: 24px; padding-top: 40px; } .toc { display: none; } .record { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header class="nav"><div class="wrap">
+  <a class="brand" href="index.html"><img src="assets/logo-white.png" alt="">Sentinel</a>
+  <a class="back" href="index.html">← Back to Sentinel</a>
+</div></header>
+
+<div class="wrap layout">
+  <nav class="toc" aria-label="Sections">
+    <a href="#service">1. The service</a>
+    <a href="#limits">2. What we don't guarantee</a>
+    <a href="#finality">3. On-chain finality</a>
+    <a href="#fraud">4. If a fraud gets through</a>
+    <a href="#record">5. The decision record</a>
+    <a href="#dora">6. Regulatory reporting</a>
+    <a href="#liability">7. Liability</a>
+    <a href="#yours">8. Your responsibilities</a>
+    <a href="#safeguards">9. Recommended safeguards</a>
+    <a href="#data">10. Data</a>
+    <a href="#misc">11. Changes &amp; contact</a>
+  </nav>
+
+  <main>
+    <p class="eyebrow">Legal</p>
+    <h1>Terms of Service</h1>
+    <p class="meta">Last updated: October 11, 2026 · Version 0.1</p>
+    <p class="draft"><b>Draft for the proof of concept.</b> These terms describe how Sentinel is meant to work and who is responsible for what. They are not legal advice and must be reviewed by counsel before any commercial launch.</p>
+
+    <div class="tldr">
+      <p class="eyebrow">In short</p>
+      <ul>
+        <li>Sentinel is a decision-support layer. It strongly reduces the risk of fraudulent agent payments, but no filter can stop every fraud.</li>
+        <li>A payment that Sentinel approves and that leaves on a blockchain is final: it cannot be reversed like a bank transfer.</li>
+        <li>If a fraud gets through, we help you report it, stop it from spreading, trace the funds and prove exactly why Sentinel said yes.</li>
+        <li>Unless a written agreement or insurance says otherwise, Sentinel does not reimburse losses. You remain in control of your agents, mandates and limits.</li>
+      </ul>
+    </div>
+
+    <section id="service">
+      <h2><span>01</span>The service</h2>
+      <p>Sentinel ("we", "the Service") is a payment guard for AI agents. Your agent calls our MCP tool <code>verify_payment</code> before a payment leaves. Sentinel analyses the order and what the agent read, gives it a trust score, and returns one of three decisions: <b>approve</b>, <b>needs a human</b> or <b>block</b>. Each decision is recorded on Sentinel L1, our Avalanche L1 blockchain.</p>
+      <p>By creating an account or connecting an agent to Sentinel, you ("the Customer") accept these terms.</p>
+    </section>
+
+    <section id="limits">
+      <h2><span>02</span>What we don't guarantee</h2>
+      <p>Sentinel evaluates each payment with the information available at the time of the check. It can be wrong in two ways:</p>
+      <ul class="l">
+        <li><b>False positive:</b> a legitimate payment is held or blocked. You can always approve it as a human.</li>
+        <li><b>False negative:</b> a fraudulent payment is approved. This is the case these terms are mostly about.</li>
+      </ul>
+      <p>False negatives can happen in particular when:</p>
+      <ul class="l">
+        <li>a known supplier's mailbox is compromised and a new payment address is sent from it (payment-detail change fraud): the beneficiary, the amount and the habits all look normal;</li>
+        <li>a fraud is split into small, repeated amounts that each stay under the thresholds;</li>
+        <li>a prompt injection is subtle enough to stay within the agent's mandate;</li>
+        <li>an address is clean when it is checked and is only used for theft afterwards.</li>
+      </ul>
+      <p>We do not promise that Sentinel detects 100% of frauds. Figures we publish (for example detection rates on our red-team bench) describe tests, not a guarantee.</p>
+    </section>
+
+    <section id="finality">
+      <h2><span>03</span>On-chain finality</h2>
+      <p>When Sentinel approves a payment, a one-time visa is issued and the payment can leave. Once a payment is settled on a public blockchain (such as the Avalanche C-Chain), it is <b>final</b>: there is no chargeback or recall mechanism like a bank's. Funds that have left can only be recovered afterwards, if at all, through the steps in section 4.</p>
+    </section>
+
+    <section id="fraud">
+      <h2><span>04</span>If a fraud gets through</h2>
+      <p>When a payment approved by Sentinel turns out to be fraudulent, we commit to the following, on a best-effort basis:</p>
+      <div class="steps">
+        <div class="step"><span class="n">1</span><div><b>Report</b><p>Report it from your dashboard ("Report a fraud") or by email. Often the real supplier claims its payment, or your own customer notices. Tell us as soon as you know.</p></div></div>
+        <div class="step"><span class="n">2</span><div><b>Contain</b><p>We revoke the agent's outstanding visas and can pause its protected payments. The thief's address is added to Sentinel's on-chain threat registry, so <b>every other Sentinel customer refuses it immediately</b>.</p></div></div>
+        <div class="step"><span class="n">3</span><div><b>Trace the funds</b><p>We follow the funds on-chain. If they reach an exchange, the exchange can be asked to freeze the account; some stablecoin issuers (for example Circle for USDC) can freeze an address, usually at the request of the authorities. This sometimes works. It is never guaranteed.</p></div></div>
+        <div class="step"><span class="n">4</span><div><b>Prove</b><p>We provide the full decision record (section 5): exactly why Sentinel approved the payment, and when. You can use it for a police complaint, your insurer, and your regulatory incident report.</p></div></div>
+        <div class="step"><span class="n">5</span><div><b>Learn</b><p>The case becomes a test scenario. We re-check similar pending payments and adjust signals and thresholds, for all customers.</p></div></div>
+      </div>
+    </section>
+
+    <section id="record">
+      <h2><span>05</span>The decision record</h2>
+      <p>For every payment it checks, Sentinel keeps a record of how the decision was made:</p>
+      <div class="record">
+        <div><b>Decision</b>approve, needs a human or block</div>
+        <div><b>Trust score</b>out of 100, and the thresholds that applied</div>
+        <div><b>Every signal</b>each deduction, its weight and its evidence</div>
+        <div><b>Timestamp</b>the exact time of the check</div>
+        <div><b>Human review</b>who approved or refused, and when</div>
+        <div><b>On-chain proof</b>the Sentinel L1 transactions (visa, flag, decision)</div>
+      </div>
+      <p>The decision and its short reason are written on Sentinel L1 and cannot be altered afterwards. The full record is available to you on request and through your dashboard.</p>
+    </section>
+
+    <section id="dora">
+      <h2><span>06</span>Regulatory reporting</h2>
+      <p>If you are a financial entity under the EU Digital Operational Resilience Act (DORA), <b>you</b> remain responsible for classifying and reporting ICT-related incidents to your competent authority. For major incidents, DORA and its technical standards currently require an initial notification within a few hours of classification and no later than 24 hours after becoming aware of the incident, followed by intermediate and final reports. Check the applicable texts for the exact deadlines.</p>
+      <p>Sentinel supports you by making the decision record available without delay, in a format suited to incident reports, audits (DORA, MiCA) and AML investigations.</p>
+    </section>
+
+    <section id="liability">
+      <h2><span>07</span>Liability</h2>
+      <p>Sentinel is a decision-support tool. Unless a separate written agreement, warranty or insurance policy says otherwise:</p>
+      <ul class="l">
+        <li>we do not reimburse losses resulting from a payment approved by Sentinel, by you, or by a human reviewer;</li>
+        <li>our total liability is limited to the fees you paid for the Service during the twelve months before the event;</li>
+        <li>we are not liable for indirect losses, or for losses caused by your agents, your keys, your mandates or third-party services.</li>
+      </ul>
+      <p>Nothing in these terms limits liability that cannot be limited by law, in particular for fraud or gross negligence on our side.</p>
+    </section>
+
+    <section id="yours">
+      <h2><span>08</span>Your responsibilities</h2>
+      <ul class="l">
+        <li>Define each agent's mandate: allowed actions, allowed recipients, per-payment and daily caps.</li>
+        <li>Keep your keys and credentials secure. Sentinel never needs your private keys.</li>
+        <li>Review payments held for a human in good time, and report suspected fraud as soon as you know.</li>
+        <li>Do not rely on Sentinel as your only control for high-value payments.</li>
+      </ul>
+    </section>
+
+    <section id="safeguards">
+      <h2><span>09</span>Recommended safeguards</h2>
+      <p>Because on-chain payments are final, the best protection is to limit the worst case before it happens:</p>
+      <ul class="l">
+        <li><b>Caps per payment and per day</b> in each agent's mandate, so that a single mistake stays small.</li>
+        <li><b>A human review</b> for large amounts and first payments to new recipients.</li>
+        <li><b>An alert when a known supplier's payment details change</b>: this is exactly the signal of payment-detail change fraud.</li>
+        <li><b>A hold period</b> for large or first-time payments, during which a payment can still be cancelled. This is on our roadmap.</li>
+      </ul>
+    </section>
+
+    <section id="data">
+      <h2><span>10</span>Data</h2>
+      <p>To check a payment, Sentinel processes the order (issuer, recipient, amount, action), the content the agent read, and context such as the merchant's domain. Records on Sentinel L1 are public and permanent: do not put personal data in fields that end up on-chain. The proof of concept uses fictitious data only.</p>
+    </section>
+
+    <section id="misc">
+      <h2><span>11</span>Changes &amp; contact</h2>
+      <p>We may update these terms; we will tell you before material changes take effect. Questions, or a fraud to report: <a href="mailto:contact@petroi.fr">contact@petroi.fr</a>.</p>
+    </section>
+  </main>
+</div>
+
+<footer><div class="wrap">
+  <span>© 2026 Sentinel</span>
+  <span><a href="index.html">Home</a> · <a href="terms.html">Terms</a></span>
+</div></footer>
+</body>
+</html>
