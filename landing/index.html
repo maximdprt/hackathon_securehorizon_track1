@@ -90,6 +90,39 @@
   .out.human i { background: var(--human); box-shadow: 0 0 10px var(--human); }
   .out.block i { background: var(--block); box-shadow: 0 0 10px var(--block); }
 
+  /* Hermès + Sentinel: the agent works, Sentinel checks each payment on the way out */
+  .hermes { padding: 0 0 104px; }
+  .hm { display: grid; grid-template-columns: 1fr 1.15fr; gap: 56px; align-items: center; background: var(--panel); border-radius: 18px;
+    box-shadow: inset 0 0 0 1px var(--edge-soft); padding: 56px; }
+  .hm > * { min-width: 0; }
+  .hm h2 { margin-top: 14px; font: 600 clamp(28px, 3vw, 40px)/1.1 var(--sans); letter-spacing: -1.6px; }
+  .hm .sub { margin-top: 14px; font: 400 17px/1.55 var(--sans); color: var(--mute); max-width: 440px; }
+  .ticks { margin-top: 26px; display: grid; gap: 12px; }
+  .ticks div { display: flex; gap: 12px; align-items: center; font: 400 15px var(--sans); color: var(--ink); }
+  .ticks div::before { content: ""; flex: none; width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--allow);
+    background: rgba(63, 208, 143, .12) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233FD08F' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12l4 4 8-8'/%3E%3C/svg%3E") center/11px no-repeat; }
+  .hm .btn { margin-top: 30px; }
+  /* the flow: Hermès → Sentinel MCP → Sentinel L1 → out */
+  .flow { position: relative; display: grid; gap: 14px; }
+  .node { position: relative; z-index: 1; display: flex; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 12px; background: var(--deep);
+    box-shadow: inset 0 0 0 1px var(--edge); }
+  .node .ic { flex: none; width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--panel-2); box-shadow: inset 0 0 0 1px var(--edge); }
+  .node .ic img { width: 20px; height: 20px; }
+  .node .ic svg { width: 20px; height: 20px; stroke: var(--ink); }
+  .node b { display: block; font: 600 15px var(--sans); }
+  .node span { font: 400 12px var(--mono); color: var(--mute); }
+  .node.guard { box-shadow: inset 0 0 0 1px var(--red), 0 0 40px -10px rgba(215, 38, 61, .55); }
+  .node.guard .ic { background: rgba(215, 38, 61, .12); box-shadow: inset 0 0 0 1px rgba(215, 38, 61, .5); }
+  .wire { position: absolute; left: 37px; top: 36px; bottom: 36px; width: 2px; background: var(--edge); overflow: hidden; }
+  .wire i { position: absolute; left: 0; width: 2px; height: 46px; background: linear-gradient(to bottom, transparent, var(--scan), transparent); animation: run 2.6s linear infinite; }
+  @keyframes run { from { top: -46px; } to { top: 100%; } }
+  .ends { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .ends div { padding: 10px 12px; border-radius: 10px; background: var(--deep); box-shadow: inset 0 0 0 1px var(--edge-soft); font: 500 13px var(--sans); display: flex; align-items: center; gap: 8px; }
+  .ends i { width: 8px; height: 8px; border-radius: 50%; }
+  .ends .a i { background: var(--allow); box-shadow: 0 0 10px var(--allow); }
+  .ends .h i { background: var(--human); box-shadow: 0 0 10px var(--human); }
+  .ends .b i { background: var(--block); box-shadow: 0 0 10px var(--block); }
+
   /* the chain, in one line */
   .chainband { padding: 0 0 104px; }
   .chainbox { position: relative; border-radius: 16px; overflow: hidden; box-shadow: inset 0 0 0 1px var(--edge-soft); min-height: 300px; display: flex; align-items: flex-end; }
@@ -110,8 +143,8 @@
 
   .rv { opacity: 0; transform: translateY(16px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
   .rv.in { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; transition: none; } .live i { animation: none; } html { scroll-behavior: auto; } }
-  @media (max-width: 900px) { .steps { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .rv { opacity: 1; transform: none; transition: none; } .live i, .wire i { animation: none; } html { scroll-behavior: auto; } }
+  @media (max-width: 900px) { .steps, .hm { grid-template-columns: 1fr; } .hm { padding: 36px 28px; gap: 36px; } .wire i { animation: none; } }
   @media (max-width: 560px) {
     .wrap { padding: 0 16px; }
     .auth .btn.ghost { display: none; }
@@ -182,6 +215,34 @@
             <div class="out block"><span><i></i>Blocked</span><span>scammer flagged</span></div>
           </div></div>
         </article>
+      </div>
+    </div>
+  </section>
+
+  <section class="hermes" id="hermes">
+    <div class="wrap">
+      <div class="hm rv">
+        <div>
+          <p class="eyebrow">Hermès × Sentinel MCP</p>
+          <h2>Use AI agents. Stay protected.</h2>
+          <p class="sub">Your Hermès agents shop, pay and invest on their own. Sentinel sits in their MCP tools and checks every payment before it leaves.</p>
+          <div class="ticks">
+            <div>One MCP server, no code to change</div>
+            <div>The agent can't skip or rewrite the check</div>
+            <div>Every decision recorded on Sentinel L1</div>
+          </div>
+          <a class="btn solid lg" href="#" data-auth="signup">Connect Hermès <span class="arr">→</span></a>
+        </div>
+        <div class="flow" aria-label="How a payment flows">
+          <div class="wire" aria-hidden="true"><i></i></div>
+          <div class="node"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="12" rx="3"/><path d="M8 21l2-4M9 11h.01M15 11h.01"/></svg></div>
+            <div><b>Hermès agent</b><span>wants to pay 739 EUR</span></div></div>
+          <div class="node guard"><div class="ic"><img src="assets/logo-white.png" alt=""></div>
+            <div><b>Sentinel MCP</b><span>verify_payment · trust score</span></div></div>
+          <div class="node"><div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg></div>
+            <div><b>Sentinel L1</b><span>decision written on-chain</span></div></div>
+          <div class="ends"><div class="a"><i></i>Paid</div><div class="h"><i></i>Human</div><div class="b"><i></i>Blocked</div></div>
+        </div>
       </div>
     </div>
   </section>
