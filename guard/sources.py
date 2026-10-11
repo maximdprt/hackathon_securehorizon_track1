@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -121,19 +122,30 @@ class ChainSource:
 
     def __init__(self, rpc_url: str, contract_address: str, owner_key: str | None = None, fallback: MockJsonSource | None = None):
         from web3 import Web3  # optional dependency: pip install -e ".[chain]"
-        self.w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 8}))
+        # cache_allowed_requests: web3 caches eth_chainId instead of asking for it around every eth_call (15 round trips -> 7 per verify)
+        self.w3 = Web3(Web3.HTTPProvider(rpc_url, request_kwargs={"timeout": 8}, cache_allowed_requests=True))
         self.contract = self.w3.eth.contract(address=Web3.to_checksum_address(contract_address), abi=ABI)
         self.owner_key = owner_key
         self.fallback = fallback
         self.decimals = int(os.environ.get("GUARD_TOKEN_DECIMALS", "6"))
         self._tx_lock = threading.Lock()  # one tx at a time: sequential nonces, receipt awaited
+        # an issuer's on-chain grant barely changes and is read on every payment: kept a minute. Threats are never cached,
+        # a recipient flagged by the previous run must be refused on the next one.
+        self._grants: dict[str, tuple[float, tuple]] = {}
+        self.grant_ttl = float(os.environ.get("GUARD_GRANT_TTL", "60"))
 
     def to_units(self, amount: float) -> int:
         return int(Decimal(str(amount)) * (10 ** self.decimals))
 
     def get_authority(self, issuer: str) -> Authority | None:
         from web3 import Web3
-        active, max_amount, role = self.contract.functions.authorities(Web3.to_checksum_address(issuer)).call()
+        key = Web3.to_checksum_address(issuer)
+        hit = self._grants.get(key)
+        if hit and time.monotonic() - hit[0] < self.grant_ttl:
+            active, max_amount, role = hit[1]
+        else:
+            active, max_amount, role = self.contract.functions.authorities(key).call()
+            self._grants[key] = (time.monotonic(), (active, max_amount, role))
         if not active and not role:
             # issuer not granted on-chain: use the local mandate registry (our agents are seeded there, not on-chain)
             return self.fallback.get_authority(issuer) if self.fallback else None
