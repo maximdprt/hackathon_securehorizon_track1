@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { BufferAttribute, BufferGeometry, Color, Group, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh, Vector3 } from "three";
+import { AdditiveBlending, BufferAttribute, BufferGeometry, Color, Group, InstancedMesh, LineBasicMaterial, LineSegments, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, Vector3 } from "three";
 import gsap from "gsap";
 import type { City } from "@/components/explorer-v2/network/city";
 import type { CameraHandle, Route } from "@/components/explorer-v2/network/icm-map";
@@ -19,17 +19,17 @@ import { HUB_KICK } from "./HubTower";
 import { HALO } from "./Labels";
 import type { RouteStreets } from "./lanes";
 import type { CityModel } from "./model";
-import type { Theme } from "./palette";
+import { AVAGUARD3, FLEET, type Theme } from "./palette";
 import type { Shot } from "./Rig";
 import { TIME } from "./shaders";
+import { CANOPY_H, EQUATOR, PODS, ROOF, podGeometry } from "./Traffic";
 import { guardGeoOf, poseAt, type GuardGeo } from "./guardGeo";
-import { Crown, ProofStack } from "./Parcel";
-import { CityYard, YARD_FROM, type PodMats } from "./CityYard";
+import { Crown, ProofStack, RegistryBin, Scrapyard, Toll } from "./Parcel";
 import { HumanLot } from "./HumanLot";
 import { GuardCar } from "./GuardCar";
 import { Road } from "./Road";
 import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard";
-import { Door, OPEN, ParkingTip, ProofTip } from "./Door";
+import { CarTip, Door, OPEN, ParkingTip, ProofTip, RegistryTip, ScrapTip, TollTip } from "./Door";
 
 type Props = { model: CityModel; city: City; routes: Route[]; streets: RouteStreets[]; theme: Theme; still: boolean; onShot: (s: Shot | null) => void; cameraRef?: RefObject<CameraHandle | null> };
 
@@ -39,9 +39,6 @@ function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
   const top = g.hq.base + g.hq.crest;
   // looked at from outside the ward, inward: the HQ and downtown stand behind what the shot shows
   const out = (p: Vector3) => Math.PI / 2 - Math.atan2(p.z, p.x);
-  // the road's shots look the other way, from downtown's side and a little aside (never through the hub's tower): the
-  // car comes toward the camera, through the gantry, the HQ tower standing behind it instead of in front of it
-  const road = out(g.toll.p) + Math.PI - 0.85;
   /** halfway between outward and away from a tower beside it */
   const awayFrom = (p: Vector3, b: { x: number; z: number }) => {
     const r = Math.hypot(p.x, p.z) || 1;
@@ -51,17 +48,14 @@ function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
     return Math.atan2(p.x / r + dx / d, p.z / r + dz / d);
   };
   return {
-    security: { key: "guard:security", points: [new Vector3(g.hq.x, top + 10, g.hq.z), g.toll.p, g.parking.c, g.scrapyard.c, ...ring(new Vector3(g.hq.x, 0, g.hq.z), g.S * 2.6)].map((p) => p.clone()), polar: 0.9, cap: 1 / 3.2, fill: 0.9, az: road },
+    security: { key: "guard:security", points: [new Vector3(g.hq.x, top + 10, g.hq.z), g.toll.p, g.parking.c, g.scrapyard.c, ...ring(new Vector3(g.hq.x, 0, g.hq.z), g.S * 2.6)].map((p) => p.clone()), polar: 0.9, cap: 1 / 3.2, fill: 0.9, az: out(g.toll.p) },
     // SENTINEL (deployed): a lower, closer look at the gantry, the car scanned under it
-    toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.1), ...ring(g.toll.p, g.S * 0.95)], polar: 0.6, cap: 1 / 5.4, fill: 0.92, az: road },
+    toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.1), ...ring(g.toll.p, g.S * 0.95)], polar: 0.46, cap: 1 / 5.4, fill: 0.92, az: out(g.toll.p) },
     // the lot from the side away from the HQ and from outside the ward, high: the HQ's tower stands behind it, never over its bays
     parking: { key: "guard:parking", points: [g.parking.c.clone().setY(g.carW * 2.4), ...ring(g.parking.c, g.parking.w * 0.55)], polar: 0.55, cap: 1 / 6, fill: 0.84, az: awayFrom(g.parking.c, g.hq) },
-    // the yard from its lane's side (the reference's cameras look at the baler over the lane)
-    scrapyard: { key: "guard:scrapyard", points: [g.scrapyard.W(2, 0, -6.5), g.scrapyard.W(20, 0, 1), g.scrapyard.W(11, 5, -3), g.scrapyard.W(2, 0, 1), g.scrapyard.W(20, 0, -6.5)], polar: 0.95, cap: 1 / 8, fill: 0.9, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
-    press: { key: "guard:press", points: [g.scrapyard.W(5.5, 0, -6.5), g.scrapyard.W(13, 0, -3.2), g.scrapyard.W(9, 2.5, -5)], polar: 0.55, cap: 1 / 12, fill: 0.86, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
-    skip: { key: "guard:skip", points: [g.scrapyard.W(12, 0, -6), g.scrapyard.W(20, 0, 0), g.scrapyard.W(16.5, 3, -1.8)], polar: 0.85, cap: 1 / 10, fill: 0.86, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
+    scrapyard: { key: "guard:scrapyard", points: [g.scrapyard.c.clone().setY(g.S * 1.1), ...ring(g.scrapyard.c, g.scrapyard.w * 0.75)], polar: 0.7, cap: 1 / 6, fill: 0.86, az: out(g.scrapyard.c) },
     cchain: { key: "guard:cchain", points: [new Vector3(0, g.hubTop * 0.75, 0), g.out.clone(), g.stop.p.clone(), ...ring(new Vector3(0, 0, 0), g.S * 2.4)], polar: 1.0, cap: 1 / 3, fill: 0.88 },
-    follow: { key: "guard:follow", points: [...g.legs.approach.pts.filter((_, i) => i % 4 === 0), g.toll.p.clone().setY(g.S * 1.2), new Vector3(g.hq.x, g.hq.base + g.hq.crest * 0.6, g.hq.z)], polar: 0.8, cap: 1 / 4.5, fill: 0.86, az: road },
+    follow: { key: "guard:follow", points: [...g.legs.approach.pts.filter((_, i) => i % 4 === 0), g.toll.p.clone().setY(g.S * 1.2), new Vector3(g.hq.x, g.hq.base + g.hq.crest * 0.6, g.hq.z)], polar: 0.8, cap: 1 / 4.5, fill: 0.86, az: out(g.toll.p) },
   };
 }
 
@@ -253,54 +247,81 @@ function RegistryPing({ geo }: { geo: GuardGeo }) {
   );
 }
 
-/** the verdict over the car: the visa plate, the hourglass of a human wait, or the refusal's plate (the car itself carries
-    the colour: its strip, its halo, its frost); the shield at the C-Chain. No particles: nothing floats once the yard
-    takes the car over at PICK, and the plate goes with it */
+/** the verdict: green crystals and the visa on the roof, red frost, or amber flakes under an hourglass; the shield at the C-Chain */
 function Verdict({ geo }: { geo: GuardGeo }) {
   const tx = useSim((s) => s.tx);
   const step = useSim((s) => s.step);
   const phase = useSim((s) => s.phase);
-  const root = useRef<Group>(null);
-  const plates = useRef<Record<"allow" | "block" | "human", HTMLDivElement | null>>({ allow: null, block: null, human: null });
+  const N = 90;
+  const pts = useRef<Group>(null);
+  const seeds = useMemo(() => Array.from({ length: N }, () => [Math.random() * Math.PI * 2, Math.random(), Math.random()]), []);
+  const geom = useMemo(() => {
+    const g = new BufferGeometry();
+    g.setAttribute("position", new BufferAttribute(new Float32Array(N * 3), 3));
+    return g;
+  }, []);
+  const label = useRef<HTMLDivElement>(null);
   const shield = useRef<HTMLDivElement>(null);
   const carAt = useMemo(() => new Vector3(), []);
-  useFrame(() => {
-    if (!tx || !root.current) return;
+  useFrame(({ clock }) => {
+    if (!tx || !pts.current) return;
     const leg = geo.legs[motion.leg as keyof GuardGeo["legs"]];
     if (leg) poseAt(leg, motion.u, carAt);
-    root.current.position.copy(carAt);
-    // the plate of the state the car is in (a human's yes turns the hourglass into a visa), gone once the yard takes it
-    const done = motion.yard >= YARD_FROM;
-    const k = { allow: Math.min(1, motion.crystals * 1.5), block: motion.frost, human: motion.tone === "human" ? 1 : 0 };
-    for (const key of ["allow", "block", "human"] as const) {
-      const el = plates.current[key];
-      if (el) el.style.opacity = String(done || motion.tone !== key ? 0 : k[key]);
+    pts.current.position.copy(carAt);
+    const pos = geom.getAttribute("position") as BufferAttribute;
+    const k = motion.crystals;
+    const w = geo.carW;
+    for (let i = 0; i < N; i++) {
+      const [a, r, h] = seeds[i];
+      let x: number, y: number, z: number;
+      if (tx.decision === "ALLOW") {
+        const fall = Math.min(1, k * (1 + h));
+        x = Math.cos(a) * (1 - fall) * w * 3 + Math.cos(a) * r * w * 0.5 * fall;
+        z = Math.sin(a) * (1 - fall) * w * 3 + Math.sin(a) * r * w * 0.35 * fall;
+        y = (1 - fall) * w * 5 + fall * w * 0.75;
+      } else if (tx.decision === "BLOCK") {
+        const f = motion.frost;
+        const spin = a + (1 - f) * clock.elapsedTime * 3;
+        x = Math.cos(spin) * w * (0.7 + r * 0.9);
+        z = Math.sin(spin) * w * (0.5 + r * 0.6);
+        y = w * (0.2 + h * 1.3);
+      } else {
+        x = Math.cos(a + clock.elapsedTime * 0.2) * w * (1 + r);
+        z = Math.sin(a + clock.elapsedTime * 0.2) * w * (1 + r);
+        y = w * (1.6 + h * 1.2) + Math.sin(clock.elapsedTime + a) * w * 0.15;
+      }
+      pos.setXYZ(i, x, y, z);
     }
+    pos.needsUpdate = true;
+    if (label.current) label.current.style.opacity = String(Math.min(1, k * 1.5));
     if (shield.current) shield.current.style.opacity = String(motion.shield);
   });
   const shown = !!tx && ((phase === "analysis" && step >= 6) || ["allow", "block", "human", "home"].includes(phase) || motion.crystals > 0);
   if (!tx || !shown) return null;
-  const plate = "absolute left-1/2 top-0 -translate-x-1/2 whitespace-nowrap rounded-md border-2 px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em]";
-  const style = (t: "allow" | "block" | "human") => ({ color: STATE[t].hex, borderColor: STATE[t].hex, background: "rgba(9,9,11,0.72)", opacity: 0 });
+  const tone = STATE[toneOf(tx.decision)].hex;
   return (
-    <group ref={root}>
-      <Html position={[0, geo.carW * 2.4, 0]} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
-        <div className="relative h-6 w-0">
-          <div ref={(el) => void (plates.current.allow = el)} className={plate} style={style("allow")}>
-            {tx.onchain?.visa_id ?? "VISA"} · signé KMS
-          </div>
-          <div ref={(el) => void (plates.current.human = el)} className={cn(plate, "flex items-center gap-1.5")} style={style("human")}>
-            <svg width="11" height="14" viewBox="0 0 44 56" aria-hidden>
-              <path d="M6 4 H38 M6 52 H38 M10 4 C10 20 34 24 34 28 C34 32 10 36 10 52 M34 4 C34 20 10 24 10 28 C10 32 34 36 34 52" fill="none" stroke={STATE.human.hex} strokeWidth="5" strokeLinecap="round" />
+    <group ref={pts}>
+      <points geometry={geom}>
+        <pointsMaterial color={tone} size={geo.carW * 0.22} sizeAttenuation transparent opacity={0.95} toneMapped={false} />
+      </points>
+      <Html position={[0, geo.carW * 2.8, 0]} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
+        <div ref={label} style={{ opacity: 0 }}>
+          {tx.decision === "ALLOW" ? (
+            <div className="whitespace-nowrap rounded-md border-2 px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: tone, borderColor: tone, background: "rgba(9,9,11,0.7)" }}>
+              {tx.onchain?.visa_id ?? "VISA"} · signé KMS
+            </div>
+          ) : tx.decision === "HUMAN" ? (
+            <svg width="26" height="34" viewBox="0 0 44 56" aria-hidden>
+              <path d="M6 4 H38 M6 52 H38 M10 4 C10 20 34 24 34 28 C34 32 10 36 10 52 M34 4 C34 20 10 24 10 28 C10 32 34 36 34 52" fill="none" stroke={tone} strokeWidth="4" strokeLinecap="round" />
             </svg>
-            Validation humaine
-          </div>
-          <div ref={(el) => void (plates.current.block = el)} className={plate} style={style("block")}>
-            Refus · fraude
-          </div>
+          ) : (
+            <div className="whitespace-nowrap rounded-md border-2 px-2 py-0.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: tone, borderColor: tone, background: "rgba(9,9,11,0.7)" }}>
+              Refus
+            </div>
+          )}
         </div>
       </Html>
-      <Html position={[0, geo.carW * 4.2, 0]} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
+      <Html position={[0, geo.carW * 4.6, 0]} center zIndexRange={[30, 0]} style={{ pointerEvents: "none" }}>
         <div ref={shield} style={{ opacity: 0 }} className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-[#3FD08F]/60 bg-zinc-950/80 px-2.5 py-1 text-[11px] font-medium text-[#3FD08F]">
           <svg width="14" height="14" viewBox="0 0 26 26" aria-hidden>
             <path d="M13 2 L23 6 V13 C23 18.5 18.8 22.6 13 24 C7.2 22.6 3 18.5 3 13 V6 Z" fill="none" stroke="#3FD08F" strokeWidth="2.4" strokeLinejoin="round" />
@@ -318,8 +339,6 @@ function Verdict({ geo }: { geo: GuardGeo }) {
 
 export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot, cameraRef }: Props) {
   const geo = useMemo(() => guardGeoOf(model, city, routes, streets), [model, city, routes, streets]);
-  // the city car's materials, shared with the yard's car so the hand-over at PICK does not show
-  const podMats = useRef<PodMats>(null);
   const shots = useMemo(() => (geo ? shotsOf(geo) : null), [geo]);
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
@@ -346,22 +365,8 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
     // a debug flight: the ward from straight above (tools/capture.mjs)
     (window as unknown as { __guardTop?: (r: number) => void }).__guardTop = (r) => onShot({ key: `guard:top:${r}`, points: [new Vector3(geo!.hq.x - r, 0, geo!.hq.z - r), new Vector3(geo!.hq.x + r, 0, geo!.hq.z + r)], polar: 0.02, cap: 0.01, fill: 0.95, az: 0 });
     // a test and debug handle: the parcel's places, read by tools/capture.mjs
-    (window as unknown as { __guard?: unknown }).__guard = geo && {
-      dbg: geo.dbg,
-      S: geo.S,
-      carW: geo.carW,
-      carL: geo.carL,
-      k: geo.k,
-      hq: [geo.hq.x, geo.hq.z],
-      toll: geo.toll.p.toArray(),
-      stop: geo.stop.p.toArray(),
-      parking: geo.parking.c.toArray(),
-      scrapyard: geo.scrapyard.c.toArray(),
-      yard: { lane: [geo.scrapyard.W(-5, 0, 0).toArray(), geo.scrapyard.pick.toArray()], baler: geo.scrapyard.W(9, 0, -5).toArray(), skip: geo.scrapyard.skip.toArray() },
-      city: { core: city.core, rings: city.rings, lot: city.lot, blocks: city.blocks.map((b) => [Math.round(b.r0), Math.round(b.r1), +b.a0.toFixed(3), +b.a1.toFixed(3)]) },
-      legs: Object.fromEntries(Object.entries(geo.legs).map(([k, v]) => [k, Math.round(v.len)])),
-    };
-  }, [shots, geo, onShot, cameraRef, city]);
+    (window as unknown as { __guard?: unknown }).__guard = geo && { dbg: geo.dbg, S: geo.S, carW: geo.carW, toll: geo.toll.p.toArray(), parking: geo.parking.c.toArray(), scrapyard: geo.scrapyard.c.toArray(), legs: Object.fromEntries(Object.entries(geo.legs).map(([k, v]) => [k, Math.round(v.len)])) };
+  }, [shots, geo, onShot, cameraRef]);
 
   // a test handle: where each door stands on screen now (tools/capture.mjs and the Playwright suite click them)
   const size = useThree((s) => s.size);
@@ -426,14 +431,22 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
       {SENTINEL_ONLY && <Road geo={geo} theme={theme} />}
       <Crown geo={geo} theme={theme} />
       {/* each piece of the parcel is a door to its screen (Door.tsx, sim/nav.ts) */}
+      <Door name="guard:toll" at={[geo.toll.p.x, geo.S * 1.1, geo.toll.p.z]} tip={<TollTip />} onOpen={OPEN.toll}>
+        <Toll geo={geo} theme={theme} />
+      </Door>
       <Door name="guard:parking" at={[geo.parking.c.x, geo.S * 0.5, geo.parking.c.z]} tip={<ParkingTip />} onOpen={OPEN.parking}>
         <HumanLot geo={geo} theme={theme} />
+      </Door>
+      <Door name="guard:scrapyard" at={[geo.scrapyard.crusher.x, geo.carW * 3.2, geo.scrapyard.crusher.z]} tip={<ScrapTip />} onOpen={OPEN.scrapyard}>
+        <Scrapyard geo={geo} theme={theme} />
+      </Door>
+      <Door name="guard:registry" at={[geo.scrapyard.bin.x, geo.carW * 2, geo.scrapyard.bin.z]} tip={<RegistryTip />} onOpen={OPEN.registry}>
+        <RegistryBin geo={geo} theme={theme} />
       </Door>
       <Door name="guard:proof" at={[geo.proof.x, geo.S * 0.4, geo.proof.z]} tip={<ProofTip />} onOpen={OPEN.proof}>
         <ProofStack geo={geo} theme={theme} />
       </Door>
-      <GuardCar geo={geo} theme={theme} share={podMats} />
-      <CityYard geo={geo} theme={theme} podMats={podMats} />
+      <GuardCar geo={geo} theme={theme} />
       <ContractHolo geo={geo} />
       <AuthorityThread geo={geo} />
       <Snowball geo={geo} />

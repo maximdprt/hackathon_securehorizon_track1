@@ -5,7 +5,7 @@ import type { AuditTx, Tone, TxEvent } from "./types";
    values (positions, sweeps, gauges) live in `motion`, which GSAP tweens and the scene reads in useFrame. */
 
 export type Phase = "idle" | "approach" | "analysis" | "allow" | "block" | "human" | "home";
-export type Leg = "approach" | "scanPass" | "toCChain" | "uTurn" | "toScrapyard" | "toParking" | "fromParking" | "none";
+export type Leg = "approach" | "toCChain" | "uTurn" | "toScrapyard" | "toParking" | "fromParking" | "none";
 export type Panel = null | "detail" | "journal" | "registry" | "audit";
 /** the screens that open over the city, a building's door each (sim/nav.ts) */
 export type View = null | "transactions" | "registry" | "parking" | "audit";
@@ -124,9 +124,7 @@ export const motion = {
   shield: 0,
   /** parking slot taken (0..5) */
   slot: 2,
-  /** the Guard Yard's own clock for a refusal (components/guard-yard/three/timeline.ts): 0 at rest, 10.4 at PICK to 22.2 */
-  yard: 0,
 };
 export function resetMotion() {
-  Object.assign(motion, { leg: "none", u: 0, visible: false, tone: "verify", xray: 0, frost: 0, cube: false, press: 0, dump: 0, barrier: 0, blink: false, scan: 0, authority: 0, snow: 0, ping: 0, gauge: 0, crystals: 0, registryFlash: 0, glow: 0, shield: 0, yard: 0 });
+  Object.assign(motion, { leg: "none", u: 0, visible: false, tone: "verify", xray: 0, frost: 0, cube: false, press: 0, dump: 0, barrier: 0, blink: false, scan: 0, authority: 0, snow: 0, ping: 0, gauge: 0, crystals: 0, registryFlash: 0, glow: 0, shield: 0 });
 }

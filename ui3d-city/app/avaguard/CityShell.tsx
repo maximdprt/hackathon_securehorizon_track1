@@ -1,13 +1,12 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { History, Moon, Search, Sun } from "lucide-react";
+import { ArrowUpRight, Moon, PanelLeftClose, PanelLeftOpen, Search, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { fmtCompact } from "@/components/explorer-v2/evm/metric-charts";
 import { useCityData } from "@/components/explorer-v2/network/city-data";
-import { CityKey, KEY_W, type Lens } from "@/components/explorer-v2/network/city-key";
-import { FRAME, FigureStrip, GLASS } from "@/components/explorer-v2/network/city-frame";
+import type { Lens } from "@/components/explorer-v2/network/city-key";
+import { EASE, FRAME, FigureStrip, GLASS, PANE, PANEL_W } from "@/components/explorer-v2/network/city-frame";
 import { overviewStatsUrl } from "@/components/explorer-v2/network/network-reads";
 import type { CameraHandle, Inset, SizeBy } from "@/components/explorer-v2/network/icm-map";
 import type { District } from "@/components/explorer-v2/network/districts";
@@ -18,58 +17,45 @@ import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused } from 
 import { startLiveFeed } from "@/sim/liveFeed";
 import { motion, sim, useSim, type View } from "@/sim/store";
 import { closeView, listenUrl, openView } from "@/sim/nav";
-import { STATE, fmtAmount } from "@/sim/types";
+import { STATE } from "@/sim/types";
 import type { SceneKey } from "@/sim/scenario";
 import { AnalysisCard } from "./ui/AnalysisCard";
 import { HumanAlert, Toasts } from "./ui/Panels";
-import { HowItWorks, Impact, TryIt } from "./ui/Story";
+import { Directory, Figures, LatestFeed, SentinelKey, useKpis } from "./ui/Frame";
 import { ViewHost } from "./views/ViewHost";
 import { TransactionsView } from "./views/TransactionsView";
 import { RegistryView } from "./views/RegistryView";
 import { ParkingView } from "./views/ParkingView";
 import { AuditView } from "./views/AuditView";
 import { ChainSheet } from "./ui/ChainSheet";
-import { LIVE_CONFIGURED, protectedOf, useAudit } from "@/data/source";
-import { StateIcon } from "./ui/charts";
+import { LIVE_CONFIGURED } from "@/data/source";
+import { sentinelConfig } from "@/data/sentinel";
 
 /* The page around the City, rebuilt after builders-hub's NetworkChains.tsx, city-app.tsx and city-frame.tsx (their
    large-screen layout: the same frame token, sky, cards, places and classes), with our contents and none of their
-   brand, navigation, AI search or server reads. */
+   brand, navigation, AI search or server reads: the list's door and the view at the top left, the search and its chips
+   at the top, the key at the bottom left, the figures at the foot, the latest decisions at the bottom right. In words a
+   newcomer to blockchains reads (ui/Frame.tsx). */
 
 const City3D = memo(dynamic(() => import("@/components/explorer-v2/network/city3d/City3D"), { ssr: false }));
 const NETWORK: PchainNetwork = "fuji";
 const WINDOW_LABEL = "24 hours";
 const NAV_H = "3.5rem";
+/** the card at the right while a transaction plays (ui/AnalysisCard.tsx) */
+const RIGHT_W = 372;
 
 /** each chain's transactions over the day, from the same aggregate the network overview reads (NetworkChains.tsx) */
 function useChainActivity(network: PchainNetwork) {
   const [byId, setById] = useState<Map<string, number | null> | null>(null);
-  const [takenAt, setTakenAt] = useState<string | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     fetch(overviewStatsUrl("day", network), { signal: controller.signal })
-      .then((res) => {
-        setTakenAt(res.headers.get("x-snapshot"));
-        return res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`));
-      })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((d: { chains?: { chainId: string; txCount: number | null }[] }) => setById(new Map((d.chains ?? []).map((c) => [String(c.chainId), c.txCount]))))
       .catch(() => {});
     return () => controller.abort();
   }, [network]);
-  return { byId, takenAt };
-}
-
-/** one cell of the figure strip, with city-app.tsx's classes */
-function Figure({ label, value, sub, title, tone }: { label: string; value: ReactNode; sub: ReactNode; title?: string; tone?: string }) {
-  return (
-    <div title={title} className="flex min-w-0 flex-col items-start gap-0.5 px-4 py-2.5">
-      <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.14em] text-zinc-400 dark:text-zinc-500">{label}</span>
-      <span className="font-mono text-[17px] font-semibold tabular-nums leading-tight text-zinc-900 dark:text-zinc-50" style={tone ? { color: tone } : undefined}>
-        {value}
-      </span>
-      <span className="truncate font-mono text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">{sub}</span>
-    </div>
-  );
+  return byId;
 }
 
 /** the card glass of city-frame.tsx's SidebarHead, behind a control */
@@ -77,32 +63,28 @@ const CARD = "absolute inset-0 -z-10 rounded-2xl border border-zinc-200/90 bg-wh
 const SEG_ON = "flex items-center rounded-xl bg-zinc-100 px-3 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-50";
 const SEG_OFF = "flex items-center rounded-xl px-3 text-zinc-400 dark:text-zinc-600";
 
-/** the top bar: the name and what it does in one line, the screens, the theme */
+/** the site's navbar, as builders-hub's: the name at the left, the sections with their underline, the status and the theme */
 function TopBar({ view }: { view: View }) {
   const [dark, setDark] = useState(false);
   useEffect(() => setDark(document.documentElement.classList.contains("dark")), []);
   const tabs: { label: string; view: View }[] = [
     { label: "Ville", view: null },
-    { label: "Transactions", view: "transactions" },
+    { label: "Paiements", view: "transactions" },
     { label: "Registre des hackers", view: "registry" },
-    { label: "Validation humaine", view: "parking" },
+    { label: "Avis humain", view: "parking" },
     { label: "Audit", view: "audit" },
   ];
   return (
-    <header className="relative z-40 flex shrink-0 items-center justify-between border-b border-slate-200/80 bg-white/95 px-5 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950" style={{ height: NAV_H }}>
-      <div className="flex items-center gap-3">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm">
-          <svg width="18" height="18" viewBox="0 0 26 26" aria-hidden>
-            <path d="M13 2 L23 6 V13 C23 18.5 18.8 22.6 13 24 C7.2 22.6 3 18.5 3 13 V6 Z" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
-            <path d="M8.5 13.2 L11.8 16.4 L17.6 10" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-        <div className="leading-tight">
-          <div className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50">Sentinel</div>
-          <div className="hidden text-[11.5px] text-slate-500 md:block dark:text-zinc-400">Contrôle les paiements des agents IA avant qu&apos;ils partent</div>
-        </div>
+    <header className="relative z-40 flex shrink-0 items-center justify-between border-b border-zinc-200 bg-white px-5 dark:border-zinc-800 dark:bg-zinc-950" style={{ height: NAV_H }}>
+      <div className="flex items-center gap-2.5">
+        <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden>
+          <path d="M13 2 L23 6 V13 C23 18.5 18.8 22.6 13 24 C7.2 22.6 3 18.5 3 13 V6 Z" fill="none" stroke="#E6212F" strokeWidth="2.2" strokeLinejoin="round" />
+          <path d="M8.5 13.2 L11.8 16.4 L17.6 10" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-zinc-900 dark:text-zinc-50" />
+        </svg>
+        <span className="text-[15px] font-semibold text-zinc-900 dark:text-zinc-50">Sentinel</span>
+        <span className="hidden text-[12.5px] text-zinc-400 lg:inline">le garde des paiements d&apos;agents IA</span>
       </div>
-      <nav aria-label="Sections" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-xl bg-slate-100/80 p-1 xl:flex dark:bg-zinc-900">
+      <nav aria-label="Sections" className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-6 xl:flex">
         {tabs.map((t) => {
           const on = view === t.view;
           return (
@@ -111,7 +93,10 @@ function TopBar({ view }: { view: View }) {
               type="button"
               onClick={() => (t.view ? openView(t.view) : closeView())}
               aria-current={on ? "page" : undefined}
-              className={cn("rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors", on ? "bg-white text-slate-900 shadow-sm dark:bg-zinc-800 dark:text-zinc-50" : "text-slate-500 hover:text-slate-900 dark:text-zinc-400 dark:hover:text-zinc-100")}
+              className={cn(
+                "border-b-2 py-[15px] text-[14px] transition-colors",
+                on ? "border-zinc-900 text-zinc-900 dark:border-zinc-50 dark:text-zinc-50" : "border-transparent text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100",
+              )}
             >
               {t.label}
             </button>
@@ -119,11 +104,14 @@ function TopBar({ view }: { view: View }) {
         })}
       </nav>
       <div className="flex items-center gap-2">
-        {LIVE_CONFIGURED ? (
-          <span className="hidden rounded-full bg-emerald-50 px-2.5 py-1 text-[11.5px] font-medium text-emerald-700 ring-1 ring-emerald-200 sm:inline dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30">Live · Sentinel L1 + agent MCP</span>
-        ) : (
-          <span className="hidden rounded-full bg-amber-50 px-2.5 py-1 text-[11.5px] font-medium text-amber-700 ring-1 ring-amber-200 sm:inline dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30">Démo · données fictives</span>
-        )}
+        <span
+          className={cn(
+            "hidden rounded-md border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.12em] sm:inline",
+            LIVE_CONFIGURED ? "border-emerald-500/40 text-emerald-600 dark:text-emerald-400" : "border-amber-500/50 text-amber-600 dark:text-amber-400",
+          )}
+        >
+          {LIVE_CONFIGURED ? "Live · blockchain Sentinel" : "Démo · données fictives"}
+        </span>
         <button
           type="button"
           aria-label={dark ? "Thème clair" : "Thème sombre"}
@@ -132,7 +120,7 @@ function TopBar({ view }: { view: View }) {
             document.documentElement.classList.toggle("dark", next);
             setDark(next);
           }}
-          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:text-slate-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
+          className="flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 text-zinc-500 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
         >
           {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
@@ -141,37 +129,34 @@ function TopBar({ view }: { view: View }) {
   );
 }
 
-const SCENES: { k: SceneKey; key: string; label: string }[] = [
-  { k: "fraud", key: "1", label: "Fraude" },
-  { k: "legit", key: "2", label: "Légitime" },
-  { k: "doubt", key: "3", label: "Doute" },
-  { k: "immunity", key: "4", label: "Immunité" },
+/** the four situations the city plays (the demo, off the chain), as the chips under the search */
+const SCENES: { k: SceneKey; key: string; label: string; tone: string }[] = [
+  { k: "fraud", key: "1", label: "Facture piégée", tone: STATE.block.hex },
+  { k: "legit", key: "2", label: "Paiement normal", tone: STATE.allow.hex },
+  { k: "doubt", key: "3", label: "Boutique inconnue", tone: STATE.human.hex },
+  { k: "immunity", key: "4", label: "Escroc récidiviste", tone: STATE.block.hex },
 ];
 
 export default function CityShell() {
   const network = NETWORK;
-  const { byId: activityById, takenAt } = useChainActivity(network);
-  const [height, setHeight] = useState<Height>("validators");
-  const [lens, setLens] = useState<Lens>("districts");
+  const activityById = useChainActivity(network);
+  const [height] = useState<Height>("validators");
+  const [lens] = useState<Lens>("districts");
   const view: SizeBy = height === "messages" ? "messages" : "validators";
   const data = useCityData({ days: 1, sizeBy: view, network });
   const [selected, setSelected] = useState<string | null>(null);
   const [focus, setFocus] = useState<District | null>(null);
   const [route, setRoute] = useState<string | null>(null);
-  const [chip, setChip] = useState<null | "risk">(null);
+  const [listOpen, setListOpen] = useState(false);
   const camera = useRef<CameraHandle | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const panel = useSim((s) => s.panel);
-  const paused = useSim((s) => s.paused);
-  const kpi = useSim((s) => s.kpi);
-  const registry = useSim((s) => s.registry);
-  const journal = useSim((s) => s.journal);
   const human = useSim((s) => s.human);
   const tx = useSim((s) => s.tx);
   const phase = useSim((s) => s.phase);
   const search = useSim((s) => s.search);
   const mode = useSim((s) => s.mode);
-  const liveStatus = useSim((s) => s.liveStatus);
+  const kpis = useKpis();
 
   // the C-Chain's tower opens the transactions it settles, Sentinel's tower the audit; any other tower stays the City's
   const hubId = data.hubId;
@@ -213,30 +198,8 @@ export default function CityShell() {
     return top ? (data.nodes.find((n) => n.id === top[0])?.name ?? null) : null;
   }, [sheetNode, data]);
   const rightOpen = busyRight || !!sheetNode;
-  const inset = useMemo<Inset>(() => ({ left: 420, right: rightOpen ? 372 + 28 : 24, top: 40, bottom: 140 }), [rightOpen]);
-
-  // the network's own figures, real and dated (the snapshot), apart from ours
-  const figures = useMemo(() => {
-    const sets = data.nodes.filter((n) => n.id !== AVAGUARD_ID);
-    const realIcm = data.icmSimulated ? 0 : data.summary.total;
-    return { chains: sets.length, validators: sets.reduce((a, n) => a + (n.validators ?? 0), 0), icm: realIcm };
-  }, [data]);
-  const day = takenAt ? new Date(takenAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "…";
-  // the strip's Sentinel figures and the risk chip, from the same source as the screens (history plus this session)
-  const audit = useAudit();
-  const avgRisk = useMemo(() => (audit.txs.length ? Math.round(audit.txs.reduce((a, t) => a + t.score, 0) / audit.txs.length) : null), [audit.txs]);
-  const pending = human ? 1 : 0;
-  const stats = useMemo(() => {
-    const t = audit.txs;
-    const final = t.filter((x) => x.status === "ALLOW" || x.status === "BLOCK");
-    return {
-      total: t.length,
-      visas: t.filter((x) => x.status === "ALLOW").length,
-      blocked: t.filter((x) => x.status === "BLOCK").length,
-      prot: protectedOf(t),
-      avg: final.length ? final.reduce((a, x) => a + x.timings_ms.decide, 0) / final.length : 0,
-    };
-  }, [audit.txs]);
+  // the camera keeps the city under the search and its chips, and clear of the list and the card (city-app.tsx's room)
+  const inset = useMemo<Inset>(() => ({ left: listOpen ? PANEL_W + 28 : 20, right: rightOpen ? RIGHT_W + 28 : 20, top: 112, bottom: 92 }), [listOpen, rightOpen]);
 
   // the presenter's keys
   useEffect(() => {
@@ -275,6 +238,7 @@ export default function CityShell() {
           break;
         case "escape":
           sim.set({ panel: null });
+          setListOpen(false);
           break;
       }
     };
@@ -296,6 +260,10 @@ export default function CityShell() {
   useEffect(() => {
     (window as unknown as { __ag: unknown }).__ag = { sim, motion, playScene, resetAll, answerHuman, setPaused };
   }, []);
+
+  // the search's box: centred on the window, kept clear of the corner cards at the left and the card at the right
+  const searchLeft = listOpen ? `calc(${PANEL_W}px + 2 * var(--frame))` : "calc(27rem + 2 * var(--frame))";
+  const searchRight = rightOpen ? `calc(${RIGHT_W}px + 2 * var(--frame))` : "calc(27rem + 2 * var(--frame))";
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -326,16 +294,106 @@ export default function CityShell() {
           cameraRef={camera}
         />
 
-        {/* the story, for someone who has never heard of the project: what the MCP agent does, and four situations to try */}
-        <div className="absolute left-(--frame) top-(--frame) z-30 hidden max-h-[calc(100%-2*var(--frame)-8.5rem)] flex-col gap-3 overflow-y-auto lg:flex">
-          <HowItWorks />
-          <TryIt />
-        </div>
-        {mode === "live" && (
-          <div className="absolute right-(--frame) top-(--frame) z-20 rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-[11.5px] text-slate-600 shadow-sm dark:border-zinc-800 dark:bg-zinc-950/85 dark:text-zinc-300">
-            Direct : {liveStatus || "connexion…"}
+        {/* the list's door, the view and the status: city-frame.tsx SidebarHead's three cards in the top left corner */}
+        <div className={cn("absolute left-(--frame) top-(--frame) z-30 flex items-center gap-2 transition-transform duration-300", EASE, listOpen && "translate-x-1 translate-y-2")}>
+          <button
+            type="button"
+            onClick={() => setListOpen((v) => !v)}
+            aria-expanded={listOpen}
+            aria-controls="city-sidebar"
+            title={listOpen ? "Fermer la liste" : "Voir la liste des paiements"}
+            className="relative isolate flex h-11 items-center gap-2 rounded-2xl pl-3.5 pr-4 text-[13px] font-medium text-zinc-800 transition-colors hover:text-zinc-950 dark:text-zinc-100 dark:hover:text-white"
+          >
+            <span aria-hidden className={cn(CARD, "transition-opacity duration-200", listOpen && "opacity-0")} />
+            {listOpen ? <PanelLeftClose className="h-4 w-4 text-zinc-500 dark:text-zinc-400" /> : <PanelLeftOpen className="h-4 w-4 text-zinc-500 dark:text-zinc-400" />}
+            Paiements
+            <span className="font-mono text-[11px] tabular-nums text-zinc-400 dark:text-zinc-500">{kpis.total}</span>
+          </button>
+          <div role="group" aria-label="Vue" className={cn("relative isolate flex h-11 items-stretch gap-0.5 rounded-2xl p-1 text-[13px] font-medium transition-opacity duration-200", listOpen && "pointer-events-none opacity-0")}>
+            <span aria-hidden className={CARD} />
+            {sentinelConfig.explorer ? (
+              <a
+                href={sentinelConfig.explorer}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="La blockchain Sentinel, bloc par bloc"
+                className="flex items-center gap-1 rounded-xl px-3 text-zinc-500 transition-colors hover:bg-zinc-100/70 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-900 dark:hover:text-zinc-100"
+              >
+                Explorer
+                <ArrowUpRight className="h-3 w-3" />
+              </a>
+            ) : (
+              <span className={SEG_OFF}>Explorer</span>
+            )}
+            <span aria-current="page" className={SEG_ON}>
+              Ville
+            </span>
           </div>
-        )}
+          <div
+            title={LIVE_CONFIGURED ? "Les chiffres sont lus en direct sur la blockchain Sentinel, où l'agent MCP inscrit chaque décision" : "Données de démonstration"}
+            className={cn("relative isolate flex h-11 items-center gap-2 rounded-2xl px-3.5 text-[13px] font-medium text-zinc-700 transition-opacity duration-200 dark:text-zinc-200", listOpen && "pointer-events-none opacity-0")}
+          >
+            <span aria-hidden className={CARD} />
+            <span className={cn("h-2 w-2 rounded-full", LIVE_CONFIGURED ? (kpis.connected ? "animate-pulse bg-emerald-500" : "bg-zinc-300") : "bg-amber-500")} />
+            {LIVE_CONFIGURED ? (kpis.connected ? "En direct" : "Connexion…") : "Démo"}
+          </div>
+        </div>
+
+        {/* the list (city-app.tsx's sidebar): the decisions by outcome, shut until asked for */}
+        <aside
+          id="city-sidebar"
+          aria-label="Paiements"
+          inert={!listOpen || undefined}
+          aria-hidden={!listOpen}
+          className={cn(PANE, "left-(--frame)", listOpen ? "translate-x-0 opacity-100" : "pointer-events-none -translate-x-6 opacity-0")}
+          style={{ width: PANEL_W }}
+        >
+          <div aria-hidden className="h-[3.75rem] shrink-0 border-b border-zinc-100 dark:border-zinc-900" />
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{listOpen && <Directory query={search} />}</div>
+        </aside>
+
+        {/* the search over the city's top, the situations to play under it (city-app.tsx's search and question chips) */}
+        <div className="pointer-events-none absolute top-(--frame) z-30 flex justify-center transition-[left,right] duration-300 ease-out" style={{ left: searchLeft, right: searchRight }}>
+          <div className="pointer-events-auto flex w-full max-w-[34rem] flex-col items-center gap-2">
+            <label className={cn("relative flex h-11 w-full items-center gap-2 rounded-2xl px-3.5", GLASS)}>
+              <Search className="h-4 w-4 text-zinc-400" />
+              <span className="sr-only">Rechercher</span>
+              <input
+                ref={searchRef}
+                value={search}
+                onChange={(e) => {
+                  sim.set({ search: e.target.value });
+                  if (e.target.value) setListOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") openView("transactions");
+                }}
+                placeholder="Rechercher un paiement, une adresse, un agent…"
+                className="h-full flex-1 bg-transparent text-[13.5px] text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+              />
+              <span className="rounded border border-zinc-200 px-1.5 font-mono text-[10px] text-zinc-400 dark:border-zinc-800">Ctrl K</span>
+            </label>
+            <div role="group" aria-label="Voir un cas" className="flex flex-wrap justify-center gap-1.5">
+              {SCENES.map((c) => (
+                <button
+                  key={c.k}
+                  type="button"
+                  onClick={() => playScene(c.k)}
+                  title={`Rejoue ce cas dans la ville (démo, touche ${c.key})`}
+                  className="flex h-8 items-center gap-1.5 rounded-full border border-zinc-200 bg-white/[0.92] px-2.5 text-[11.5px] text-zinc-600 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950/[0.88] dark:text-zinc-300 dark:hover:border-zinc-700 dark:hover:text-zinc-50"
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ background: c.tone }} />
+                  {c.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* the key in the bottom left corner (city-key.tsx's place), hidden under the open list */}
+        <div className={cn("absolute bottom-(--frame) left-(--frame) z-30 hidden transition-opacity duration-200 xl:block", listOpen && "pointer-events-none opacity-0")}>
+          <SentinelKey />
+        </div>
 
         <AnalysisCard />
         {sheetNode && <ChainSheet node={sheetNode} partner={sheetPartner} simulated={data.icmSimulated} onClose={() => setSelected(null)} />}
@@ -343,13 +401,11 @@ export default function CityShell() {
         <Toasts />
         <ViewHost screens={{ transactions: <TransactionsView />, registry: <RegistryView />, parking: <ParkingView />, audit: <AuditView /> }} />
 
-        {/* what it is worth, in five figures */}
-        <div className={cn("absolute bottom-[1.6rem] left-(--frame) z-20 transition-[right] duration-300", rightOpen ? "right-[calc(var(--frame)+384px)]" : "right-(--frame)")}>
-          <Impact />
-        </div>
-
-        {/* the licence's mention, as the prompt asks */}
-        <p className="pointer-events-none absolute inset-x-0 bottom-1 z-10 text-center text-[10px] text-slate-400 dark:text-zinc-500">City 3D d&apos;après le code open source Avalanche Builder Hub (BSD-3) · Concept Sentinel · données de démonstration</p>
+        {/* the figures at the city's foot (city-frame.tsx FigureStrip), and the latest decisions in the bottom right corner */}
+        <FigureStrip sidebar={listOpen} legend right={rightOpen ? RIGHT_W : 0} network={network}>
+          <Figures />
+        </FigureStrip>
+        <LatestFeed away={rightOpen} />
       </div>
     </div>
   );

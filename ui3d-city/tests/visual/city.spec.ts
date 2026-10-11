@@ -14,12 +14,13 @@ async function open(page: Page) {
   await page.waitForTimeout(10_000);
 }
 
-test("home: the city, its Security ward, the figures and the licence's mention", async ({ page }) => {
+test("home: the city, its Security ward, the figures, the key and the licence's mention", async ({ page }) => {
   await open(page);
-  await expect(page.getByText("City 3D d'après le code open source Avalanche Builder Hub (BSD-3) · Concept Sentinel · simulation")).toBeVisible();
-  await expect(page.getByText("Concept Sentinel · simulation").first()).toBeVisible();
+  await expect(page.getByText("Ville 3D d'après Avalanche Builder Hub (open source, BSD-3)")).toBeVisible();
   await expect(page.getByText("SECURITY", { exact: false }).first()).toBeVisible();
-  await expect(page.getByPlaceholder("Rechercher une transaction, une adresse, un agent…")).toBeVisible();
+  await expect(page.getByPlaceholder("Rechercher un paiement, une adresse, un agent…")).toBeVisible();
+  for (const label of ["Paiements", "Fraudes", "Escrocs", "Preuves"]) await expect(page.getByRole("button", { name: new RegExp(`^${label}`) }).or(page.getByRole("link", { name: new RegExp(`^${label}`) })).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Facture piégée" })).toBeVisible();
   await page.screenshot({ path: "docs/captures/home.jpg", quality: 85, type: "jpeg" });
 });
 
