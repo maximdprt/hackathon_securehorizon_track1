@@ -114,6 +114,7 @@ Détail complet et honnête dans [`deliverables/audit-report.md`](deliverables/a
 Le garde tourne sans rien. Pour la fusion IA et l'écriture on-chain :
 ```
 GUARD_LLM=on                       # off = heuristiques seules, pas d'AWS
+GUARD_KYB=on                       # opt-in : vérifie le bénéficiaire au registre d'entreprises de l'État (data.gouv), off par défaut
 AWS_DEFAULT_REGION=us-west-2       # Bedrock Claude
 AWS_ACCESS_KEY_ID=...              # creds temporaires
 AWS_SECRET_ACCESS_KEY=...

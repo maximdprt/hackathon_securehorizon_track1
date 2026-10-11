@@ -17,6 +17,7 @@
 - **Qui paie qui, combien, pourquoi** : attachés à chaque transaction (métadonnées de paiement verify_payment) → éléments Travel Rule.
 - **Détection de schémas** : structuring (montant juste sous le plafond), vélocité (paiements/heure), bénéficiaire récemment modifié, honeypot/contrat non vérifié → signaux dédiés.
 - **Registre des adresses à risque** : partagé on-chain, réutilisable → la 2e tentative vers une adresse flaguée est refusée d'office.
+- **KYB souverain (« know your beneficiary »)** : couche opt-in (`GUARD_KYB=on`) qui vérifie le bénéficiaire contre le **registre officiel des entreprises de l'État** (API Recherche d'entreprises, data.gouv.fr / DINUM). Entreprise active et correspondante → preuve officielle attachée à la décision (SIREN + état), bénéficiaire radié / introuvable / nom non concordant → signal de risque (escalade humaine). Vérification par **source tierce officielle**, loggée et rejouable (exigence DORA tiers), jamais déclarative. Dégrade proprement : si le registre est indisponible, aucun paiement n'est débloqué pour autant (le garde reste fail-closed via les autres couches).
 
 ## AI Act (règlement IA UE)
 - **Transparence & explicabilité** : chaque décision est explicable — signaux cités, poids, formule (OU bruité), seuils affichés (exigence sur les systèmes à haut risque).

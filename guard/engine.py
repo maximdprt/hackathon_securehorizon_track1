@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from guard import sanitize, scoring
-from guard.features import authority as f_auth, content as f_content, counterparty as f_cp, mandate as f_mandate, tools as f_tools, transaction as f_tx
+from guard.features import authority as f_auth, content as f_content, counterparty as f_cp, mandate as f_mandate, registry as f_registry, tools as f_tools, transaction as f_tx
 from guard.llm import ClaudeScorer, build_payload
 from guard.models import Mandate, Signal, Verdict, VerifyRequest, norm_addr
 from guard.queue import PendingQueue
@@ -183,6 +183,7 @@ class Engine:
             ("counterparty", lambda: f_cp.extract(req, mandate, self.source, self.data, prior=self._paid_before(o.issuer, o.recipient))),
             ("transaction", lambda: f_tx.extract(req, mandate, self.source, self.data)),
             ("tools", lambda: f_tools.extract(req, self.data)),
+            ("registry", lambda: f_registry.extract(req, mandate, self.data)),  # sovereign KYB, opt-in GUARD_KYB=on
         ]
         for name, fn in layers:
             try:

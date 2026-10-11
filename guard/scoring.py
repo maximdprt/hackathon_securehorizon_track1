@@ -14,7 +14,7 @@ FLOOR_NEEDS_APPROVAL = {"calldata_undecodable", "authority_source_unavailable", 
 # mandate rules: the order is beyond what the issuer may do alone. No trust is taken, but it never passes without a human.
 RULE_NEEDS_APPROVAL = {"amount_within_mandate", "amount_over_onchain_cap", "daily_cap_exceeded"}
 # context, not evidence: they raise the score but never justify an escalation by themselves
-INFORMATIONAL = {"order_origin", "hidden_text_ratio", "recipient_prior_incident_info", "invisible_unicode_trace", "payment_details_mention", "amount_just_under_threshold", "tld_risk", "source_is_ad", "tls_missing", "legal_pages_missing", "geo_mismatch"}
+INFORMATIONAL = {"order_origin", "hidden_text_ratio", "recipient_prior_incident_info", "invisible_unicode_trace", "payment_details_mention", "amount_just_under_threshold", "tld_risk", "source_is_ad", "tls_missing", "legal_pages_missing", "geo_mismatch", "kyb_verified_active", "kyb_registry_unavailable"}
 
 
 def load_thresholds(path: str | Path | None) -> dict:
