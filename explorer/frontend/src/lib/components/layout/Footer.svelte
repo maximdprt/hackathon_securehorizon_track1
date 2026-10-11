@@ -31,6 +31,7 @@
 	<div class="footer__top">
 		<div class="footer__brand">
 			<div class="footer__logo">
+				<img src="/sentinel-logo.png" alt="Sentinel" class="h-9 w-9 object-contain" />
 				<div>
 					<h3>SentinelScan</h3>
 					<p class="caption">SentinelL1 explorer</p>
