@@ -194,6 +194,7 @@ function Agents({ agents, add, update, remove, mine, walletAddress }: { agents: 
           <div className="badge">Hermès × Sentinel MCP</div>
           <h2>Create an agent, give it a precise XML prompt and its limits, and every payment it makes is checked.</h2>
           <div className="row g8"><button className="btn" onClick={() => setEditing('new')}>Create my first agent</button><button className="btn ghost" onClick={demo}>Add the demo agent</button></div>
+          <p className="mute">Prefer to run it yourself? Clone the ready agent <a href="https://github.com/walidb212/secure-agent-starter" target="_blank" rel="noreferrer">secure-agent-starter</a> or add the guard <a href="https://github.com/walidb212/sentinel-guard" target="_blank" rel="noreferrer">sentinel-guard</a> to your own.</p>
         </section>
       ) : (
         <div className="agents">{agents.map((a) => {
@@ -338,7 +339,7 @@ function AgentEditor({ agent, walletAddress, onClose, onSave, onDelete }: { agen
         <div className="row g8"><Copy text={initCmd(f)} label="Copy" /><span className="mute">Writes the same limits Sentinel enforces, whatever the prompt says.</span></div>
         <p className="eb">2 · Plug it into {FRAMEWORK[f.framework]}</p>
         <pre className="code">{mcpConfig(f)}</pre>
-        <div className="row g8"><Copy text={mcpConfig(f)} label="Copy config" /><a className="btn sm ghost" href="https://github.com/walidb212/sentinel-guard" target="_blank" rel="noreferrer">Docs &amp; source</a></div>
+        <div className="row g8"><Copy text={mcpConfig(f)} label="Copy config" /><a className="btn sm ghost" href="https://github.com/walidb212/sentinel-guard" target="_blank" rel="noreferrer">Docs &amp; source</a><a className="btn sm ghost" href="https://github.com/walidb212/secure-agent-starter" target="_blank" rel="noreferrer">Clone the demo agent</a></div>
         <p className="note">The guard is open source (MIT). Connected-mode key enforcement is rolling out; local screening works today.</p>
       </>)}
 
