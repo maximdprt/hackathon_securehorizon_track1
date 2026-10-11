@@ -7,7 +7,7 @@ type Ag = { sim: { get: () => { phase: string; step: number; registry: string[];
 const ag = (page: Page) => page.evaluate(() => (window as unknown as { __ag: Ag }).__ag.sim.get());
 
 async function open(page: Page) {
-  await page.goto("/");
+  await page.goto("/?live=0");
   await page.locator("canvas").first().waitFor();
   await page.waitForFunction(() => !!(window as unknown as { __ag?: Ag }).__ag);
   // the city's rise and the first bake

@@ -40,6 +40,15 @@ export type SimState = {
   viewFilter: ViewFilter;
 };
 
+/** live as soon as the team's verdict stream is configured (.env.local): every decision the API records (the explorer's
+    test panel's too) drives in as a car; ?live=0 keeps the demo alone, ?live=1 forces the stream */
+function initialMode(): SimState["mode"] {
+  const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("live") : null;
+  if (q === "0") return "demo";
+  if (q === "1") return "live";
+  return process.env.NEXT_PUBLIC_AVAGUARD_SSE_URL || process.env.NEXT_PUBLIC_AVAGUARD_WS_URL ? "live" : "demo";
+}
+
 const initial = (): SimState => ({
   tx: null,
   phase: "idle",
@@ -54,7 +63,7 @@ const initial = (): SimState => ({
   toasts: [],
   panel: null,
   search: "",
-  mode: typeof window !== "undefined" && new URLSearchParams(window.location.search).get("live") === "1" ? "live" : "demo",
+  mode: initialMode(),
   liveStatus: "",
   routeLit: false,
   ledger: [],

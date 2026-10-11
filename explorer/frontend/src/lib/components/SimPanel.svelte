@@ -38,17 +38,17 @@
 		const n = Date.now() % 100000;
 		if (kind === 'allow')
 			return send({
-				payment: { issuer: ISSUER, recipient: '0x0000000000000000000000000000000000Fa38c12', amount: 12, nonce: n },
+				payment: { issuer: ISSUER, recipient: '0x0Fa3e5c7d9b1a3c5e7f9b1d3a5c7e9f1b3d58c12', amount: 12, nonce: n },
 				verdict: 'allow', reason: 'facture SaaS connue, dans le mandat',
 				context: { issuer_label: 'agent-meteo-02', recipient_label: 'SaaS Vendor' },
-				full: { instruction_id: '0xa1' + n, issuer: ISSUER, action: 'pay', amount: 12, currency: 'USDC', recipient: '0x0000000000000000000000000000000000Fa38c12', verdict: 'allow', risk_score: 0.08, reasons: ['service connu, enregistré ERC-8004', 'montant dans le mandat'], owasp: [], authority_check: { authorized: true, within_limit: true }, poison_check: { is_poisoned: false } }
+				full: { instruction_id: '0xa1' + n, issuer: ISSUER, action: 'pay', amount: 12, currency: 'USDC', recipient: '0x0Fa3e5c7d9b1a3c5e7f9b1d3a5c7e9f1b3d58c12', verdict: 'allow', risk_score: 0.08, reasons: ['service connu, enregistré ERC-8004', 'montant dans le mandat'], owasp: [], authority_check: { authorized: true, within_limit: true }, poison_check: { is_poisoned: false } }
 			});
 		if (kind === 'human')
 			return send({
-				payment: { issuer: ISSUER, recipient: '0x00000000000000000000000000000000b0u71c9e', amount: 640, nonce: n },
+				payment: { issuer: ISSUER, recipient: '0xC0ffee5e7a9b1c3d5e7f9a1b3c5d7e9f1a3b9d07', amount: 640, nonce: n },
 				verdict: 'needs_human', reason: 'domaine créé il y a 3 jours, risque 55',
 				context: { issuer_label: 'agent-achat-03', recipient_label: 'boutique-neuve.example' },
-				full: { instruction_id: '0xb0' + n, issuer: ISSUER, action: 'pay', amount: 640, currency: 'USDC', recipient: '0x00000000000000000000000000000000b0u71c9e', verdict: 'needs_approval', risk_score: 0.55, reasons: ['domaine récent', 'hors habitude'], owasp: ['ASI07'], authority_check: { authorized: true, within_limit: true }, poison_check: { is_poisoned: false, confidence: 0.4 } }
+				full: { instruction_id: '0xb0' + n, issuer: ISSUER, action: 'pay', amount: 640, currency: 'USDC', recipient: '0xC0ffee5e7a9b1c3d5e7f9a1b3c5d7e9f1a3b9d07', verdict: 'needs_approval', risk_score: 0.55, reasons: ['domaine récent', 'hors habitude'], owasp: ['ASI07'], authority_check: { authorized: true, within_limit: true }, poison_check: { is_poisoned: false, confidence: 0.4 } }
 			});
 		return send({
 			payment: { issuer: ISSUER, recipient: '0x00000000000000000000000000000000DeaDBeef', amount: 4800, nonce: n },

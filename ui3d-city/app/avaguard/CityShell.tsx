@@ -14,7 +14,7 @@ import type { Height } from "@/components/explorer-v2/network/city-app";
 import type { PchainNetwork } from "@/lib/pchain-explorer";
 import { AVAGUARD_ID } from "@/components/explorer-v2/network/avaguard";
 import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused } from "@/sim/Director";
-import { startLiveFeed } from "@/sim/liveFeed";
+import { parseMessage, startLiveFeed } from "@/sim/liveFeed";
 import { motion, sim, useSim, type View } from "@/sim/store";
 import { closeView, listenUrl, openView } from "@/sim/nav";
 import { STATE } from "@/sim/types";
@@ -258,7 +258,7 @@ export default function CityShell() {
 
   // a test and debug handle for tools/capture.mjs and the Playwright suite
   useEffect(() => {
-    (window as unknown as { __ag: unknown }).__ag = { sim, motion, playScene, resetAll, answerHuman, setPaused };
+    (window as unknown as { __ag: unknown }).__ag = { sim, motion, playScene, resetAll, answerHuman, setPaused, enqueue, parseMessage };
   }, []);
 
   // the search's box: centred on the window, kept clear of the corner cards at the left and the card at the right
