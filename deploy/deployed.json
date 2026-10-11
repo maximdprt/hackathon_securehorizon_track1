@@ -1,10 +1,10 @@
 {
  "function": "team2-agents",
  "arn": "arn:aws:lambda:us-west-2:393886879451:function:team2-agents",
- "image": "393886879451.dkr.ecr.us-west-2.amazonaws.com/team2-agents@sha256:c5f668706ca7646c6851e61fe470c32b4b1b5066a004d05872677e1261d3def7",
+ "image": "393886879451.dkr.ecr.us-west-2.amazonaws.com/team2-agents@sha256:5e6d0516c9f84ac94a46e9280aef76ac8fcc40b68b7e69b6b4998ded66fb80ef",
  "url": "https://yo6k6eid4h.execute-api.us-west-2.amazonaws.com/",
  "function_url": "https://gex772brms4sqt7ixoxbwpwloy0fzmqc.lambda-url.us-west-2.on.aws/",
  "runs_bucket": "team2-agents-runs-393886879451",
  "region": "us-west-2",
- "deployed": "2026-10-11T03:41:41"
+ "deployed": "2026-10-11T07:12:55"
 }
