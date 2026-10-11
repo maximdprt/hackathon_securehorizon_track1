@@ -1,7 +1,8 @@
 // AVAGUARD: our parcel's geometry, read from the vendored plan and lanes (not from builders-hub). Every place is
 // derived from our chain's lot (city.ts CityLot), its ward's arc and our street's lanes (lanes.ts streetsOf), so the
 // parcel follows the plan wherever planCity puts it. World frame as model.ts: plan x -> X, plan y -> Z, Y up.
-import { Vector3 } from "three";
+import { Matrix4, Vector3 } from "three";
+import { CHX, CHZ, FLOOR, KX, KZ, PICK, POD_W, SKIP_LAND } from "@/components/guard-yard/three/constants";
 import type { City } from "@/components/explorer-v2/network/city";
 import type { Route } from "@/components/explorer-v2/network/icm-map";
 import { AVAGUARD_ID, guardBackKey, guardKey } from "@/components/explorer-v2/network/avaguard";
@@ -41,11 +42,17 @@ export type GuardGeo = {
   carL: number;
   hq: Building;
   hubTop: number;
+  /** the X-ray gantry: its beam's point on our street, the street's heading there */
   toll: { p: Vector3; yaw: number; span: number };
   stop: { p: Vector3; yaw: number };
+  /** the C-Chain's gate on the lane into the hub: a visa's car goes through it and is gone (GuardCar clips it there) */
+  gate: { p: Vector3; yaw: number; w: number };
+  /** the yard's metres in the world */
+  k: number;
   legs: Record<Exclude<Leg, "none">, Path>;
   parking: Parking;
-  scrapyard: { c: Vector3; yaw: number; w: number; d: number; crusher: Vector3; bin: Vector3 };
+  /** the Guard Yard (baler, crane, skip) standing in the city: its frame, its scale, its landmarks in the world */
+  scrapyard: { c: Vector3; matrix: Matrix4; zHat: Vector3; crusher: Vector3; bin: Vector3; pick: Vector3; skip: Vector3; w: number; d: number; W: (x: number, y: number, z: number) => Vector3 };
   proof: Vector3;
   out: Vector3;
   dbg?: Record<string, number>;
@@ -127,7 +134,8 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   const lp = (lane: typeof laneOut, k: number) => new Vector3(lane.x[k], yAt(lane.x[k], lane.z[k]), lane.z[k]);
   const S = city.lot;
   const carW = WIDTH * Math.min(1.25, Math.max(0.6, S / LOT)) * SIZE * 1.9; // our car stands out of the traffic: about twice a pod
-  const carL = PODS.car.length * carW;
+  const carL = PODS.van.length * carW; // our car: the fleet's van, the yard's car at POD_W metres wide
+  const k = carW / POD_W;
   const n = laneOut.x.length;
   const hqR = hq.n.w * 1.5;
   const away = (lane: typeof laneOut, k: number) => Math.hypot(lane.x[k] - hq.x, lane.z[k] - hq.z) > hqR;
@@ -137,9 +145,13 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   while (iDoor < n - 1 && !away(laneOut, iDoor)) iDoor++;
   let iExit = iDoor;
   while (iExit < n - 1 && inBlock(laneOut.x[iExit], laneOut.z[iExit])) iExit++;
-  const iToll = Math.min(n - 2, Math.max(iDoor + Math.round(carL * 1.6), iExit));
-  // SENTINEL (from the deployed sentinel-city-3d): the car stops UNDER the gate, so the scanner sweeps it at the toll
-  const iStop = Math.max(iDoor + 1, iToll);
+  // the gantry stands a good two car lengths out of the HQ's door (on the ring road, past the turn), so the car is seen
+  // leaving the tower and driving up to it
+  const iToll = Math.min(n - 2, Math.max(iDoor + Math.round(carL * 2.2), iExit));
+  // the X-ray gantry's beam stands at iToll: the car waits before it, drives through it while scanned, stops past it
+  // (the yard's SX - 3.3 and SX + 3.4), as the customs portals work
+  const iPre = Math.max(iDoor + 1, iToll - Math.round(3.3 * k));
+  const iStop = Math.min(n - 2, Math.max(iToll + 1, iToll + Math.round(3.4 * k)));
   const tollP = lp(laneOut, iToll);
   const stopP = lp(laneOut, iStop);
   const fwd = new Vector3(Math.cos(laneOut.yaw[iStop]), 0, Math.sin(laneOut.yaw[iStop]));
@@ -174,17 +186,25 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   const x1 = depth / 2 + edge;
   const z1 = 3 * bay + edge;
   // a ward that holds the whole circle (the Sentinel-only city): the human lot and the scrapyard stand either side of the
-  // HQ's block, at its radius, a service lane between; a narrow ward: beyond the block, a central lane between them
+  // HQ's block, in its block row, served by the ring road downtown's side of it; a narrow ward: beyond the block, a
+  // central lane between them
   const beside = ward.a1 - ward.a0 > Math.PI;
-  const rP = beside ? lot.r : rLat + carL * 0.75 + z1;
-  const aP = beside ? blockMid - runSide * (blockHalf + (2 * corridor - x0) / rP) : lot.a - runSide * ((corridor - x0) / rP);
-  const radial = new Vector3(Math.cos(aP), 0, Math.sin(aP));
+  // the ring road the HQ's block fronts on: its centre and its outer kerb (city.ts rings, ROAD = 0.5 lot)
+  const ringR = city.rings.find((r) => r < lot.r) ?? lot.r - S;
+  const ringKerb = ringR + S * 0.25;
   const tangent = (a: number) => new Vector3(-Math.sin(a), 0, Math.cos(a));
-  // the frame: +x away from the central lane, +z a quarter turn from it (outward or inward, as the side falls)
-  const xHat = tangent(aP).multiplyScalar(-runSide);
+  // beside: the lot's long side runs along the ring, its gate on the ring road's kerb, its bays' noses outward (the lot
+  // is deeper than a block row, so its bays stand over the row's mid lane rather than over the ring road)
+  const rP = beside ? ringKerb + carW * 0.4 - x0 : rLat + carL * 0.75 + z1;
+  const aP = beside ? blockMid - runSide * (blockHalf + (corridor + z1) / rP) : lot.a - runSide * ((corridor - x0) / rP);
+  const radial = new Vector3(Math.cos(aP), 0, Math.sin(aP));
+  // the frame: +x away from the lane the car comes by (outward, beside; away from the central lane otherwise), +z a
+  // quarter turn from it
+  const xHat = beside ? radial.clone() : tangent(aP).multiplyScalar(-runSide);
   const slotYaw = Math.atan2(xHat.z, xHat.x);
   const zHat = new Vector3(-Math.sin(slotYaw), 0, Math.cos(slotYaw));
-  const inward = -Math.sign(zHat.dot(radial)) || -1;
+  // the gate's end of the row: toward the HQ's block (beside), else the inward end
+  const inward = beside ? runSide : -Math.sign(zHat.dot(radial)) || -1;
   const pc = polar(rP, aP, 0);
   const py = yAt(pc.x, pc.z);
   pc.y = py;
@@ -213,20 +233,30 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
     d: x1 - x0,
   };
 
-  // the scrapyard: fenced, across the central lane from the human lot; its crusher by the lane, the registry's container at its far side
-  const sw = S * 1.5;
-  const sd = S * 1.6;
-  const rS = beside ? lot.r : rLat + carL * 0.75 + sd / 2;
-  const aS = beside ? blockMid + runSide * (blockHalf + (2 * corridor + sw / 2) / rS) : lot.a + runSide * ((corridor + sw / 2) / rS);
+  // the Guard Yard (baler, crane, skip) across the service lane from the human lot, in its own metres scaled by k: its x
+  // runs away from the HQ along the ring (the car comes in along it to PICK), its z a quarter turn from it, inward.
+  // Beside: its lane (z = 0) runs on the ring road's outer half, the baler and the skip in the block row behind it
+  const r0 = beside ? ringR + carW * 0.45 + 2.75 * k : rLat + carL + 3.5 * k;
+  const a0 = beside ? blockMid + runSide * (blockHalf + (2 * corridor) / lot.r) : lot.a + runSide * (corridor / r0);
   const sideS = blockMid + runSide * (blockHalf + corridor / lot.r);
-  const sc = G(rS, aS);
+  const yx = tangent(a0).multiplyScalar(runSide);
+  const up = new Vector3(0, 1, 0);
+  const yz = yx.clone().cross(up);
+  const g0 = G(r0, a0);
+  const yo = g0.clone().addScaledVector(yz, 2.75 * k); // the yard's z = -2.75 (between the lane and the baler) on r0
+  const W = (x: number, y: number, z: number) => yo.clone().addScaledVector(yx, x * k).addScaledVector(up, y * k).addScaledVector(yz, z * k);
+  const matrix = new Matrix4().makeBasis(yx, up, yz).scale(new Vector3(k, k, k)).setPosition(yo);
   const scrapyard = {
-    c: sc,
-    yaw: Math.atan2(Math.sin(aS + Math.PI / 2), Math.cos(aS + Math.PI / 2)),
-    w: sw,
-    d: sd,
-    crusher: G(rS - sd * 0.22, aS - runSide * ((sw * 0.22) / rS)),
-    bin: G(rS + sd * 0.26, aS + runSide * ((sw * 0.12) / rS)),
+    c: W(11, 0, -3),
+    matrix,
+    zHat: yz,
+    crusher: W(CHX, FLOOR, CHZ),
+    bin: W(SKIP_LAND.x, SKIP_LAND.y, SKIP_LAND.z),
+    pick: W(PICK.x, 0, 0),
+    skip: W(KX, 1, KZ),
+    w: 20 * k,
+    d: 8 * k,
+    W,
   };
 
   // the legs the Director drives
@@ -236,8 +266,12 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
     for (let k = a; step > 0 ? k <= b : k >= b; k += step) out.push(lp(lane, k));
     return out;
   };
-  const approach = pathOf(lanePts(laneOut, iDoor, iStop));
+  const approach = pathOf(lanePts(laneOut, iDoor, iPre));
+  const scanPass = pathOf(lanePts(laneOut, iPre, iStop));
   const toCChain = pathOf(lanePts(laneOut, iStop, n - 1));
+  // the gate: a car and a half before the lane's end, so the whole car has gone through it before the leg ends
+  let iGate = n - 1;
+  for (let left = 0; iGate > iStop + 1 && left < carL * 1.5; iGate--) left += Math.hypot(laneOut.x[iGate] - laneOut.x[iGate - 1], laneOut.z[iGate] - laneOut.z[iGate - 1]);
   // the U-turn: a loop ahead onto the lane back, then back toward the HQ's door
   const nb = laneBack.x.length;
   const turnPoint = stopP.clone().add(fwd.clone().multiplyScalar(carL * 1.1));
@@ -256,9 +290,8 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
   const door = lp(laneBack, jDoor);
   // round the block by the service road, along the lateral street, down the central lane, in to the crusher
   const lane0 = G(rLat, lot.a);
-  const toScrapyard = pathOf(
-    smooth(beside ? [door, G(rIn, sideS), G(rS - sd * 0.3, sideS), scrapyard.crusher.clone()] : [door, G(rIn, sideA), G(rLat, sideA), lane0, G(rS - sd * 0.3, lot.a), scrapyard.crusher.clone()]),
-  );
+  // round the block by the service lane, onto the yard's lane, up to PICK, heading along the yard's x
+  const toScrapyard = pathOf(smooth(beside ? [door, G(rIn, sideS), W(-5, 0, 0), W(0, 0, 0), W(PICK.x, 0, 0)] : [door, G(rIn, sideA), G(rLat, sideA), lane0, W(-5, 0, 0), W(0, 0, 0), W(PICK.x, 0, 0)]));
   const slot = slots[2];
   // in by the gate, along the aisle, a turn into P3; out in reverse to the aisle, then forward through the gate to the toll
   const slotZ = (2 - 2.5) * bay;
@@ -278,10 +311,12 @@ export function guardGeoOf(model: CityModel, city: City, routes: Route[], street
     hubTop,
     toll: { p: tollP, yaw: laneOut.yaw[iToll], span: Math.max(carW * 2.4, S * 0.7) },
     stop: { p: stopP, yaw: laneOut.yaw[iStop] },
-    legs: { approach, toCChain, uTurn, toScrapyard, toParking, fromParking },
+    gate: { p: lp(laneOut, iGate), yaw: laneOut.yaw[iGate], w: carW * 2.2 },
+    k,
+    legs: { approach, scanPass, toCChain, uTurn, toScrapyard, toParking, fromParking },
     parking,
     scrapyard,
-    dbg: { ...room, lotA: lot.a, aP, aS, rP, rS, runSide },
+    dbg: { ...room, lotA: lot.a, aP, a0, rP, r0, runSide, k },
     proof: polar(lot.r + hq.n.w * 2.2, lot.a, BLOCK_H),
     out: lp(laneOut, n - 1),
   };

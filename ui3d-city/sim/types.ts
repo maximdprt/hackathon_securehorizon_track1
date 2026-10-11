@@ -47,6 +47,8 @@ export type AuditTx = TxEvent & {
   decided_at?: string;
   /** read from the chain alone: the verdict, its reason and its proof, not the five checks' scores */
   partial?: boolean;
+  /** a doubtful case's human answer: who decided, when, and the protocol it set off */
+  review?: { by: string; at: string; approve: boolean; protocol: "visa" | "déchetterie" };
 };
 
 export const CHECK_ORDER: CheckKey[] = ["authority", "beneficiary", "mandate", "intent_ai", "contract"];

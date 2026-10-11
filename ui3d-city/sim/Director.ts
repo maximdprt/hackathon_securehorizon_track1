@@ -1,14 +1,18 @@
 import gsap from "gsap";
 import { SCENARIO, type SceneKey } from "./scenario";
 import { STEPS, TIMINGS } from "./timings";
-import { motion, resetMotion, sim, toast, type JournalEntry } from "./store";
+import { motion, resetMotion, sim, toast, type JournalEntry, type Paint } from "./store";
 import { fmtAmount, shortAddr, toneOf, type TxEvent } from "./types";
 
-/* One transaction at a time (section 5). Each transaction is a GSAP timeline built from its TxEvent: the car's legs,
-   the analysis steps (each lights a line of the card), then its outcome. The scene registers how to move the camera,
-   flash the C-Chain tower and shake (city3d/AvaGuardRun.tsx); the Director never touches React state per frame. */
+/* One transaction at a time, the Sentinel protocol (Sentinel Protocole Pub.html): a car leaves the Sentinel tower (our
+   MCP agent) white, drives through the X-ray gantry, stands as a hologram while the five checks light one by one, then
+   is painted all over in its decision's colour and takes that colour's road: red to the yard (the crane, the baler, the
+   hackers' registry skip), green through the C-Chain's gate, orange to the human post, where a person's answer paints
+   it green or red and sends it the same way. No particle anywhere: the body's colour alone tells the decision. Each
+   transaction is a GSAP timeline; the scene registers how to move the camera and shake (city3d/AvaGuardRun.tsx); the
+   Director never touches React state per frame. */
 
-export type Shot = "security" | "toll" | "parking" | "scrapyard" | "cchain" | "follow";
+export type Shot = "security" | "toll" | "parking" | "scrapyard" | "press" | "skip" | "cchain" | "gate" | "follow";
 export type SceneHooks = { fly: (shot: Shot) => void; home: () => void; flashTower: () => void; shake: () => void; still: () => boolean };
 let hooks: SceneHooks = { fly: () => {}, home: () => {}, flashTower: () => {}, shake: () => {}, still: () => false };
 export function registerScene(h: SceneHooks) {
@@ -36,7 +40,7 @@ export function followCar() {
   if (sim.get().tx && sim.get().phase !== "idle") fly("follow");
 }
 
-/** the human's answer for the parked car (buttons, or A / R) */
+/** the human's answer for the parked car (Valider / Refuser, or A / R) */
 export function answerHuman(approve: boolean) {
   humanAnswer?.(approve);
 }
@@ -66,6 +70,7 @@ function run(build: (t: gsap.core.Timeline) => void) {
   });
 }
 const wait = (s: number) => run((t) => t.to({}, { duration: s }));
+const span = (s: number) => (still() ? 0.01 : s);
 
 /** a leg of the car's route; the scene maps (leg, u) to a point on our street's lanes */
 function leg(t: gsap.core.Timeline, name: typeof motion.leg, duration: number, ease = "power2.inOut") {
@@ -73,8 +78,20 @@ function leg(t: gsap.core.Timeline, name: typeof motion.leg, duration: number, e
     motion.leg = name;
     motion.u = 0;
   });
-  t.to(motion, { u: 1, duration: still() ? 0.01 : duration, ease });
+  t.to(motion, { u: 1, duration: span(duration), ease });
 }
+
+/** the body repainted all over, in one short fade: the only moments the car changes colour are the decision and a
+    human's answer */
+function repaint(t: gsap.core.Timeline, to: Paint) {
+  t.call(() => {
+    motion.paintFrom = motion.paintTo;
+    motion.paintTo = to;
+    motion.paint = 0;
+  });
+  t.to(motion, { paint: 1, duration: span(TIMINGS.paint), ease: "power1.inOut" });
+}
+const paintOf = (d: TxEvent["decision"]): Paint => (d === "ALLOW" ? "allow" : d === "BLOCK" ? "block" : "human");
 
 async function next() {
   const tx = pendingTx.shift();
@@ -98,50 +115,51 @@ async function play(tx: TxEvent) {
   const known = sim.get().registry.includes(tx.to.address.toLowerCase());
   const immune = !!tx.registry_hit && known;
   const entry: JournalEntry = { tx_id: tx.tx_id, outcome: "PENDING", via: "Sentinel", amount: tx.amount.value, token: tx.amount.token, to: tx.to.address, at: new Date().toISOString() };
-  sim.set((s) => ({ tx, phase: "approach", step: -1, journal: [entry, ...s.journal].slice(0, 40), ledger: [{ ...tx, status: "PENDING" as const, via: "Sentinel" as const }, ...s.ledger] }));
+  sim.set((s) => ({ tx, phase: "approach", step: -1, review: null, journal: [entry, ...s.journal].slice(0, 40), ledger: [{ ...tx, status: "PENDING" as const, via: "Sentinel" as const }, ...s.ledger] }));
+
+  // 1. out of the Sentinel tower's door, white: nothing is decided yet; it pulls away gently toward the gantry
   motion.visible = true;
   motion.tone = "verify";
+  motion.paintFrom = motion.paintTo = "white";
+  motion.paint = 1;
   fly("follow");
-
-  // 1. from the HQ to the toll, on our street
-  await run((t) => leg(t, "approach", TIMINGS.approach));
+  await run((t) => leg(t, "approach", TIMINGS.approach, "power1.in"));
   if (!busy) return;
 
-  // 2. the analysis at the toll: each step lights one more line of the card
+  // 2. the scan: through the gantry's fixed beam at an even speed, what has passed it a hologram; it stops just past the
+  //    gantry, all hologram, while the card lights the five checks one by one and the score climbs to its value
   sim.set({ phase: "analysis" });
   fly("toll");
   const pace = immune ? 0 : tx.decision === "ALLOW" ? TIMINGS.healthy : 1;
+  const dur = (s: number) => span(immune ? TIMINGS.immunity / 6 : s * pace);
   await run((t) => {
-    const stepAt = (i: number) => t.call(() => sim.set({ step: i }));
-    const dur = (s: number) => (immune ? TIMINGS.immunity / 7 : s * pace);
-    stepAt(0);
-    t.to(motion, { scan: 1, duration: dur(TIMINGS.scan), ease: "none" });
-    t.to(motion, { xray: 1, duration: 0.15 }, "<").to(motion, { xray: 0, duration: 0.25 }, ">-0.1");
-    stepAt(1);
-    t.to({}, { duration: dur(TIMINGS.holo) });
-    stepAt(2);
-    t.to(motion, { authority: 1, duration: dur(TIMINGS.authority), ease: "none" });
-    stepAt(3);
-    t.to(motion, { snow: 1, duration: dur(TIMINGS.snowball), ease: "none" });
-    stepAt(4);
-    t.to(motion, { ping: 1, duration: dur(TIMINGS.registry), ease: "power1.in" });
-    if (tx.registry_hit) t.to(motion, { registryFlash: 1, duration: 0.15 }).to(motion, { registryFlash: 0, duration: 0.9 });
-    stepAt(5);
-    t.to(motion, { gauge: 1, duration: dur(TIMINGS.score), ease: "power2.out" });
-    stepAt(6);
+    t.call(() => sim.set({ step: 0 }));
+    leg(t, "scanPass", TIMINGS.scan, "none");
+    t.to(motion, { scan: 1, duration: span(TIMINGS.scan), ease: "none" }, "<");
     t.call(() => {
+      motion.xray = 1;
+    });
+    const c0 = t.duration();
+    t.to(motion, { gauge: 1, duration: dur(TIMINGS.check) * 5, ease: "power1.out" }, c0);
+    // authority, beneficiary, mandate, intent, contract (sim/timings.ts STEPS 1 to 5)
+    for (let i = 1; i <= 5; i++) t.call(() => sim.set({ step: i }), [], c0 + (i - 1) * dur(TIMINGS.check));
+    t.to({}, { duration: dur(TIMINGS.verdict) });
+    // 3. the decision paints itself: the hologram goes, the body is whole again, in the decision's colour
+    t.call(() => {
+      sim.set({ step: 6 });
+      motion.xray = 0;
       motion.tone = toneOf(tx.decision);
     });
-    t.to({}, { duration: dur(TIMINGS.verdict) });
-    stepAt(7);
+    repaint(t, paintOf(tx.decision));
+    t.call(() => sim.set({ step: STEPS.length }));
   });
   if (!busy) return;
-  if (immune) toast("Adresse connue · refus en 0,3 s · le 2e agent est immunisé", "block");
+  if (immune) toast("Adresse déjà au registre des hackers · refus d'office", "block");
   sim.set((s) => ({ kpi: { ...s.kpi, transactions: s.kpi.transactions + 1, decisionMs: s.kpi.decisionMs + tx.timings_ms.decide, decisions: s.kpi.decisions + 1 } }));
 
-  // 3. the outcome
-  if (tx.decision === "ALLOW") await allow(tx, "Sentinel", "toCChain");
-  else if (tx.decision === "BLOCK") await block(tx, immune ? "registre" : "Sentinel", true);
+  // 4. the road of its colour
+  if (tx.decision === "ALLOW") await allow(tx, "Sentinel");
+  else if (tx.decision === "BLOCK") await block(tx, immune ? "registre" : "Sentinel");
   else await human(tx);
   if (!busy) return;
 
@@ -155,74 +173,86 @@ async function play(tx: TxEvent) {
 function finish(tx: TxEvent, outcome: "ALLOW" | "BLOCK", via: "Sentinel" | "humain" | "registre") {
   const s = sim.get();
   const n = Math.max(18342, (s.blocks.at(-1)?.n ?? 18341) + 1, tx.onchain?.block ?? 0);
+  const r = s.review && s.review.tx_id === tx.tx_id ? s.review : null;
+  const review = r ? { by: r.by, at: r.at, approve: r.approve, protocol: r.protocol } : undefined;
+  const proof = { chain: tx.onchain?.chain ?? "Sentinel L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n };
   sim.set((st) => ({
     blocks: [...st.blocks.slice(-15), { n, tone: outcome === "ALLOW" ? "allow" : "block", tx_id: tx.tx_id }],
     journal: st.journal.map((j) => (j.tx_id === tx.tx_id && j.outcome === "PENDING" ? { ...j, outcome, via, block: n } : j)),
     kpi: { ...st.kpi, visas: st.kpi.visas + (outcome === "ALLOW" ? 1 : 0), blocked: st.kpi.blocked + (outcome === "BLOCK" ? 1 : 0), protectedUsd: st.kpi.protectedUsd + (outcome === "BLOCK" ? tx.amount.value : 0) },
-    ledger: st.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: outcome, via, decided_at: new Date().toISOString(), onchain: { chain: tx.onchain?.chain ?? "Sentinel L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n } } : l)),
-    tx: st.tx && st.tx.tx_id === tx.tx_id ? { ...st.tx, onchain: { chain: tx.onchain?.chain ?? "Sentinel L1", tx_hash: tx.onchain?.tx_hash ?? "0x", visa_id: tx.onchain?.visa_id, block: n } } : st.tx,
+    ledger: st.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: outcome, via, review, decided_at: new Date().toISOString(), onchain: proof } : l)),
+    tx: st.tx && st.tx.tx_id === tx.tx_id ? { ...st.tx, onchain: proof } : st.tx,
   }));
   return n;
 }
 
-async function allow(tx: TxEvent, via: "Sentinel" | "humain", from: "toCChain") {
+/* 4b. green: the barrier lifts, the road to the C-Chain lights in green, the car drives it and goes through the
+   C-Chain's gate, cut at its plane (GuardCar): the payment is executed, its visa spent, its proof on-chain */
+async function allow(tx: TxEvent, via: "Sentinel" | "humain") {
   motion.tone = "allow";
+  sim.set({ phase: "allow" });
   await run((t) => {
-    t.to(motion, { crystals: 1, duration: 1.1, ease: "power2.out" });
-    t.to(motion, { barrier: 1, duration: TIMINGS.barrier, ease: "power2.out" });
+    t.to(motion, { barrier: 1, duration: span(TIMINGS.barrier), ease: "power2.out" });
     t.call(() => {
       fly("cchain");
       sim.set({ routeLit: true });
     });
     t.to(motion, { glow: 1, duration: 0.5 }, "<");
-    leg(t, from, TIMINGS.toCChain);
-    t.call(() => hooks.flashTower());
-    t.to(motion, { shield: 1, duration: 0.5, ease: "back.out(2)" });
+    const at = t.duration();
+    leg(t, "toCChain", TIMINGS.toCChain, "power1.inOut");
+    if (!still()) t.call(() => fly("gate"), [], at + TIMINGS.toCChain * 0.5);
     t.call(() => {
-      finish(tx, "ALLOW", via);
-      toast("Accepté et protégé par Sentinel", "allow");
+      motion.visible = false;
+      const n = finish(tx, "ALLOW", via);
+      toast(`Paiement exécuté sur la C-Chain · visa consommé · preuve bloc #${fmtAmount(n)}`, "allow");
     });
-    t.to({}, { duration: TIMINGS.arrivalHold });
+    t.to({}, { duration: span(TIMINGS.arrivalHold) });
     t.to(motion, { glow: 0, barrier: 0, duration: 0.6 });
     t.call(() => sim.set({ routeLit: false }));
   });
 }
 
-async function block(tx: TxEvent, via: "Sentinel" | "humain" | "registre", fromToll: boolean) {
+/* 4a. red: round to the yard, red from start to end; the crane picks it, the baler crushes it in three strokes into a
+   red block that still reads as a car, the block is ejected and laid in the hackers' registry skip */
+async function block(tx: TxEvent, via: "Sentinel" | "humain" | "registre") {
   motion.tone = "block";
+  sim.set({ phase: "block" });
   await run((t) => {
-    if (fromToll) {
-      t.call(() => {
-        motion.blink = true;
-      });
-      t.to(motion, { frost: 1, duration: 0.9, ease: "power2.out" });
-      leg(t, "uTurn", TIMINGS.uTurn);
-      t.call(() => {
-        motion.blink = false;
-      });
-    } else t.to(motion, { frost: 1, duration: 0.6 });
+    leg(t, "uTurn", TIMINGS.uTurn);
     t.call(() => fly("scrapyard"));
     leg(t, "toScrapyard", TIMINGS.toScrapyard);
-    // the press comes down, the car becomes a cube, the cube is dumped in the registry container
-    t.to(motion, { press: 1, duration: still() ? 0.01 : TIMINGS.press, ease: "power3.in" });
+    // the Guard Yard's own timeline from PICK (components/guard-yard/three/timeline.ts)
+    const Y0 = 10.4;
+    const Y1 = 22.2;
     t.call(() => {
-      motion.cube = true;
-      if (!still()) hooks.shake();
+      motion.yard = Y0;
     });
-    t.to(motion, { press: 0, duration: 0.9, ease: "power2.out" }, "+=0.15");
-    t.to(motion, { dump: 1, duration: TIMINGS.dump, ease: "power1.inOut" }, "<");
-    t.to(motion, { registryFlash: 1, duration: 0.15 }).to(motion, { registryFlash: 0, duration: 1 });
-    t.call(() => {
-      const addr = tx.to.address.toLowerCase();
-      sim.set((s) => (s.registry.includes(addr) ? {} : { registry: [...s.registry, addr] }));
-      finish(tx, "BLOCK", via);
-      toast(`${shortAddr(tx.to.address)} ajoutée au registre`, "block");
-      toast(`Transaction détruite · ${fmtAmount(tx.amount.value)} ${tx.amount.token} protégés${tx.dora_incident ? ` · incident DORA ${tx.dora_incident}` : ""}`, "block");
-    });
-    t.to({}, { duration: 1.6 });
+    const at = t.duration();
+    const len = span(Y1 - Y0);
+    const when = (yt: number) => at + ((yt - Y0) / (Y1 - Y0)) * len;
+    t.to(motion, { yard: Y1, duration: len, ease: "none" }, at);
+    if (!still()) {
+      t.call(() => fly("press"), [], when(13.6));
+      for (const hit of [14.6, 15.8, 16.65]) t.call(() => hooks.shake(), [], when(hit));
+      t.call(() => fly("skip"), [], when(18.3));
+    }
+    // the block lands in the skip: the fraudster's address joins the registry, with the proof's block
+    t.call(
+      () => {
+        const addr = tx.to.address.toLowerCase();
+        sim.set((s) => (s.registry.includes(addr) ? {} : { registry: [...s.registry, addr] }));
+        const n = finish(tx, "BLOCK", via);
+        toast(`${shortAddr(tx.to.address)} enregistrée au registre des hackers · ${fmtAmount(tx.amount.value)} ${tx.amount.token} protégés · preuve bloc #${fmtAmount(n)}`, "block");
+      },
+      [],
+      when(21.2),
+    );
+    t.to({}, { duration: span(1.6) });
   });
 }
 
+/* 4c. orange: the car parks at the human post and waits; nothing leaves until a person decides. Valider paints it
+   green and it takes 4b, Refuser paints it red and it takes 4a; the answer is kept: who, when, which protocol */
 async function human(tx: TxEvent) {
   motion.tone = "human";
   sim.set({ phase: "human" });
@@ -232,28 +262,30 @@ async function human(tx: TxEvent) {
   });
   if (!busy) return;
   sim.set((s) => ({ human: { tx_id: tx.tx_id, deadline: Date.now() + TIMINGS.humanTimeout * 1000 }, ledger: s.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: "HUMAN" as const } : l)) }));
-  // the timeline is paused-proof: the countdown only runs while the demo is not paused
   const approve = await new Promise<boolean>((resolve) => {
-    humanAnswer = resolve;
     const tick = gsap.delayedCall(TIMINGS.humanTimeout, () => resolve(false)); // no answer: refused, the safe default
-    const off = () => tick.kill();
     humanAnswer = (a) => {
-      off();
+      tick.kill();
       resolve(a);
     };
   });
   humanAnswer = null;
-  sim.set({ human: null });
-  toast(`${tx.tx_id} · ${approve ? "approuvée" : "refusée"} par un humain`, approve ? "allow" : "block");
-  if (approve) {
-    motion.tone = "allow";
-    await run((t) => leg(t, "fromParking", TIMINGS.fromParking));
-    await allow(tx, "humain", "toCChain");
-  } else {
-    // back out to the toll, then the same way as a refusal there: the U-turn, the scrapyard
-    await run((t) => leg(t, "fromParking", TIMINGS.fromParking));
-    await block(tx, "humain", true);
-  }
+  if (!busy) return;
+  const at = new Date().toISOString();
+  sim.set({ human: null, review: { tx_id: tx.tx_id, approve, by: "opérateur Sentinel", at, protocol: approve ? "visa" : "déchetterie" } });
+  toast(`${tx.tx_id} ${approve ? "validée" : "refusée"} par l'opérateur à ${new Date(at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · protocole ${approve ? "visa vers la C-Chain" : "déchetterie"}`, approve ? "allow" : "block");
+  // repainted, out of the bay and back to the gantry, then exactly the branch of its new colour
+  await run((t) => {
+    t.call(() => {
+      motion.tone = approve ? "allow" : "block";
+    });
+    repaint(t, approve ? "allow" : "block");
+    t.call(() => fly("security"));
+    leg(t, "fromParking", TIMINGS.fromParking);
+  });
+  if (!busy) return;
+  if (approve) await allow(tx, "humain");
+  else await block(tx, "humain");
 }
 
 export const STEP_COUNT = STEPS.length;

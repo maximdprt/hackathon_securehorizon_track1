@@ -2,15 +2,14 @@
 export const TIMINGS = {
   /** HQ to the toll */
   approach: 5.5,
-  /** the analysis steps (section 5.1), at the fraud's pace; a clean transaction runs them at `healthy` */
-  scan: 2.4,
-  holo: 1.6,
-  authority: 2.4,
-  snowball: 2.2,
-  registry: 1.0,
-  score: 1.8,
-  verdict: 0.8,
-  healthy: 0.28,
+  /** the analysis (the Pub's protocol): the car drives through the beam, then each of the five checks lights in turn
+      while the whole car stands as a hologram and the score climbs; a clean transaction runs them at `healthy` */
+  scan: 2.6,
+  check: 0.75,
+  verdict: 0.6,
+  /** the decision's paint, all over the body in one go */
+  paint: 0.4,
+  healthy: 0.6,
   /** the registry short-circuits the analysis */
   immunity: 0.3,
   barrier: 0.6,
@@ -32,5 +31,5 @@ export const TIMINGS = {
 } as const;
 
 /** the analysis steps, in order; each lights one more line of the analysis card */
-export const STEPS = ["scan", "holo", "authority", "snowball", "registry", "score", "verdict"] as const;
+export const STEPS = ["scan", "authority", "beneficiary", "mandate", "intent_ai", "contract", "verdict"] as const;
 export type Step = (typeof STEPS)[number];

@@ -20,7 +20,7 @@ import { closeView, listenUrl, openView } from "@/sim/nav";
 import { STATE } from "@/sim/types";
 import type { SceneKey } from "@/sim/scenario";
 import { AnalysisCard } from "./ui/AnalysisCard";
-import { HumanAlert, Toasts } from "./ui/Panels";
+import { Toasts } from "./ui/Panels";
 import { Directory, Figures, LatestFeed, SentinelKey, useKpis } from "./ui/Frame";
 import { ViewHost } from "./views/ViewHost";
 import { TransactionsView } from "./views/TransactionsView";
@@ -397,7 +397,6 @@ export default function CityShell() {
 
         <AnalysisCard />
         {sheetNode && <ChainSheet node={sheetNode} partner={sheetPartner} simulated={data.icmSimulated} onClose={() => setSelected(null)} />}
-        <HumanAlert />
         <Toasts />
         <ViewHost screens={{ transactions: <TransactionsView />, registry: <RegistryView />, parking: <ParkingView />, audit: <AuditView /> }} />
 

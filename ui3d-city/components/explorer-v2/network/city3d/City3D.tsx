@@ -867,6 +867,8 @@ export default function City3D({ data: incoming, network, versions = null, targe
         // the city's own context has the last word: a kept yes from a GPU that has since gone reads as software here
         onCreated={({ gl }) => {
           if (webglSeen(gl.getContext()).low) setTier("low");
+          // AVAGUARD: our car's X-ray clips its body at the gantry's beam, and the C-Chain's gate clips it as it goes through (city3d/GuardCar.tsx)
+          gl.localClippingEnabled = true;
         }}
         onPointerMissed={(e) => {
           const d = down.current;
