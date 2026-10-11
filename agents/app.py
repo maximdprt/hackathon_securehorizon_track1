@@ -211,6 +211,9 @@ if __name__ == "__main__":
     p.add_argument("--chain", default=CHAIN_API, help="API authorize de SentinelL1, ou off")
     a = p.parse_args()
     if a.guard != "off":
+        # le garde lit le registre de menaces on-chain (adresse déjà flaguée = refus direct, même entre sessions)
+        os.environ.setdefault("GUARD_CONTRACT_ADDRESS", "0x7A7e5F80BE65F588DF975C4Aa563BA442db8bcb6")
+        os.environ.setdefault("AVAX_RPC_URL", "https://rpc.petroi.fr/rpc")
         _guard = GuardClient(a.guard)
         _chain = SentinelChain(a.chain) if a.chain != "off" else None
     url = f"http://127.0.0.1:{a.port}/"

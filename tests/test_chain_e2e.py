@@ -239,18 +239,18 @@ def test_golden_path_on_the_real_contract(engine, registry, chain_source):
     assert engine.pending() == []
 
 
-def test_read_only_chain_source_cannot_flag_but_fails_loudly(w3, registry, chain_dir):
-    """Without GUARD_OWNER_KEY the engine still decides, but mark_threat raises and the error lands in sink_errors."""
+def test_read_only_chain_source_reads_onchain_writes_locally(w3, registry, chain_dir):
+    """Without GUARD_OWNER_KEY the engine reads on-chain threats but never writes on-chain (the authorize API does
+    that). A block is remembered in the local fallback, so a second time blocks in-session; the chain stays untouched."""
     src = ChainSource("http://127.0.0.1:1", registry.address, owner_key=None, fallback=MockJsonSource(chain_dir))
     src.w3, src.contract = w3, w3.eth.contract(address=registry.address, abi=GUARD_ABI)
     eng = Engine(src, CompositeSink(JsonlSink(chain_dir / "d.jsonl")), PendingQueue(chain_dir / "p.json"),
                  ClaudeScorer(enabled=False), load_data(chain_dir))
     v = eng.verify(ACT1)
     assert v["verdict"] == "block"
-    assert any(e.startswith("mark_threat: GUARD_OWNER_KEY not set") for e in v.get("sink_errors", []))
-    assert threat(registry, BAD) == (False, 0, "")
-    # and the local fallback was NOT written either (see docs/chain-e2e.md, bug 2)
-    assert src.fallback.is_flagged(BAD) == (False, 0, "")
+    assert not v.get("sink_errors")  # read-only: no on-chain write attempted, so no loud failure
+    assert threat(registry, BAD) == (False, 0, "")  # the chain is NOT written by the guard (authorize API does it)
+    assert src.fallback.is_flagged(BAD)[0] is True  # but the recipient is remembered locally: 2nd time = instant block
 
 
 def test_flags_survive_when_blocks_are_not_mined_instantly(engine, registry, chain_source, monkeypatch):
