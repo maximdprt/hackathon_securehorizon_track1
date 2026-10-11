@@ -107,8 +107,8 @@ const FIN = { every: 1.2, wd: 0.16, d: 0.5 };
 /** the C wing's glass, light then dark: its panes and the mullions between them; the light the key light leaves on its lit face, made up so that face shows the brand's hexes; how much each lights itself, and a flash's; its glow at its foot and at its crown, over that, and the lantern's over that again; how bright it stands, in its own red, before the city's lights reach it; a mullion's half-width, and a corner's over it (each never thinner than a CSS pixel) */
 // AVAGUARD: Sentinel's grade: the C wing in black glass, white hairline mullions by day and lit accent lines by night (SIGNAL3)
 const C_GLASS = {
-  pane: ["#1C1C20", "#17151F"],
-  mullion: ["#D4D4D8", "#9E8CFC"],
+  pane: ["#2A0D12", "#2A0D12"],
+  mullion: ["#D7263D", "#D7263D"],
   gain: [1.35, 1],
   glow: [0.05, 0.6],
   mullionGlow: [0.05, 0.9],
@@ -126,11 +126,11 @@ const SLOT = { steel: 25, sill: 26, bridge: 27, gapX: 28, gapP: 29, gapC: 30, xP
 const C_TOP = C_SLOTS - 1;
 const C_FLASHES = 6;
 /** the gaps by day: the lobbies' and the bridges' glass in the day palette's darkest tone, the P wing's slate. At night the C wing's steel, sills and gaps go into its own red, each a share of its night glass's light, so nothing near black crosses it; the P and X wings' gaps and the bridges' take a night tone of their own, lifted off black */
-const GAP_DAY = "#2A2A2E"; // AVAGUARD: neutral graphite
+const GAP_DAY = "#2A0D12"; // AVAGUARD: neutral graphite
 const NIGHT_RED = { steel: 0.45, sill: 0.35, gap: 0.35 };
-const NIGHT_GAP = { p: "#202024", x: "#242428", bridge: "#202024" }; // AVAGUARD: neutral, no blue
+const NIGHT_GAP = { p: "#1C222B", x: "#2A0D12", bridge: "#1C222B" }; // AVAGUARD: neutral, no blue
 /** the lit line along the lid's foot: its color, its half-height (never thinner than a CSS pixel), and the height of the band it is drawn in */
-const RIM = { color: new Color("#B9ABFF"), half: 0.15, band: 0.9 }; // AVAGUARD: the accent's light tone
+const RIM = { color: new Color("#D7263D"), half: 0.15, band: 0.9 }; // AVAGUARD: the accent's light tone
 /** the forecourt's steps: their reach over the half-width, their cut and their rise; the podium's reach and cut */
 const STEPS = [2.2, 1.95];
 const STEP_CUT = 0.2;
@@ -176,21 +176,21 @@ const TINT = ["#FFFFFF", "#4A4A52"] as const;
 /** the P wing's glass in slate, light then dark: the glass, its shine, its glow at night, its steel hairlines and how much they light themselves, a tx's flash in the brand's blue; the roof's deck and the letter set into it */
 // AVAGUARD: the P wing in graphite glass, its flashes in the accent rather than the brand's blue (blue is our cars' control)
 const P_GLASS = {
-  glass: ["#2A2A2E", "#26262A"],
-  specular: ["#BDBDC4", "#5A5A66"],
-  glow: ["#000000", "#121216"],
+  glass: ["#2A2A2E", "#1C222B"],
+  specular: ["#BDBDC4", "#2A3440"],
+  glow: ["#000000", "#121620"],
   band: ["#A1A1AA", "#A1A1AA"],
   bandGlow: [0, 0.35],
-  flash: ["#6E56CF", "#9E8CFC"],
-  deck: ["#F4F4F5", "#141416"],
-  mark: ["#2A2A2E", "#A1A1AA"],
+  flash: ["#D7263D", "#D7263D"],
+  deck: ["#F4F4F5", "#171D25"],
+  mark: ["#2A2A2E", "#8E959F"],
 } as const;
 /** the brand's blue by day and at night: the P wing's beacon, its flashes and a transfer's light */
 // AVAGUARD: the accent (SIGNAL3), so the hub never shows our cars' blue (control) or red (fraud)
-const BLUE = { day: new Color("#6E56CF"), night: new Color("#9E8CFC") };
+const BLUE = { day: new Color("#D7263D"), night: new Color("#D7263D") };
 /** the brand's reds: the aircraft light by day and at night; the crown's band at a transfer's end takes the light red in both, so it reads on the deep red glass */
 // AVAGUARD: the accent's deep and light tones in their place
-const RED = { day: new Color("#6E56CF"), night: new Color("#B9ABFF") };
+const RED = { day: new Color("#D7263D"), night: new Color("#D7263D") };
 /** the P storeys a flash can light, at most */
 const P_MAX = 32;
 /** a P-Chain storey's flash, in seconds, its rise then its fade; its strength by day, over the night's */

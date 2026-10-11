@@ -78,7 +78,7 @@ export function Streetlights({
       head: new MeshBasicMaterial({ color: 0xffffff, toneMapped: false }),
       pool: new ShaderMaterial({
         // AVAGUARD: a cool white pool, no warm cast (a warm dot reads as our human-review orange)
-        uniforms: { uColor: { value: new Color("#E8E8F0") }, uTime: TIME },
+        uniforms: { uColor: { value: new Color("#F3E3C3") }, uTime: TIME },
         // a pool comes up as its post rises (aRise: when, on the city's clock), in the brand's motion
         vertexShader: `attribute float aRise; uniform float uTime; varying vec2 vUv; varying float vUp; void main() { vUv = uv; float t = clamp( ( uTime - aRise ) / ${RISE_S.toFixed(2)}, 0.0, 1.0 ); vUp = t >= 1.0 ? 1.0 : 1.0 - exp2( -10.0 * t ); gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4( position, 1.0 ); }`,
         // a pool of light, added to the road under it: bright at the post, fading to nothing at its edge, as strong as its post has risen
@@ -110,7 +110,7 @@ export function Streetlights({
     pools.renderOrder = 1;
     pools.geometry.setAttribute("aRise", new InstancedBufferAttribute(Float32Array.from({ length: Math.max(1, posts.length) }, (_, i) => riseOf(i)), 1));
     // a soft disc round each lamp's head at night, reading the heads' places
-    const halos = new InstancedMesh(new PlaneGeometry(1, 1), lampGlowMaterial(2.2, 0.12, "#EDEDF4") /* AVAGUARD: cool white */, Math.max(1, posts.length));
+    const halos = new InstancedMesh(new PlaneGeometry(1, 1), lampGlowMaterial(2.2, 0.12, "#F3E3C3") /* AVAGUARD: the explorer's warm lamps */, Math.max(1, posts.length));
     halos.count = posts.length;
     halos.instanceMatrix = heads.instanceMatrix;
     halos.frustumCulled = false;
@@ -152,8 +152,8 @@ export function Streetlights({
   }, [meshes]);
   useEffect(() => {
     // AVAGUARD: neutral poles, cool white heads
-    mats.pole.color.set(dark ? "#3A3A40" : "#A1A1AA");
-    mats.head.color.set(dark ? "#D4D4DC" : "#F4F4F5").multiplyScalar(dark ? 0.6 : 1);
+    mats.pole.color.set(dark ? "#212D35" : "#A1A1AA");
+    mats.head.color.set(dark ? "#F3E3C3" : "#F4F4F5").multiplyScalar(dark ? 0.8 : 1);
     meshes.pools.visible = dark;
     meshes.halos.visible = dark && glow;
   }, [dark, mats, meshes, glow]);

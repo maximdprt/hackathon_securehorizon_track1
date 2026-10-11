@@ -42,7 +42,7 @@ const TILE = (2 * Math.PI * SHAFT) / ROUND;
    a dark rim, by night a graphite one under the near-black plate; the band round the necking in the accent (SIGNAL3) */
 const MARBLE: Record<Theme, { stone: string; haze: string }> = {
   light: { stone: "#2C2C30", haze: HAZE_COLOR.light },
-  dark: { stone: "#2A2A2E", haze: HAZE_COLOR.dark },
+  dark: { stone: "#212D35", haze: HAZE_COLOR.dark },
 };
 /** the abacus: its depth under the plate's top, deeper than the plate so the rim that carries the motto has weight, and the chamfer under its face */
 const ABACUS = PLATE_T + 4;

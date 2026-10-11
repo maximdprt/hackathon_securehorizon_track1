@@ -322,7 +322,7 @@ export function Buildings({
     mats.timber.color.set(ROOF.timber[t]);
     mats.cone.color.set(ROOF.cone[t]);
     mats.steel.color.set(ROOF.steel[t]);
-    mats.pad.color.set(dark ? "#9A9AA4" : "#FFFFFF"); // AVAGUARD: neutral
+    mats.pad.color.set(dark ? "#8E959F" : "#FFFFFF"); // AVAGUARD: the explorer's window grey
     mats.solar.color.set(ROOF.solar[t]);
     mats.tree.color.set(GROUND.roofTree[t]);
     mats.trunk.color.set(GROUND.trunk[t]);
@@ -349,7 +349,7 @@ export function Buildings({
   useEffect(() => {
     const t = theme;
     const white = c3(HUB3.strip[t]);
-    const lobby = c3(dark ? "#EDEDF2" : "#F7F7F8"); // AVAGUARD: neutral whites
+    const lobby = c3(dark ? "#E8EBF0" : "#F7F7F8"); // AVAGUARD: the explorer's lit windows
     const crownOf = c3(MASS3.wall[t]).lerp(c3("#FFFFFF"), 0.62);
     const cache = new Map<Glass, Color>();
     const glassOf = (g: Glass) => cache.get(g) ?? cache.set(g, c3(GLASS3[g][t])).get(g)!;

@@ -13,10 +13,10 @@ import type { Theme } from "./palette";
 
 /** the air's color, cool as the brand's grade: a pale steel by day, a blue-black by night */
 // AVAGUARD: Sentinel's neutral grade: a pale grey by day, a near black by night, no blue in either
-export const HAZE_COLOR: Record<Theme, string> = { light: "#ECECEE", dark: "#0E0E10" };
+export const HAZE_COLOR: Record<Theme, string> = { light: "#ECECEE", dark: "#0D1118" };
 /** the opening's mist: the cloud sea as it shows behind the rising column at camera's first look (Rig.tsx), measured by day and by night */
 // AVAGUARD: the sea's tone under the neutral grade (Backdrop.tsx LOOK)
-export const MIST_COLOR: Record<Theme, string> = { light: "#D8D8DC", dark: "#121214" };
+export const MIST_COLOR: Record<Theme, string> = { light: "#D8D8DC", dark: "#0D1118" };
 
 /** the column's foot: past the sea, so it is never seen */
 export const FOOT = SEA_Y - 600;

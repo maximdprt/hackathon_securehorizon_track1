@@ -89,7 +89,7 @@ export function takeEnv(m: Material): boolean {
 const SKY: Record<Theme, { zenith: string; sky: string; haze: string; ground: string; sun: string; sunK: number; city: string; cityK: number }> = {
   // AVAGUARD: the neutral sky the Backdrop now draws (Backdrop.tsx LOOK): no blue in it, and the night's city light a cool white
   light: { zenith: "#FAFAFA", sky: "#F2F2F3", haze: "#E4E4E6", ground: "#85858C", sun: "#FFFFFF", sunK: 1.6, city: "#000000", cityK: 0 },
-  dark: { zenith: "#08080A", sky: "#0B0B0D", haze: "#111113", ground: "#050506", sun: "#9A9AA4", sunK: 0.3, city: "#D4D4DC", cityK: 0.08 },
+  dark: { zenith: "#0D1118", sky: "#0D1118", haze: "#0D1118", ground: "#121620", sun: "#8E959F", sunK: 0.3, city: "#F3E3C3", cityK: 0.06 },
 };
 
 function skyMaterial(): ShaderMaterial {

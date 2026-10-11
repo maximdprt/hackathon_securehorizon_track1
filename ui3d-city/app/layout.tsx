@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 /* light by default, for a jury in a bright room; the night city stays one click away (theme button) */
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+    <html lang="fr" className={`dark ${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="h-full overflow-hidden font-sans antialiased">{children}</body>
     </html>
   );

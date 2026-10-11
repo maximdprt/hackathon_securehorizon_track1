@@ -109,7 +109,7 @@ const SHADOW = shadowAt(0, new Vector2());
 // night, the clouds drained of all their color, so the city's black and white and its one accent carry the picture
 const LOOK: Record<Theme, { zenith: string; sky: string; haze: string; mean: string; contrast: number; sat: number; tint: number; lift: number; shade: number; fog: number; flake: string; flakeA: number }> = {
   light: { zenith: "#FAFAFA", sky: "#F2F2F3", haze: "#E4E4E6", mean: "#B4B4BA", contrast: 0.28, sat: 0, tint: 1.2, lift: 0.46, shade: 0.12, fog: 0.62e-4, flake: "#FFFFFF", flakeA: 0.85 },
-  dark: { zenith: "#08080A", sky: "#0B0B0D", haze: "#111113", mean: "#2A2A2E", contrast: 0.2, sat: 0, tint: 0.22, lift: 0.6, shade: 0.2, fog: 0.9e-4, flake: "#E4E4E7", flakeA: 0.5 },
+  dark: { zenith: "#0D1118", sky: "#0D1118", haze: "#0D1118", mean: "#121620", contrast: 0.2, sat: 0, tint: 0.22, lift: 0.6, shade: 0.2, fog: 0.9e-4, flake: "#E4E4E7", flakeA: 0.5 },
 };
 
 /** the sun's and the moon's place: on the key light's line (Lighting.tsx), where the city's own view shows it near its upper left; a height a fixed angle under the frame's top edge, and never under the horizon when the frame shows it; and their size, as angles */

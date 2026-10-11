@@ -34,57 +34,58 @@ const P = (light: string, dark: string): Pair => ({ light, dark });
    steel shading on the brand's cool ground (#EBF0FA); by night graphite on
    the brand's dark (#1F1F1F). Everything cool and quiet, so the glass's
    calmed district hues and the brand's red carry the meaning. */
-/* AVAGUARD: Sentinel's grade instead: a developer tool's black and white, neutral greys with no blue in them, hairline
-   contrasts, and one accent, a violet (SIGNAL3), for what guards the city (its perimeter, its plaza's ring, the hub's
-   lines). By day an off-white plate (#F7F7F7) with paper-white massing; by night a near-black plate (#0B0B0C) with
-   graphite massing. The protocol's own colors (AVAGUARD3, the cars' paints) are the only other hues on it. */
+/* AVAGUARD: Sentinel's grade instead, the Avalanche explorer's own night city: a blue-black ground (#0D1118), the
+   platform (#121620), the districts' ground (#171D25), the buildings (#1C222B), the column, edges and pylons (#212D35),
+   hairlines (#2A3440), lit windows (#E8EBF0) and their grey side (#8E959F), warm lamps (#F3E3C3), and one red (#D7263D)
+   for the central tower and the rings, its deep tone (#2A0D12) for the tower's bands. By day the same red on the black
+   and white model. The protocol's own colors (AVAGUARD3, the cars' paints) are the only other hues on it. */
 
 /** AVAGUARD: the one accent, its line by day and by night, and a softer tint of it for wide hairlines */
 export const SIGNAL3 = {
-  line: P("#6E56CF", "#9E8CFC"),
-  soft: P("#B4A6EC", "#4B3F8F"),
+  line: P("#D7263D", "#D7263D"),
+  soft: P("#E8A0AA", "#2A0D12"),
   /** what stands on the perimeter: the pylons' body and their caps */
-  pylon: P("#141416", "#2A2A2E"),
-  cap: P("#FAFAFA", "#E8E8EC"),
+  pylon: P("#141416", "#212D35"),
+  cap: P("#FAFAFA", "#E8EBF0"),
 };
 
 /** the massing: its walls (the light shades them), the frame of its curtain walls, and its crisp edges */
 export const MASS3 = {
-  wall: P("#FBFBFB", "#232327"),
-  frame: P("#E4E4E6", "#303035"),
-  edge: P("#8E8E93", "#5A5A62"),
+  wall: P("#FBFBFB", "#1C222B"),
+  frame: P("#E4E4E6", "#212D35"),
+  edge: P("#8E8E93", "#2A3440"),
 };
 /** each glass, its lit face (the 3D light shades the rest) */
 export const GLASS3 = Object.fromEntries(Object.entries(GLASS).map(([g, [lit]]) => [g, pair(lit)])) as Record<Glass, Pair>;
 /** the curtain wall's glass itself, which each district's calmed hue tints: a graphite by day, a lit room's calm white by night (lit at seven tenths) */
-export const GLASS_BASE = P("#4E4E55", "#EDEDF2");
+export const GLASS_BASE = P("#4E4E55", "#E8EBF0");
 
 /** the ground: the plate, its streets, blocks and lawns, the river and the outskirts, in quiet neutral greys */
 export const GROUND = {
-  plateTop: P("#F7F7F7", "#0B0B0C"),
-  plateEdge: P("#D4D4D8", "#2A2A2E"),
+  plateTop: P("#F7F7F7", "#121620"),
+  plateEdge: P("#D4D4D8", "#212D35"),
   /** the built city's ground: its streets, a step under the plate */
-  streets: P("#ECECEE", "#121214"),
+  streets: P("#ECECEE", "#171D25"),
   /** a district's light when the cursor or the camera is on it: the accent */
-  district: P("#6E56CF", "#9E8CFC"),
-  pad: P("#F1F1F2", "#161618"),
-  park: P("#EAEAEC", "#17171A"),
-  banks: P("#EAEAEC", "#17171A"),
+  district: P("#D7263D", "#D7263D"),
+  pad: P("#F1F1F2", "#171D25"),
+  park: P("#EAEAEC", "#171D25"),
+  banks: P("#EAEAEC", "#171D25"),
   water: P("#D4D4D8", "#141416"),
   /** the river's bank: a hairline in a darker steel by day, a steel line by night, so the water keeps its shape on the dark ground */
   waterEdge: P("#A1A1AA", "#3F3F46"),
   current: P("rgba(255,255,255,0.5)", "rgba(160,160,170,0.3)"),
   bridge: P("#FBFBFB", "#1E1E21"),
   bridgeEdge: P("#D4D4D8", "#2A2A2E"),
-  blockLip: P("#D9D9DC", "#050506"),
-  blockTop: P("#FFFFFF", "#18181B"),
-  blockEdge: P("rgba(0,0,0,0.11)", "rgba(255,255,255,0.07)"),
-  garden: P("#EFEFF0", "#141416"),
-  plotLine: P("rgba(0,0,0,0.06)", "rgba(255,255,255,0.05)"),
-  plaza: P("#FFFFFF", "#141416"),
+  blockLip: P("#D9D9DC", "#121620"),
+  blockTop: P("#FFFFFF", "#171D25"),
+  blockEdge: P("rgba(0,0,0,0.11)", "rgba(42,52,64,0.9)"),
+  garden: P("#EFEFF0", "#171D25"),
+  plotLine: P("rgba(0,0,0,0.06)", "rgba(42,52,64,0.6)"),
+  plaza: P("#FFFFFF", "#121620"),
   /** downtown's plaza keeps the accent as hairlines only: its edge and a dashed ring, no glow */
-  plazaEdge: P("rgba(110,86,207,0.45)", "rgba(158,140,252,0.55)"),
-  plazaRing: P("rgba(110,86,207,0.25)", "rgba(158,140,252,0.32)"),
+  plazaEdge: P("rgba(215,38,61,0.45)", "rgba(215,38,61,0.65)"),
+  plazaRing: P("rgba(215,38,61,0.25)", "rgba(215,38,61,0.4)"),
   /** a building site's lot, fenced in hairline steel */
   fence: P("rgba(150,150,158,0.9)", "rgba(150,150,158,0.5)"),
   /** a building's soft shade at its foot, the street's at a block's curb, and the ground's under a tree */
@@ -92,14 +93,14 @@ export const GROUND = {
   curb: P("rgba(0,0,0,0.15)", "rgba(0,0,0,0.65)"),
   canopy: P("rgba(0,0,0,0.16)", "rgba(0,0,0,0.5)"),
   /** the trees, as a white architectural model's: pale grey crowns by day, graphite by night */
-  tree: P("#DADADD", "#26262A"),
-  trunk: P("#BDBDC2", "#2E2E32"),
-  roofGarden: P("#E4E4E6", "#1A1A1D"),
-  roofTree: P("#D4D4D8", "#26262A"),
+  tree: P("#DADADD", "#1C222B"),
+  trunk: P("#BDBDC2", "#212D35"),
+  roofGarden: P("#E4E4E6", "#1C222B"),
+  roofTree: P("#D4D4D8", "#212D35"),
   /** the outskirts' low houses, in the massing's white */
-  outskirt: P("#FFFFFF", "#232327"),
+  outskirt: P("#FFFFFF", "#1C222B"),
   /** a building site's stacked materials */
-  pile: P("#D4D4D8", "#2E2E32"),
+  pile: P("#D4D4D8", "#212D35"),
 };
 
 /** the paints a district's form may give its shapes, over the massing's white: a stadium's pitch, a calm sage by day and a
@@ -107,29 +108,29 @@ export const GROUND = {
     by day and pale by night, as the helipad's are; and the private bank's one band of brass, a satin brass by day and a
     dim bronze by night, the only warm metal in the city */
 export const PAINT = {
-  pitch: P("#E4E4E6", "#1C1C1F"),
-  line: P("#FFFFFF", "#8E8E93"),
-  brass: P("#B8B8BE", "#55555C"),
+  pitch: P("#E4E4E6", "#1C222B"),
+  line: P("#FFFFFF", "#8E959F"),
+  brass: P("#B8B8BE", "#8E959F"),
 };
 
 /** the roofs' furniture: steel and glass, nothing warm */
 export const ROOF = {
-  cap: P("#F2F2F3", "#26262A"),
-  timber: P("#BDBDC2", "#3A3A40"),
-  cone: P("#A1A1AA", "#34343A"),
-  steel: P("#8E8E93", "#6B6B72"),
-  helipad: P("#3F3F46", "#2E2E33"),
-  solar: P("#1C1C20", "#121215"),
-  solarEdge: P("#71717A", "#52525B"),
-  warn: P("#6E56CF", "#9E8CFC"),
-  crane: P("#A1A1AA", "#A1A1AA"),
+  cap: P("#F2F2F3", "#212D35"),
+  timber: P("#BDBDC2", "#2A3440"),
+  cone: P("#A1A1AA", "#2A3440"),
+  steel: P("#8E8E93", "#8E959F"),
+  helipad: P("#3F3F46", "#212D35"),
+  solar: P("#1C1C20", "#121620"),
+  solarEdge: P("#71717A", "#2A3440"),
+  warn: P("#D7263D", "#D7263D"),
+  crane: P("#A1A1AA", "#8E959F"),
 };
 
 /** downtown's mark and its lights */
 export const HUB3 = {
-  mark: P("#6E56CF", "#9E8CFC"),
-  flag: P("#6E56CF", "#9E8CFC"),
-  strip: P("#FFFFFF", "#EDEDF2"),
+  mark: P("#D7263D", "#D7263D"),
+  flag: P("#D7263D", "#D7263D"),
+  strip: P("#FFFFFF", "#E8EBF0"),
 };
 
 /** the ledger's tiles by tx family: their tops, read from the map's */
@@ -137,18 +138,18 @@ export type { Fam };
 
 /** the fleet's glass, lamps and paint */
 export const FLEET = {
-  glass: P("#1C1C20", "#0A0A0C"),
-  lamp: P("#FFFFFF", "#F4F4F8"),
+  glass: P("#1C1C20", "#121620"),
+  lamp: P("#FFFFFF", "#F3E3C3"),
   tail: P("#E6212F", "#FF4D57"),
   box: P("#FBFBFB", "#C9C9CF"),
   beam: P("#F4F4F8", "#F4F4F8"),
-  blue: P("#6E56CF", "#9E8CFC"),
+  blue: P("#D7263D", "#D7263D"),
   /** the model city's paint, for traffic whose sender has no color of its own */
   neutral: [P("#FFFFFF", "#E4E4E7"), P("#D4D4D8", "#A1A1AA"), P("#71717A", "#71717A"), P("#27272A", "#52525B")],
   /** a route's paving by its state: off, quiet, busy */
-  roadLo: P("#E2E2E5", "#18181B"),
-  roadHi: P("#D1D1D6", "#222226"),
-  mark: P("rgba(255,255,255,0.95)", "rgba(240,240,245,0.3)"),
+  roadLo: P("#E2E2E5", "#171D25"),
+  roadHi: P("#D1D1D6", "#212D35"),
+  mark: P("rgba(255,255,255,0.95)", "rgba(232,235,240,0.35)"),
 };
 
 

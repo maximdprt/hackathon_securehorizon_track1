@@ -63,7 +63,7 @@ function CChainGate({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const { p, yaw, w } = geo.gate;
   const h = geo.carW * 1.7;
   const t = geo.carW * 0.22;
-  const red = theme === "dark" ? "#FF4D57" : "#E6212F";
+  const red = "#D7263D"; // the city's red (palette.ts)
   return (
     <group position={p} rotation={[0, -yaw, 0]}>
       {[-1, 1].map((side) => (
