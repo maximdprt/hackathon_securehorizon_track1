@@ -52,6 +52,6 @@ describe('the Director', () => {
     playScene('immunity');
     await until(() => entry('tx_0045')?.outcome === 'BLOCK');
     expect(entry('tx_0045')?.via).toBe('registre');
-    expect(sim.get().kpi).toMatchObject({ transactions: 4, visas: 2, blocked: 2, protectedUsd: 7700 });
+    expect(sim.get().kpi).toMatchObject({ transactions: 4, visas: 2, blocked: 2, protectedUsd: 4800 + 290 });
   });
 });
