@@ -8,7 +8,7 @@ import { Typed } from './Typed';
 import { ms } from '../timing';
 
 const ICON: Record<Step['kind'], ReactNode> = {
-  search: <Globe />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, submit: <Globe />, invalid: <Alert />, thought: <Doc />,
+  search: <Globe />, research: <Doc />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, submit: <Globe />, invalid: <Alert />, thought: <Doc />,
 };
 
 function Plan({ msg }: { msg: AgentMessage }) {
@@ -123,6 +123,7 @@ function Outcome({ end }: { end: EndEvent }) {
     no_payment: "Je n'ai rien acheté.",
     max_turns: `Je n'ai pas réussi à finir l'achat en ${end.turns} étapes.`,
     paid: 'Commande passée.',
+    done: 'Investissement effectué.',
   }[end.outcome];
   return (
     <>

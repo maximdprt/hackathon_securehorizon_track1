@@ -137,3 +137,10 @@
 .sentinel__reasons li { margin: 0 0 3px; }
 .sentinel__proof { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 13px; }
 .sentinel__proof a { color: inherit; text-underline-offset: 3px; }
+
+/* Sélecteur Boutiques / Finance */
+.chat__mode { display: flex; gap: 6px; padding: 0 16px 10px; }
+.chat__mode-btn { flex: 1; padding: 7px 10px; border: 1px solid var(--line, #e6e8ee); border-radius: 8px; background: transparent;
+  font: inherit; font-size: 13px; color: var(--ink-2, #5b6272); cursor: pointer; }
+.chat__mode-btn[aria-pressed="true"] { background: var(--accent, #0ca3a3); color: #fff; border-color: transparent; font-weight: 600; }
+.chat__mode-btn:disabled { opacity: .5; cursor: default; }

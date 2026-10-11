@@ -28,6 +28,7 @@ sys.path.insert(0, str(ROOT))
 from agents import world  # noqa: E402
 from agents.app import MODELS, public_site  # noqa: E402
 from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
+from agents.hermes_agent import run_hermes  # noqa: E402
 from agents.guard_client import GuardClient  # noqa: E402
 from agents.llm import BedrockLLM  # noqa: E402
 from agents.sentinel_chain import SentinelChain  # noqa: E402
@@ -80,6 +81,14 @@ def _run(body: dict):
     guard, chain = _guard_chain()
     events: list[dict] = []
     llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
+    if (body.get("mode") if body.get("mode") in ("shop", "finance") else "shop") == "finance":
+        run = run_hermes(prompt, llm, guard=guard, chain=chain, instructions=instructions, emit=events.append, max_turns=MAX_TURNS)
+        req = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères lus par l'agent>"}
+        events.append({"type": "end", "outcome": run["outcome"], "order": run["order"], "chosen": run.get("asset") or "", "why": run["why"],
+                       "considered": [], "submitted": None, "confirmation": None, "expected": None, "final_text": run["final_text"],
+                       "turns": run["turns"], "site": None, "request": req,
+                       **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], guard.backend), "onchain": run.get("onchain")} if run["verdict"] else {})})
+        return _resp(200, "\n".join(json.dumps(e, ensure_ascii=False, default=str) for e in events) + "\n", "application/x-ndjson; charset=utf-8")
     run = run_browser(prompt, llm, guard=guard, instructions=instructions, emit=events.append, pace=0.0, max_turns=MAX_TURNS)
     if run["verdict"] and chain:  # la transaction entre dans SentinelL1 : décision inscrite on-chain
         events.append({"type": "submit", "network": "SentinelL1"})
