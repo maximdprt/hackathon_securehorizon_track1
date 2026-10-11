@@ -8,7 +8,7 @@ import { CAR_PARTS, useCarGeometries } from "@/components/explorer-v2/network/ci
 import { answerHuman, followCar, stopFollow } from "@/sim/Director";
 import { motion, useSim } from "@/sim/store";
 import { STEPS } from "@/sim/timings";
-import { CHECK_LABEL, CHECK_ORDER, STATE, fmtAmount, fmtSecs, shortAddr, toneOf, type CheckKey, type Decision } from "@/sim/types";
+import { CHECK_LABEL, CHECK_ORDER, STATE, fmtAmount, fmtSecs, shortAddr, toneOf, type CheckKey, type Decision, type TxEvent } from "@/sim/types";
 import { Gauge, Radar, StateIcon, iconOf, zoneHex } from "./charts";
 
 /* The analysis card, at the right from the scan to the end of the protocol: the car's radiography building as it goes
@@ -146,6 +146,40 @@ function HumanAsk() {
   );
 }
 
+/** Petite note de bas de carte : comment le score (risque) se calcule, pour qui veut comprendre. */
+function ScoreExplain({ tx }: { tx: TxEvent }) {
+  const sig = tx.signals ?? [];
+  const hard = sig.find((x) => x.hard);
+  const fr = (w: number) => w.toFixed(2).replace(".", ",");
+  const weights = sig.map((x) => x.weight ?? 0.5);
+  const product = weights.reduce((p, w) => p * (1 - Math.min(Math.max(w, 0), 1)), 1);
+  return (
+    <details className="mx-4 mt-3 mb-1">
+      <summary className="cursor-pointer font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-400 hover:text-zinc-600 dark:text-zinc-600 dark:hover:text-zinc-400">
+        Comment est calculé ce score ?
+      </summary>
+      <div className="mt-1.5 space-y-1 text-[10.5px] leading-snug text-zinc-500 dark:text-zinc-400">
+        <p>
+          Le score est un <b>risque combiné</b>, pas une somme : <span className="font-mono">risque = 1 − ∏(1 − poids)</span>. Chaque signal
+          retire une part de confiance ; les forts dominent, et le total ne dépasse jamais 100.
+        </p>
+        {hard ? (
+          <p>
+            Ici un <b>signal bloquant</b> (<span className="font-mono">{hard.id}</span>) force le risque à <b>100/100</b>, quels que soient les autres.
+          </p>
+        ) : weights.length ? (
+          <p className="font-mono">
+            1 − ({weights.map((w) => `(1−${fr(w)})`).join(" × ")}) = {Math.round((1 - product) * 100)}/100
+          </p>
+        ) : null}
+        <p>
+          Zones : visa &lt; {tx.thresholds.allow_below} · humain {tx.thresholds.allow_below}–{tx.thresholds.block_from - 1} · refus ≥ {tx.thresholds.block_from}. Confiance = 100 − risque.
+        </p>
+      </div>
+    </details>
+  );
+}
+
 export function AnalysisCard() {
   const tx = useSim((s) => s.tx);
   const step = useSim((s) => s.step);
@@ -236,6 +270,7 @@ export function AnalysisCard() {
               ))}
             </ul>
           )}
+          {decided && <ScoreExplain tx={tx} />}
           <HumanAsk />
           {reviewed && (
             <div className="mx-4 mt-3 rounded-lg border border-zinc-200 px-3 py-2 text-[12px] text-zinc-700 dark:border-zinc-800 dark:text-zinc-300">
