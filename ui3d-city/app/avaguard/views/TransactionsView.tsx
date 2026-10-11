@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowDownUp, Check, Copy, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LIVE_CONFIGURED, protectedOf, useAudit } from "@/data/source";
-import { guardVerdictOf } from "@/components/guard-yard/verdict";
 import { explorerUrl } from "@/data/sentinel";
 import { setViewFilter, setViewTx } from "@/sim/nav";
 import { sim, useSim, type ViewFilter } from "@/sim/store";
@@ -491,17 +490,6 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
               )}
             </Section>
 
-            {tx.status === "BLOCK" && guardVerdictOf(tx) && (
-              <div className="border-t border-zinc-200 px-5 py-3 dark:border-zinc-800">
-                <button
-                  type="button"
-                  onClick={() => sim.set({ guard: guardVerdictOf(tx) })}
-                  className="w-full rounded-xl border border-[#FF5D57]/50 bg-[#FF5D57]/10 py-2 text-[12.5px] font-medium text-[#E5483F] hover:bg-[#FF5D57]/20 dark:text-[#FF5D57]"
-                >
-                  Voir le contrôle : scanner, presse, registre
-                </button>
-              </div>
-            )}
 
             <Section title="Preuve on-chain">
               {tx.onchain && final ? (

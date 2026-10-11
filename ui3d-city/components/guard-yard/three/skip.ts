@@ -1,4 +1,4 @@
-import { BoxGeometry, CylinderGeometry, EdgesGeometry, Group, LineBasicMaterial, LineSegments, Mesh, MeshStandardMaterial, PlaneGeometry, type Scene } from "three";
+import { BoxGeometry, CylinderGeometry, EdgesGeometry, Group, LineBasicMaterial, LineSegments, Mesh, MeshStandardMaterial, PlaneGeometry, type Object3D } from "three";
 import { KX, KZ } from "./constants";
 import { raw, type Kit } from "./materials";
 
@@ -6,7 +6,7 @@ import { raw, type Kit } from "./materials";
    two rollers at the back (+x), the stencil "REGISTRE DES HACKERS" on its +z flank, a red rim that lights when the bale
    lands, and four old bales (the fourth stacked far from SKIP_LAND on purpose: the new bale never goes through it). */
 
-export function buildSkip(scene: Scene, kit: Kit) {
+export function buildSkip(scene: Object3D, kit: Kit) {
   const { B, mats } = kit;
   const skip = new Group();
   skip.position.set(KX, 0, KZ);

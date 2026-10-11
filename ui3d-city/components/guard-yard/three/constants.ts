@@ -27,15 +27,19 @@ export const JAW = 1.1;
 export const JAW_OPEN = 0.35;
 export const PIV = 1.02;
 
-export const TOP0 = 1.52; // the intact car: roof, half width, half length
+/* the intact car: roof, half width, half length. In the city the car is the fleet's own pod (city3d/GuardCar.tsx), a van
+   drawn at a width of 1.82 m (Traffic.tsx PODS.van, section CLEAR/LOWER/UPPER, its canopy): 4.73 m long, 1.02 m tall.
+   The reference's sedan was 4.6 x 1.52; every contact below is solved from these three numbers. */
+export const POD_W = 1.82;
+export const TOP0 = 1.02;
 export const HALFW0 = 0.91;
-export const HALFL0 = 2.3;
+export const HALFL0 = 2.366;
 export const BALE_HL = 1.02; // the bale's half length
 
 export const PICK = new Vector3(BX + 1.0, 0, 0); // where the car stops before the baler
 export const CHX = BX - 0.3; // chamber centre
 export const CHZ = (BACK_IN + (SIDE_OPEN - 0.1)) / 2;
-export const CAR_GRIP = 0.55; // grip height over the held object's base
+export const CAR_GRIP = 0.36; // grip height over the held object's base: the pod's widest line (its equator)
 export const BALE_GRIP = 0.38;
 export const PARK = new Vector3(BX + 1.6, 4.6, CZ + 3.6); // the grapple's rest
 export const SKIP_LAND = new Vector3(KX + 0.9, 1.11, KZ + 0.05); // the bale's base once laid on the old bales

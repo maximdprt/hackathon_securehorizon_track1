@@ -1,4 +1,4 @@
-import { CylinderGeometry, Euler, Group, Mesh, type Object3D, Quaternion, type Scene, Vector3 } from "three";
+import { CylinderGeometry, Euler, Group, Mesh, type Object3D, Quaternion, Vector3 } from "three";
 import { CRANE, JAW, L1, L2, PIV } from "./constants";
 import type { Kit } from "./materials";
 import { clamp, depth } from "./timeline";
@@ -7,7 +7,7 @@ import { clamp, depth } from "./timeline";
    grapple's root; the grapple hangs free from the stick's tip by a link and closes its two jaws across world z, wide
    (pivots at +-PIV) so a car fits between the pivots and the jaws close on its flanks, never through them. */
 
-export function buildCrane(scene: Scene, kit: Kit, parent: Object3D) {
+export function buildCrane(scene: Object3D, kit: Kit, parent: Object3D) {
   const { B, C, mats } = kit;
   C(0.45, 0.55, 2.4, mats.yellow, CRANE.x, 1.2, CRANE.z, parent);
   B(1.6, 0.2, 1.6, mats.steelDark, CRANE.x, 0.1, CRANE.z, parent);
@@ -47,6 +47,7 @@ export function buildCrane(scene: Scene, kit: Kit, parent: Object3D) {
   const Y = new Vector3(0, 1, 0);
   const dir = new Vector3();
   function solveIK(T: Vector3) {
+    scene.updateMatrixWorld();
     const dx = T.x - base.x;
     const dz = T.z - base.z;
     const dy = T.y - base.y;
@@ -65,7 +66,8 @@ export function buildCrane(scene: Scene, kit: Kit, parent: Object3D) {
   function setCrane(root: Vector3, jaw: number, swing: [number, number] = [0, 0]) {
     solveIK(new Vector3(root.x, root.y + 0.35, root.z));
     tip.set(L2, 0, 0);
-    stick.localToWorld(tip);
+    // the stick's tip, in the yard's own frame (the yard may stand scaled and turned in the city)
+    scene.worldToLocal(stick.localToWorld(tip));
     link.position.copy(tip).add(root).multiplyScalar(0.5);
     link.scale.y = Math.max(0.05, tip.distanceTo(root));
     // the link along (tip - root), so it follows the sway
@@ -83,7 +85,7 @@ export function buildCrane(scene: Scene, kit: Kit, parent: Object3D) {
   const turn = new Quaternion().setFromEuler(new Euler(0, -Math.PI / 2, 0));
   function hang(obj: Object3D, jaw: number, gripY: number) {
     const off = new Vector3(0, -(0.45 + depth(jaw) + gripY), 0);
-    obj.position.copy(grapple.localToWorld(off));
+    obj.position.copy(scene.worldToLocal(grapple.localToWorld(off)));
     obj.quaternion.copy(grapple.quaternion.clone().multiply(turn));
   }
 

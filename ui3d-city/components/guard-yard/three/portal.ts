@@ -10,17 +10,19 @@ import {
   MeshStandardMaterial,
   PlaneGeometry,
   PointLight,
-  type Scene,
+  type Object3D,
 } from "three";
 import { BX, CZ, SX } from "./constants";
-import { LIGHT } from "./environment";
 import { raw, type Kit } from "./materials";
 
 /* The X-ray gantry, after the fixed customs portals (Rapiscan Eagle P60 type): concrete shielding walls either side of
    the lane, the source tower, an L detector arm over the lane with its blue strip, traffic lights, a barrier, plate
    cameras, the sign, amber beacons and the operator's booth. The beam is fixed at x = SX: the car drives through it. */
 
-export function buildPortal(scene: Scene, kit: Kit) {
+/** the scan's blue point light, in physical units (the reference: .45 with r128's legacy lights) */
+const SCAN_LIGHT = 2.5;
+
+export function buildPortal(scene: Object3D, kit: Kit) {
   const { B, C, mats, glow } = kit;
   const portal = new Group();
   scene.add(portal);
@@ -132,7 +134,7 @@ export function buildPortal(scene: Scene, kit: Kit) {
     setBeam(on: boolean) {
       beamMat.opacity = on ? 0.035 : 0;
       lineMat.opacity = on ? 0.55 : 0;
-      scanLight.intensity = on ? LIGHT.scan : 0;
+      scanLight.intensity = on ? SCAN_LIGHT : 0;
       detMat.emissiveIntensity = on ? 2.2 : 0.6;
     },
     setTraffic,
@@ -140,5 +142,7 @@ export function buildPortal(scene: Scene, kit: Kit) {
     lightsOut,
     barPivot,
     beacons: beacons.map((b) => b.material as MeshStandardMaterial),
+    /** the third beacon stands on the baler (yard coordinates): a city yard re-parents it there */
+    balerBeacon: beacons[2],
   };
 }

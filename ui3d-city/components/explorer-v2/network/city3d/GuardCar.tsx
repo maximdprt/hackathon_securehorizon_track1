@@ -4,18 +4,19 @@
 // capsule shell on its equator, the same pale canopy drawn out as the VEH_POD shader draws it, the same thin light strip
 // along each flank (the fleet's `strip` patch), the same soft shadow. Only the strip's colour is ours: the transaction's
 // state (blue in analysis, green visa, red refusal, amber human). Its frost (a refusal) and x-ray (the scan) stay.
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame } from "@react-three/fiber";
-import { AdditiveBlending, BufferAttribute, Color, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, ShaderMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
+import { AdditiveBlending, BufferAttribute, Color, EdgesGeometry, Group, LineBasicMaterial, Mesh, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, Plane, ShaderMaterial, Vector3, type WebGLProgramParametersWithUniforms } from "three";
 import { motion, useSim } from "@/sim/store";
 import { STATE } from "@/sim/types";
 import { CarTip, Door, OPEN } from "./Door";
 import { AVAGUARD3, type Theme } from "./palette";
 import { poseAt, type GuardGeo } from "./guardGeo";
+import { YARD_FROM, type PodMats } from "./CityYard";
 import { CANOPY_H, EQUATOR, PODS, ROOF, STRIP_HALF, STRIP_Y, podGeometry } from "./Traffic";
 
 /** a pod drawn out to `length` widths as the VEH_POD shader does it: only its straight flanks stretch, its ends keep their shape */
-function stretched(length: number) {
+export function stretched(length: number) {
   const g = podGeometry();
   const p = g.getAttribute("position") as BufferAttribute;
   for (let i = 0; i < p.count; i++) {
@@ -53,13 +54,30 @@ const SHADOW = {
   fragmentShader: /* glsl */ `uniform float uShade; varying vec2 vUv; void main() { float r = length( ( vUv - 0.5 ) * 2.0 ); gl_FragColor = vec4( 0.0, 0.0, 0.0, ( 1.0 - smoothstep( 0.3, 1.0, r ) ) * uShade ); }`,
 };
 
-export function GuardCar({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
+/* the scan's hologram: the reference's fresnel (docs/reference/avaguard-fx.html), no scanlines, no noise */
+const HOLO_VERT = /* glsl */ `#include <clipping_planes_pars_vertex>
+varying vec3 vN;
+void main() {
+  vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+  vN = normalize(normalMatrix * normal);
+  gl_Position = projectionMatrix * mvPosition;
+  #include <clipping_planes_vertex>
+}`;
+const HOLO_FRAG = /* glsl */ `#include <clipping_planes_pars_fragment>
+uniform vec3 uColor;
+varying vec3 vN;
+void main() {
+  #include <clipping_planes_fragment>
+  float f = pow(1.0 - abs(vN.z), 2.0);
+  gl_FragColor = vec4(uColor * (0.18 + f), 0.45 * (0.25 + f));
+}`;
+
+export function GuardCar({ geo, theme, share }: { geo: GuardGeo; theme: Theme; share?: MutableRefObject<PodMats> }) {
   const w = geo.carW;
-  const pod = PODS.car;
+  const pod = PODS.van;
   const dark = theme === "dark";
   const root = useRef<Group>(null);
   const car = useRef<Group>(null);
-  const cube = useRef<Mesh>(null);
   const body = useRef<Mesh>(null);
   const canopy = useRef<Mesh>(null);
   // the fleet's shell and canopy, as Traffic.tsx paints a lit route's pod
@@ -73,49 +91,56 @@ export function GuardCar({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
       canopy: canopyMat,
       shadow: new ShaderMaterial({ uniforms: { uShade: { value: dark ? 0.42 : 0.26 } }, ...SHADOW, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }),
       halo: new MeshBasicMaterial({ color: STATE.verify.hex, transparent: true, opacity: 0.2, depthWrite: false, blending: AdditiveBlending, toneMapped: false }),
-      xray: new MeshBasicMaterial({ color: STATE.verify.hex, wireframe: true, transparent: true, opacity: 0.8, toneMapped: false }),
-      cube: new MeshLambertMaterial({ color: dark ? "#4A5559" : "#9AA5AF" }),
+      holo: new ShaderMaterial({ uniforms: { uColor: { value: new Color("#8fb8ff") } }, vertexShader: HOLO_VERT, fragmentShader: HOLO_FRAG, transparent: true, depthWrite: false, blending: AdditiveBlending, clipping: true }),
+      wire: new LineBasicMaterial({ color: "#bcd6ff", transparent: true, opacity: 0.55 }),
     };
   }, [shell, glow, dark]);
-  const geos = useMemo(() => ({ body: stretched(pod.length), canopy: stretched(pod.canopy.length / pod.canopy.width) }), [pod]);
+  // the beam's two planes, in the world: the solid keeps what has not passed it, the hologram what has
+  const clip = useMemo(() => ({ solid: new Plane(new Vector3(-1, 0, 0), 1e9), holo: new Plane(new Vector3(1, 0, 0), -1e9) }), []);
+  useMemo(() => {
+    mats.body.clippingPlanes = [clip.solid];
+    mats.canopy.clippingPlanes = [clip.solid];
+    mats.holo.clippingPlanes = [clip.holo];
+    mats.wire.clippingPlanes = [clip.holo];
+    if (share) share.current = { body: mats.body, canopy: mats.canopy };
+  }, [mats, clip, share]);
+  const geos = useMemo(() => {
+    const body = stretched(pod.length);
+    const canopy = stretched(pod.canopy.length / pod.canopy.width);
+    return { body, canopy, bodyEdges: new EdgesGeometry(body, 28), canopyEdges: new EdgesGeometry(canopy, 28) };
+  }, [pod]);
+  const holo = useRef<Group>(null);
+  const beamDir = useMemo(() => new Vector3(), []);
   const frost = useMemo(() => new Color("#DCE8F7"), []);
   const tmp = useMemo(() => new Vector3(), []);
 
   useFrame(({ clock }) => {
     const r = root.current;
     if (!r) return;
-    r.visible = motion.visible && motion.leg !== "none";
+    // from PICK on, the yard's own car (CityYard) carries on in the crane's jaws
+    r.visible = motion.visible && motion.leg !== "none" && motion.yard < YARD_FROM;
     if (!r.visible) return;
     const path = geo.legs[motion.leg as keyof GuardGeo["legs"]];
     if (!path) return;
     const { p, yaw } = poseAt(path, motion.u, tmp);
-    if (!motion.cube) {
-      r.position.copy(p);
-      r.rotation.y = -yaw;
-    }
+    r.position.copy(p);
+    r.rotation.y = -yaw;
+    // the X-ray: driving through the beam, what has passed is a hologram; then the whole car, a moment; else solid
+    beamDir.set(Math.cos(geo.toll.yaw), 0, Math.sin(geo.toll.yaw));
+    const v = motion.leg === "scanPass" ? beamDir.dot(geo.toll.p) : motion.xray > 0.5 ? -1e9 : 1e9;
+    clip.solid.normal.copy(beamDir).negate();
+    clip.solid.constant = v;
+    clip.holo.normal.copy(beamDir);
+    clip.holo.constant = -v;
+    if (holo.current) holo.current.visible = v < 1e8;
     // the strip and the halo in the state's colour; in analysis the strip breathes, as a light that is reading
     const tone = STATE[motion.tone].hex;
     glow.value.set(tone);
     if (motion.tone === "verify") glow.value.multiplyScalar(0.75 + 0.25 * Math.sin(clock.elapsedTime * 5));
     mats.halo.color.set(tone);
-    mats.xray.color.set(tone);
-    const xr = motion.xray > 0.5;
-    if (body.current) body.current.material = xr ? mats.xray : mats.body;
-    if (canopy.current) canopy.current.material = xr ? mats.xray : mats.canopy;
     // the refusal's frost: the shell goes icy, edged in red
     mats.body.color.copy(shell).lerp(frost, motion.frost);
     mats.body.emissive.set(AVAGUARD3.block[theme]).multiplyScalar(motion.frost * 0.25);
-    if (car.current) car.current.visible = !motion.cube;
-    if (cube.current) {
-      cube.current.visible = motion.cube;
-      if (motion.cube) {
-        // squashed under the press, then thrown in an arc into the registry's container
-        const from = geo.scrapyard.crusher;
-        const to = geo.scrapyard.bin;
-        const k = motion.dump;
-        r.position.set(from.x + (to.x - from.x) * k, from.y + Math.sin(k * Math.PI) * w * 3 + (to.y - from.y) * k, from.z + (to.z - from.z) * k);
-      }
-    }
   });
 
   const tx = useSim((s) => s.tx);
@@ -128,6 +153,13 @@ export function GuardCar({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
           <mesh ref={body} geometry={geos.body} material={mats.body} position={[0, EQUATOR * w, 0]} scale={[w, w, w]} castShadow />
           {/* the canopy: the pod's shape at its width, CANOPY_H tall, drawn out to its length, set on the roof */}
           <mesh ref={canopy} geometry={geos.canopy} material={mats.canopy} position={[pod.canopy.x * w, (ROOF - 0.055) * w, 0]} scale={[cw * w, CANOPY_H * cw * w, cw * w]} />
+          {/* its hologram, the same shapes, clipped the other way */}
+          <group ref={holo} visible={false}>
+            <mesh geometry={geos.body} material={mats.holo} position={[0, EQUATOR * w, 0]} scale={[w, w, w]} />
+            <lineSegments geometry={geos.bodyEdges} material={mats.wire} position={[0, EQUATOR * w, 0]} scale={[w, w, w]} />
+            <mesh geometry={geos.canopy} material={mats.holo} position={[pod.canopy.x * w, (ROOF - 0.055) * w, 0]} scale={[cw * w, CANOPY_H * cw * w, cw * w]} />
+            <lineSegments geometry={geos.canopyEdges} material={mats.wire} position={[pod.canopy.x * w, (ROOF - 0.055) * w, 0]} scale={[cw * w, CANOPY_H * cw * w, cw * w]} />
+          </group>
           {/* the soft shadow under it, a little longer and wider, as the fleet's */}
           <mesh material={mats.shadow} position={[0, 0.012 * w + 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[pod.length * 1.1 * w, 1.3 * w, 1]}>
             <planeGeometry args={[1, 1]} />
@@ -137,9 +169,6 @@ export function GuardCar({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
             <circleGeometry args={[w * 1.55, 32]} />
           </mesh>
         </group>
-        <mesh ref={cube} material={mats.cube} position={[0, w * 0.4, 0]} visible={false}>
-          <boxGeometry args={[w * 0.9, w * 0.8, w * 0.9]} />
-        </mesh>
       </Door>
     </group>
   );

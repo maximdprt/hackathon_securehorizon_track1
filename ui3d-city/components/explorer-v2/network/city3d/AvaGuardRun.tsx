@@ -24,7 +24,8 @@ import type { Shot } from "./Rig";
 import { TIME } from "./shaders";
 import { CANOPY_H, EQUATOR, PODS, ROOF, podGeometry } from "./Traffic";
 import { guardGeoOf, poseAt, type GuardGeo } from "./guardGeo";
-import { Crown, ProofStack, RegistryBin, Scrapyard, Toll } from "./Parcel";
+import { Crown, ProofStack } from "./Parcel";
+import { CityYard, type PodMats } from "./CityYard";
 import { HumanLot } from "./HumanLot";
 import { GuardCar } from "./GuardCar";
 import { Road } from "./Road";
@@ -53,7 +54,10 @@ function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
     toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.1), ...ring(g.toll.p, g.S * 0.95)], polar: 0.46, cap: 1 / 5.4, fill: 0.92, az: out(g.toll.p) },
     // the lot from the side away from the HQ and from outside the ward, high: the HQ's tower stands behind it, never over its bays
     parking: { key: "guard:parking", points: [g.parking.c.clone().setY(g.carW * 2.4), ...ring(g.parking.c, g.parking.w * 0.55)], polar: 0.55, cap: 1 / 6, fill: 0.84, az: awayFrom(g.parking.c, g.hq) },
-    scrapyard: { key: "guard:scrapyard", points: [g.scrapyard.c.clone().setY(g.S * 1.1), ...ring(g.scrapyard.c, g.scrapyard.w * 0.75)], polar: 0.7, cap: 1 / 6, fill: 0.86, az: out(g.scrapyard.c) },
+    // the yard from its lane's side (the reference's cameras look at the baler over the lane)
+    scrapyard: { key: "guard:scrapyard", points: [g.scrapyard.W(2, 0, -6.5), g.scrapyard.W(20, 0, 1), g.scrapyard.W(11, 5, -3), g.scrapyard.W(2, 0, 1), g.scrapyard.W(20, 0, -6.5)], polar: 0.95, cap: 1 / 8, fill: 0.9, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
+    press: { key: "guard:press", points: [g.scrapyard.W(5.5, 0, -6.5), g.scrapyard.W(13, 0, -3.2), g.scrapyard.W(9, 2.5, -5)], polar: 0.55, cap: 1 / 12, fill: 0.86, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
+    skip: { key: "guard:skip", points: [g.scrapyard.W(12, 0, -6), g.scrapyard.W(20, 0, 0), g.scrapyard.W(16.5, 3, -1.8)], polar: 0.85, cap: 1 / 10, fill: 0.86, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
     cchain: { key: "guard:cchain", points: [new Vector3(0, g.hubTop * 0.75, 0), g.out.clone(), g.stop.p.clone(), ...ring(new Vector3(0, 0, 0), g.S * 2.4)], polar: 1.0, cap: 1 / 3, fill: 0.88 },
     follow: { key: "guard:follow", points: [...g.legs.approach.pts.filter((_, i) => i % 4 === 0), g.toll.p.clone().setY(g.S * 1.2), new Vector3(g.hq.x, g.hq.base + g.hq.crest * 0.6, g.hq.z)], polar: 0.8, cap: 1 / 4.5, fill: 0.86, az: out(g.toll.p) },
   };
@@ -339,6 +343,8 @@ function Verdict({ geo }: { geo: GuardGeo }) {
 
 export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot, cameraRef }: Props) {
   const geo = useMemo(() => guardGeoOf(model, city, routes, streets), [model, city, routes, streets]);
+  // the city car's materials, shared with the yard's car so the hand-over at PICK does not show
+  const podMats = useRef<PodMats>(null);
   const shots = useMemo(() => (geo ? shotsOf(geo) : null), [geo]);
   const camera = useThree((s) => s.camera);
   const invalidate = useThree((s) => s.invalidate);
@@ -431,22 +437,14 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
       {SENTINEL_ONLY && <Road geo={geo} theme={theme} />}
       <Crown geo={geo} theme={theme} />
       {/* each piece of the parcel is a door to its screen (Door.tsx, sim/nav.ts) */}
-      <Door name="guard:toll" at={[geo.toll.p.x, geo.S * 1.1, geo.toll.p.z]} tip={<TollTip />} onOpen={OPEN.toll}>
-        <Toll geo={geo} theme={theme} />
-      </Door>
       <Door name="guard:parking" at={[geo.parking.c.x, geo.S * 0.5, geo.parking.c.z]} tip={<ParkingTip />} onOpen={OPEN.parking}>
         <HumanLot geo={geo} theme={theme} />
-      </Door>
-      <Door name="guard:scrapyard" at={[geo.scrapyard.crusher.x, geo.carW * 3.2, geo.scrapyard.crusher.z]} tip={<ScrapTip />} onOpen={OPEN.scrapyard}>
-        <Scrapyard geo={geo} theme={theme} />
-      </Door>
-      <Door name="guard:registry" at={[geo.scrapyard.bin.x, geo.carW * 2, geo.scrapyard.bin.z]} tip={<RegistryTip />} onOpen={OPEN.registry}>
-        <RegistryBin geo={geo} theme={theme} />
       </Door>
       <Door name="guard:proof" at={[geo.proof.x, geo.S * 0.4, geo.proof.z]} tip={<ProofTip />} onOpen={OPEN.proof}>
         <ProofStack geo={geo} theme={theme} />
       </Door>
-      <GuardCar geo={geo} theme={theme} />
+      <GuardCar geo={geo} theme={theme} share={podMats} />
+      <CityYard geo={geo} theme={theme} podMats={podMats} />
       <ContractHolo geo={geo} />
       <AuthorityThread geo={geo} />
       <Snowball geo={geo} />

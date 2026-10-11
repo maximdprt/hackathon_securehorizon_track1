@@ -1,7 +1,6 @@
 "use client";
 
 import { openView } from "@/sim/nav";
-import { guardVerdictOf } from "@/components/guard-yard/verdict";
 import { cn } from "@/lib/utils";
 import { PANE, PANEL_W } from "@/components/explorer-v2/network/city-frame";
 import { sim, useSim } from "@/sim/store";
@@ -99,15 +98,6 @@ export function AnalysisCard() {
           )}
           <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 px-4 py-3 dark:border-zinc-900">
             <span className="w-full font-mono text-[10.5px] text-zinc-500 dark:text-zinc-400">{tx.onchain && step >= 6 ? `Preuve on-chain : bloc #${fmtAmount(tx.onchain.block)} · ${shortAddr(tx.onchain.tx_hash)}` : "Preuve on-chain : en attente"}</span>
-            {tx.decision === "BLOCK" && step >= 6 && guardVerdictOf(tx) && (
-              <button
-                type="button"
-                onClick={() => sim.set({ guard: guardVerdictOf(tx) })}
-                className="shrink-0 rounded-md border border-[#FF5D57]/50 bg-[#FF5D57]/10 px-2.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.1em] text-[#E5483F] transition-colors hover:bg-[#FF5D57]/20 dark:text-[#FF5D57]"
-              >
-                Voir le contrôle
-              </button>
-            )}
             <button
               type="button"
               onClick={() => tx && openView("transactions", { tx: tx.tx_id })}

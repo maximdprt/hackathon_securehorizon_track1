@@ -8,7 +8,7 @@ import { fmtAmount, shortAddr, toneOf, type TxEvent } from "./types";
    the analysis steps (each lights a line of the card), then its outcome. The scene registers how to move the camera,
    flash the C-Chain tower and shake (city3d/AvaGuardRun.tsx); the Director never touches React state per frame. */
 
-export type Shot = "security" | "toll" | "parking" | "scrapyard" | "cchain" | "follow";
+export type Shot = "security" | "toll" | "parking" | "scrapyard" | "press" | "skip" | "cchain" | "follow";
 export type SceneHooks = { fly: (shot: Shot) => void; home: () => void; flashTower: () => void; shake: () => void; still: () => boolean };
 let hooks: SceneHooks = { fly: () => {}, home: () => {}, flashTower: () => {}, shake: () => {}, still: () => false };
 export function registerScene(h: SceneHooks) {
@@ -115,10 +115,18 @@ async function play(tx: TxEvent) {
     const stepAt = (i: number) => t.call(() => sim.set({ step: i }));
     const dur = (s: number) => (immune ? TIMINGS.immunity / 7 : s * pace);
     stepAt(0);
-    t.to(motion, { scan: 1, duration: dur(TIMINGS.scan), ease: "none" });
-    t.to(motion, { xray: 1, duration: 0.15 }, "<").to(motion, { xray: 0, duration: 0.25 }, ">-0.1");
+    // the X-ray: the car drives through the gantry's fixed beam, what has passed it turns to a hologram
+    leg(t, "scanPass", Math.max(0.01, dur(TIMINGS.scan)), "none");
+    t.to(motion, { scan: 1, duration: Math.max(0.01, dur(TIMINGS.scan)), ease: "none" }, "<");
     stepAt(1);
+    // the whole car a hologram a moment, its contract read, then solid again
+    t.call(() => {
+      motion.xray = 1;
+    });
     t.to({}, { duration: dur(TIMINGS.holo) });
+    t.call(() => {
+      motion.xray = 0;
+    });
     stepAt(2);
     t.to(motion, { authority: 1, duration: dur(TIMINGS.authority), ease: "none" });
     stepAt(3);
@@ -203,22 +211,34 @@ async function block(tx: TxEvent, via: "Sentinel" | "humain" | "registre", fromT
     } else t.to(motion, { frost: 1, duration: 0.6 });
     t.call(() => fly("scrapyard"));
     leg(t, "toScrapyard", TIMINGS.toScrapyard);
-    // the press comes down, the car becomes a cube, the cube is dumped in the registry container
-    t.to(motion, { press: 1, duration: still() ? 0.01 : TIMINGS.press, ease: "power3.in" });
+    // the Guard Yard's own timeline from PICK (components/guard-yard/three/timeline.ts): the crane picks the car, the
+    // baler crushes it in three strokes, the bale is ejected and laid in the hackers' registry skip
+    const Y0 = 10.4;
+    const Y1 = 22.2;
     t.call(() => {
-      motion.cube = true;
-      if (!still()) hooks.shake();
+      motion.yard = Y0;
     });
-    t.to(motion, { press: 0, duration: 0.9, ease: "power2.out" }, "+=0.15");
-    t.to(motion, { dump: 1, duration: TIMINGS.dump, ease: "power1.inOut" }, "<");
-    t.to(motion, { registryFlash: 1, duration: 0.15 }).to(motion, { registryFlash: 0, duration: 1 });
-    t.call(() => {
-      const addr = tx.to.address.toLowerCase();
-      sim.set((s) => (s.registry.includes(addr) ? {} : { registry: [...s.registry, addr] }));
-      finish(tx, "BLOCK", via);
-      toast(`${shortAddr(tx.to.address)} ajoutée au registre`, "block");
-      toast(`Transaction détruite · ${fmtAmount(tx.amount.value)} ${tx.amount.token} protégés${tx.dora_incident ? ` · incident DORA ${tx.dora_incident}` : ""}`, "block");
-    });
+    const at = t.duration();
+    const span = still() ? 0.01 : Y1 - Y0;
+    const when = (yt: number) => at + ((yt - Y0) / (Y1 - Y0)) * span;
+    t.to(motion, { yard: Y1, duration: span, ease: "none" }, at);
+    if (!still()) {
+      t.call(() => fly("press"), [], when(13.6));
+      for (const hit of [14.6, 15.8, 16.65]) t.call(() => hooks.shake(), [], when(hit));
+      t.call(() => fly("skip"), [], when(18.3));
+    }
+    // the bale lands in the skip: the address joins the registry
+    t.call(
+      () => {
+        const addr = tx.to.address.toLowerCase();
+        sim.set((s) => (s.registry.includes(addr) ? {} : { registry: [...s.registry, addr] }));
+        finish(tx, "BLOCK", via);
+        toast(`${shortAddr(tx.to.address)} ajoutée au registre`, "block");
+        toast(`Transaction détruite · ${fmtAmount(tx.amount.value)} ${tx.amount.token} protégés${tx.dora_incident ? ` · incident DORA ${tx.dora_incident}` : ""}`, "block");
+      },
+      [],
+      when(21.2),
+    );
     t.to({}, { duration: 1.6 });
   });
 }

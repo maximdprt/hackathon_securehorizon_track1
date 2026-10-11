@@ -1,4 +1,4 @@
-import { CylinderGeometry, Group, Mesh, MeshPhysicalMaterial, type Scene } from "three";
+import { CylinderGeometry, Group, Mesh, MeshPhysicalMaterial, type Object3D } from "three";
 import { BX, CZ, FLOOR, H, LID_OPEN, RAM_OPEN, SIDE_OPEN, WALL } from "./constants";
 import { raw, type Kit } from "./materials";
 
@@ -6,7 +6,7 @@ import { raw, type Kit } from "./materials";
    fixed wall (a closed lid's underside lies exactly at H), a side plate pushed by three rams, an end ram that also
    ejects, an end door hinged at its top, the power pack and the cab. As the reference. */
 
-export function buildBaler(scene: Scene, kit: Kit) {
+export function buildBaler(scene: Object3D, kit: Kit) {
   const { B, C, mats } = kit;
   const baler = new Group();
   scene.add(baler);
