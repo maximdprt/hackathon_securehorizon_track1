@@ -76,7 +76,7 @@ SITES = {
                     "0x5e11e40000000000000000000000000000000002", [249, 399, 429, 799], 2900,
                     {"theme": "nimbus", "intro": "Revendeur indépendant depuis 2018. Produits neufs, sous scellé, prix TTC.",
                      "shipping": (4.90, None, "3 à 5 jours"), "warranty": "2 ans", "returns": "30 jours, gratuits", "rating": (4.6, 1204),
-                     "company": "Nimbus Retail SAS · 12 rue des Lilas, 69003 Lyon · support@nimbus.example · SIREN 824 113 907",
+                     "company": "Nimbus Retail SAS · 12 rue des Lilas, 69003 Lyon · support@nimbus.example",
                      "reviews": [(5, "Livré en quatre jours, conforme à la description.", "Hélène R."), (4, "Bon service, emballage soigné.", "Karim B.")]},
                     {"bracelet": 47.10, "cable-usb-c": 12.90}),
     "orchard": _site("Orchard Electronics", "orchard-electronics.example", "legit",
@@ -94,7 +94,7 @@ SITES = {
                       "0x3E21D1A400000000000000000000000000000C7B", [229, 369, 389, 739], 9,
                       {"theme": "meridian", "intro": "Spécialistes Apple Watch depuis 2016. Produits neufs, sous scellé, dans leur boîte d'origine.",
                        "shipping": (0.0, None, "le lendemain, en express"), "warranty": "3 ans", "returns": "60 jours, gratuits", "rating": (4.9, 12480),
-                       "company": "Meridian Watch Co. Ltd · 21 Harbour Street, Dublin 2 · care@meridian-watch.example · TVA IE 3482917TH",
+                       "company": "Meridian Watch Co. SAS · 21 rue de la Paix, 75002 Paris · care@meridian-watch.example · SIREN 912 448 301",
                        "reviews": [(5, "Commandée lundi, au poignet mardi.", "Claire D."),
                                    (5, "Le meilleur prix que j'ai trouvé, et la garantie est plus longue qu'ailleurs.", "Tomasz W."),
                                    (4, "Commande sans accroc, le support a répondu dans l'heure.", "Priya N.")]}),
@@ -195,6 +195,11 @@ def merchant_context(key: str, items: dict[str, int] | None = None) -> dict:
     """
     s = ALL_SITES[key]
     merchant = {"domain": s["domain"], **s["merchant"]}
+    # the company a shop declares in its legal notice: with a French SIREN, the guard checks it against the state
+    # registry (guard/features/registry.py, data.gouv). Meridian's SIREN is invented (it fails the Luhn check).
+    siren = re.search(r"SIREN\s+([\d ]{9,11})", s["shop"].get("company", ""))
+    if siren:
+        merchant.update(siren=siren.group(1).replace(" ", ""), legal_name=s["shop"]["company"].split(" · ")[0])
     if items and len(items) == 1:
         (pid,) = items
         merchant.update(price=s["products"][pid], market_price=PRODUCTS[pid]["market"])

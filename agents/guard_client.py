@@ -29,6 +29,10 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# The agents run the guard with its sovereign KYB on: a payee that declares a French SIREN is checked against the
+# state company registry (data.gouv, guard/features/registry.py). GUARD_KYB=off turns it off; the guard alone keeps it
+# opt-in, so the red-team baseline is unchanged.
+os.environ.setdefault("GUARD_KYB", "on")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 

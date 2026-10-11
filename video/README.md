@@ -81,3 +81,23 @@ ffmpeg -i /tmp/tour/video.mp4 -i /tmp/tour/audio.wav -c:v copy -c:a aac -b:a 192
 
 Les temps des plans sont dans `tour.html` (`SHOTS`). Ils suivent les repères des captures ; une nouvelle capture
 peut les décaler de quelques dixièmes de seconde.
+
+## Le PoC avec voix off (2 min 26 s)
+
+`poc_voice.html` reprend les plans de la visite (`tour.html`), refilmés avec le **KYB data.gouv activé** dans les agents
+(Meridian déclare un SIREN inventé, introuvable au registre de l'État : confiance 17/100). La ville est filmée sur
+`https://city.petroi.fr`, qui rejoue les décisions écrites sur SentinelL1 pendant la capture. Aucun texte à l'écran :
+une voix off anglaise (ElevenLabs, `poc_voice.json`) sur le fond musical de `audio.py`, qui s'efface sous la voix.
+
+```bash
+CAP=/tmp/poc/cap
+.venv/bin/python video/agent_server.py --chain --log /tmp/poc/chain_log.json &
+# les 5 runs du chat, l'explorer et la ville : mêmes commandes que pour la visite (ci-dessus)
+FILM_PAGE=video/poc_voice.html node video/render.mjs "$CAP" /tmp/poc/video.mp4
+.venv/bin/python video/audio.py /tmp/poc/music.wav video/tour_audio.json
+ELEVENLABS_API_KEY=... .venv/bin/python video/voice.py video/poc_voice.json /tmp/poc/music.wav /tmp/poc/voice.wav /tmp/poc/voice_cache
+ffmpeg -i /tmp/poc/video.mp4 -i /tmp/poc/voice.wav -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart Sentinel_PoC_VoiceOver_1080p.mp4
+```
+
+`voice.py` garde chaque réplique en cache (par son texte) : changer un temps ne recoûte aucun caractère. La clé
+ElevenLabs reste dans `.env`, jamais dans le repo.

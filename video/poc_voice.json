@@ -1,0 +1,71 @@
+{
+ "voice": "onwK4e9ZLuTAKqWW03F9",
+ "model": "eleven_multilingual_v2",
+ "end": 146,
+ "lines": [
+  [
+   0.9,
+   "AI agents can now pay on their own. Sentinel makes sure they never pay a scammer."
+  ],
+  [
+   7.0,
+   "This is Sentinel L-one, our Avalanche chain."
+  ],
+  [
+   12.6,
+   "First, without Sentinel. We switch the guard off, and ask a shopping agent for an Apple Watch Ultra 2, at the best price."
+  ],
+  [
+   21.4,
+   "It compares the shops and picks Meridian, the cheapest. A ghost store, nine days old. The agent fills in the card, and pays."
+  ],
+  [
+   31.6,
+   "Now the same request, with the guard on. The agent doesn't even know Sentinel exists. It clicks pay, as before."
+  ],
+  [
+   40.6,
+   "Instead, the payment goes to our MCP server first. Eight layers check it."
+  ],
+  [
+   47.0,
+   "Meridian claims a French company number. Sentinel checks it live with the state registry, data dot gouv. It doesn't exist. Trust: seventeen. Refused."
+  ],
+  [
+   59.4,
+   "The refusal is written on Sentinel L-one, with its proof. Here it is, in our explorer."
+  ],
+  [
+   66.3,
+   "And here it is live, on city dot petroi dot F R. The payment becomes a car. It is scanned at the gate, turned away, and sent to the scrapyard. Its address joins the threat registry."
+  ],
+  [
+   82.2,
+   "An unusual amount at a known shop is not a scam, but it isn't normal either. Sentinel holds it, and a human decides. One click approves it, and the visa is issued."
+  ],
+  [
+   97.8,
+   "In the city, the parked car leaves, green."
+  ],
+  [
+   104.4,
+   "An ordinary payment goes straight through. Trust: one hundred. A one-time visa, written on chain."
+  ],
+  [
+   114.4,
+   "The car drives into the C-Chain, where the money actually lands."
+  ],
+  [
+   120.6,
+   "And the scammer tries again. This time there is nothing to compute: the address is already on the registry. Refused instantly, for every agent."
+  ],
+  [
+   132.6,
+   "Every visa and every decision is a transaction on Sentinel L-one, paid in S-E-C."
+  ],
+  [
+   140.3,
+   "Sentinel. Your AI agents never lose your money."
+  ]
+ ]
+}
