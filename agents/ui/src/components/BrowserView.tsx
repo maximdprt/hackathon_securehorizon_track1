@@ -20,6 +20,8 @@ type Props = {
   gesture?: Step['kind'];
   replaying: boolean;
   running: boolean;
+  /** Mode finance : l'agent n'ouvre aucune page, tout se passe dans le chat. */
+  finance?: boolean;
   onLive: () => void;
 };
 
@@ -74,7 +76,7 @@ function tween(duration: number, draw: (t: number) => void, alive: () => boolean
 }
 
 /** La fenêtre de navigation de l'agent : onglet, barre d'adresse, page réelle du site, et un curseur qui joue ses gestes. */
-export function BrowserView({ frame, frameKey, animate, agentName, sites, caption, why, gesture, replaying, running, onLive }: Props) {
+export function BrowserView({ frame, frameKey, animate, agentName, sites, caption, why, gesture, replaying, running, finance, onLive }: Props) {
   const iframe = useRef<HTMLIFrameElement>(null);
   const pointer = useRef<HTMLDivElement>(null);
   const trail = useRef<SVGSVGElement>(null);
@@ -352,7 +354,7 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
             Revenir au direct
           </button>
         ) : (
-          <span className={`browser__state${running ? ' browser__state--live' : ''}`}>{running ? "L'agent navigue" : frame ? 'Navigation terminée' : 'En attente'}</span>
+          <span className={`browser__state${running ? ' browser__state--live' : ''}`}>{running ? (finance ? "L'agent analyse" : "L'agent navigue") : frame ? 'Navigation terminée' : 'En attente'}</span>
         )}
         {site && (
           <a className="button" href={site.preview} target="_blank" rel="noopener">
@@ -407,11 +409,13 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
           </span>
           <h2 className="browser__start-title">Commencez une conversation avec un agent</h2>
           <p className="browser__start-text">
-            Confiez-lui un achat dans le chat, à droite. Vous le verrez agir ici en direct, geste après geste, pendant qu'il explique ce qu'il fait.
+            {finance
+              ? "En mode Finance, l'agent n'ouvre aucune page : il cherche des placements, lit leur fiche et prépare un ordre. Suivez son raisonnement dans le chat, à droite."
+              : "Confiez-lui un achat dans le chat, à droite. Vous le verrez agir ici en direct, geste après geste, pendant qu'il explique ce qu'il fait."}
           </p>
           {running && (
             <p className="browser__start-wait">
-              {agentName} prépare sa navigation
+              {agentName} {finance ? 'analyse les placements' : 'prépare sa navigation'}
               <Dots />
             </p>
           )}

@@ -15,9 +15,15 @@ export type Confirmation = {
   card: { holder: string; last4: string; exp: string };
 };
 
+/** Boutiques : l'agent navigue et achète. Finance : l'agent Hermès cherche des placements, lit leur fiche et prépare un ordre. */
+export type Mode = 'shop' | 'finance';
+/** Ce que le bac à sable sait du placement choisi en mode finance, et que l'agent ignore. */
+export type FinanceAsset = { id: string; name: string; domain: string; kind: 'legit' | 'fraud'; why: string; apy: number };
+
 export type EndEvent = {
   type: 'end';
-  outcome: 'paid' | 'blocked' | 'needs_approval' | 'no_payment' | 'max_turns';
+  /** ready : en mode finance sans garde, l'ordre est préparé mais pas envoyé. done : l'investissement est parti. */
+  outcome: 'paid' | 'blocked' | 'needs_approval' | 'no_payment' | 'max_turns' | 'ready' | 'done';
   order: Order | null;
   chosen: string;
   why: string;
@@ -29,6 +35,7 @@ export type EndEvent = {
   turns: number;
   site: Site | null;
   request: unknown;
+  asset?: FinanceAsset | null;
 };
 
 /** Un geste de l'agent, tel que le serveur l'envoie au fil de l'eau (une ligne JSON par geste). */
@@ -39,8 +46,10 @@ export type RunEvent =
   | { type: 'click'; ref: string; label: string; kind: string; why: string; view: View }
   | { type: 'fill'; ref: string; label: string; value: string; why: string; view: View }
   | { type: 'choose'; merchant: string; site: string | null; why: string; considered: Considered[] }
-  | { type: 'pay'; site: string; order: Order; items: string[]; submitted: Record<string, string> }
-  | { type: 'invalid'; tool: string; message: string }
+  | { type: 'pay'; site?: string | null; order: Order; items?: string[]; submitted?: Record<string, string> | null; why?: string; asset?: string }
+  | { type: 'search'; query: string; results: { id: string; name: string; snippet: string }[]; why: string }
+  | { type: 'research'; asset: string; name: string; why: string }
+  | { type: 'invalid'; tool?: string; message?: string }
   | EndEvent
   | { type: 'error'; message: string };
 

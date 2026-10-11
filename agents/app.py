@@ -13,6 +13,9 @@ Aucun garde n'est branché ici : l'agent va jusqu'au bout et la boutique confirm
 le profil et la carte de l'acheteur sont fictifs. La requête `verify_payment` que le garde aurait reçue juste avant le
 clic sur "Payer" est montrée dans l'interface et enregistrée dans agents/out/runs.jsonl (voir `run_browser(guard=...)`).
 
+En mode "finance", c'est l'agent Hermès (agents/hermes_agent.py) qui répond : il n'ouvre aucune page, il cherche des
+placements (agents/assets.py), lit leur fiche et prépare un ordre. Sans garde, l'ordre est préparé mais jamais envoyé.
+
 Tout reste sur la machine : le serveur n'écoute que sur 127.0.0.1 et les boutiques n'existent que dans ce processus.
 """
 from __future__ import annotations
@@ -32,8 +35,9 @@ from urllib.parse import parse_qs, urlsplit
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from agents import shops, world  # noqa: E402
+from agents import assets, shops, world  # noqa: E402
 from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
+from agents.hermes_agent import run_hermes  # noqa: E402
 from agents.llm import MODEL_ID, BedrockLLM  # noqa: E402
 
 OUT = ROOT / "agents" / "out"
@@ -66,6 +70,12 @@ def public_site(key: str) -> dict:
     s = world.SITES[key]
     return {"key": key, "name": s["name"], "domain": s["domain"], "kind": s["kind"], "why": s["why"], "preview": f"/shop/{key}/",
             "color": world.COLORS[key]}
+
+
+def public_asset(asset_id: str | None) -> dict | None:
+    """Ce que le bac à sable sait du placement choisi par l'agent finance, et que l'agent ignore."""
+    a = assets.ASSETS.get(asset_id or "")
+    return a and {"id": a.id, "name": a.name, "domain": a.domain, "kind": a.kind, "why": a.why, "apy": a.apy}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -147,7 +157,8 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             prompt, model = body["prompt"].strip(), body.get("model") or MODEL_ID
             instructions, agent = str(body.get("instructions", "")).strip(), str(body.get("agent", "")).strip()
-            assert prompt and len(prompt) <= 2000 and len(instructions) <= 4000 and len(agent) <= 80 and model in MODELS
+            mode = body.get("mode", "shop")
+            assert prompt and len(prompt) <= 2000 and len(instructions) <= 4000 and len(agent) <= 80 and model in MODELS and mode in ("shop", "finance")
         except Exception:
             return self._json(400, {"error": "bad request"})
 
@@ -162,6 +173,17 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
+            if mode == "finance":  # pas de garde : l'ordre est préparé, jamais envoyé (outcome "ready")
+                run = run_hermes(prompt, llm, instructions=instructions, emit=emit)
+                run.update(agent=agent, model=model, mode=mode, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+                OUT.mkdir(exist_ok=True)
+                with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(run, ensure_ascii=False) + "\n")
+                request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères lus par l'agent>"}
+                emit({"type": "end", "outcome": run["outcome"], "order": run["order"], "chosen": run["asset"] or "", "why": run["why"],
+                      "considered": [], "submitted": None, "confirmation": None, "expected": None, "final_text": run["final_text"],
+                      "turns": run["turns"], "site": None, "request": request, "asset": public_asset(run["asset"])})
+                return
             run = run_browser(prompt, llm, instructions=instructions, emit=emit, pace=PACE)  # pas de garde : le paiement part
             run.update(agent=agent, model=model, backend=None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
             OUT.mkdir(exist_ok=True)

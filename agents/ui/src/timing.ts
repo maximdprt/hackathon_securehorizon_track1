@@ -52,7 +52,8 @@ export function easeMove(t: number): number {
 /** Ce que l'agent dit de ce geste, quand le fil l'affiche : la raison d'une action, ou une réflexion. */
 export function spoken(ev: RunEvent): string {
   if (ev.type === 'thought') return ev.text;
-  if (ev.type === 'click' || ev.type === 'fill' || ev.type === 'choose') return ev.why;
+  if (ev.type === 'click' || ev.type === 'fill' || ev.type === 'choose' || ev.type === 'search' || ev.type === 'research') return ev.why;
+  if (ev.type === 'pay') return ev.why ?? '';
   if (ev.type === 'nav' && ev.how !== 'click') return ev.why;
   return '';
 }
@@ -66,6 +67,8 @@ function gesture(ev: RunEvent): number {
     case 'nav':
       return (ev.how === 'goto' || ev.how === 'search' ? T.address : 0) + T.fade + T.load + 250;
     case 'choose':
+    case 'search':
+    case 'research':
       return 600;
     case 'pay':
       return 500;

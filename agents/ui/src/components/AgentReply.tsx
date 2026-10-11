@@ -1,12 +1,12 @@
 import { useState, type ReactNode } from 'react';
 import { initials } from '../agents';
-import { amount, planOf, type AgentMessage, type Step } from '../run';
+import { amount, planOf, short, type AgentMessage, type Step } from '../run';
 import type { EndEvent } from '../types';
 import { Alert, Card, Check, Doc, Globe, Pen, Pointer, Scale } from './Icons';
 import { Typed } from './Typed';
 
 const ICON: Record<Step['kind'], ReactNode> = {
-  search: <Globe />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, invalid: <Alert />, thought: <Doc />,
+  search: <Globe />, research: <Doc />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, invalid: <Alert />, thought: <Doc />,
 };
 
 function Plan({ msg }: { msg: AgentMessage }) {
@@ -51,6 +51,16 @@ function StepLine({ step, selected, live, onSelect }: StepProps) {
             <span key={i} className="tool__field">
               <span className="tool__field-label">{f.label}</span>
               <span className="mono">{f.value}</span>
+            </span>
+          ))}
+        </span>
+      )}
+      {step.results && step.results.length > 0 && (written || !step.why) && (
+        <span className="tool__fields">
+          {step.results.map((r, i) => (
+            <span key={i} className="tool__field tool__field--stack">
+              <span className="tool__field-label">{r.name}</span>
+              <span>{r.snippet}</span>
             </span>
           ))}
         </span>
@@ -111,7 +121,30 @@ function Outcome({ end }: { end: EndEvent }) {
       </>
     );
   }
+  if (end.outcome === 'ready' && end.order) {
+    const { order, asset } = end;
+    return (
+      <>
+        <p className="chat__text chat__text--strong">Ordre prêt{asset ? ` pour ${asset.name}` : ''}.</p>
+        <p className="chat__text">
+          « {order.action} » de {amount(order.amount)} {order.currency} vers <span className="mono">{short(order.recipient)}</span>.
+        </p>
+        <section className="plan">
+          <h3 className="plan__title">Bac à sable</h3>
+          {asset && (
+            <div className="plan__row">
+              <span className={`pill pill--${asset.kind === 'legit' ? 'ok' : 'warn'}`}>Placement {asset.kind === 'legit' ? 'légitime' : 'frauduleux'}</span>
+              <p className="plan__text">{asset.why}</p>
+            </div>
+          )}
+          <p className="plan__text">Aucun garde n'était branché : l'ordre est préparé mais n'a pas été envoyé. Le garde le recevra juste avant l'envoi.</p>
+        </section>
+      </>
+    );
+  }
   const text = {
+    ready: 'Ordre prêt.',
+    done: 'Investissement effectué.',
     blocked: 'Le garde a bloqué le paiement.',
     needs_approval: 'Le garde demande une validation humaine avant de payer.',
     no_payment: "Je n'ai rien acheté.",
