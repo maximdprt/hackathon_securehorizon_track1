@@ -6,12 +6,12 @@
 // Shot), flashes the C-Chain (their HubTower, HUB_KICK) and shakes. Mounted in City3D.tsx inside <Rise>.
 import { Suspense, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Vector3 } from "three";
+import { Raycaster, Vector3 } from "three";
 import gsap from "gsap";
 import type { City } from "@/components/explorer-v2/network/city";
 import type { CameraHandle, Route } from "@/components/explorer-v2/network/icm-map";
 import { registerScene, type Shot as GuardShotName } from "@/sim/Director";
-import { sim } from "@/sim/store";
+import { sim, useSim } from "@/sim/store";
 import { HUB_KICK } from "./HubTower";
 import type { RouteStreets } from "./lanes";
 import type { CityModel } from "./model";
@@ -29,39 +29,55 @@ import { Door, OPEN, ParkingTip, ProofTip } from "./Door";
 
 type Props = { model: CityModel; city: City; routes: Route[]; streets: RouteStreets[]; theme: Theme; still: boolean; onShot: (s: Shot | null) => void; cameraRef?: RefObject<CameraHandle | null> };
 
-/** the camera's shots over our parcel, framed by their Rig from points (Rig.tsx Shot) */
+/** the camera's shots over our parcel, framed by their Rig from points (Rig.tsx Shot). Each looks from aside the
+    straight road (from v: the camera stands that way of what it frames), so no tower ever stands between it and the car */
 function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
-  const ring = (c: Vector3, r: number, y = 0) => Array.from({ length: 8 }, (_, i) => new Vector3(c.x + r * Math.cos((i / 8) * Math.PI * 2), y, c.z + r * Math.sin((i / 8) * Math.PI * 2)));
-  const top = g.hq.base + g.hq.crest;
-  // looked at from outside the ward, inward: the HQ and downtown stand behind what the shot shows
-  const out = (p: Vector3) => Math.PI / 2 - Math.atan2(p.z, p.x);
-  // the road's shots look the other way, from downtown's side and a little aside (never through the hub's tower): the
-  // car comes toward the camera, through the gantry, the HQ tower standing behind it instead of in front of it
-  const road = out(g.toll.p) + Math.PI - 0.85;
-  /** halfway between outward and away from a tower beside it */
-  const awayFrom = (p: Vector3, b: { x: number; z: number }) => {
-    const r = Math.hypot(p.x, p.z) || 1;
-    const dx = p.x - b.x;
-    const dz = p.z - b.z;
-    const d = Math.hypot(dx, dz) || 1;
-    return Math.atan2(p.x / r + dx / d, p.z / r + dz / d);
+  const ring = (c: Vector3, r: number, n = 8) => Array.from({ length: n }, (_, i) => new Vector3(c.x + r * Math.cos((i / n) * Math.PI * 2), c.y, c.z + r * Math.sin((i / n) * Math.PI * 2)));
+  const from = (r: number, f: number) => {
+    const v = g.R.clone().multiplyScalar(r).addScaledVector(g.F, f);
+    return Math.PI / 2 - Math.atan2(v.z, v.x);
   };
+  const lift = (p: Vector3, y: number) => p.clone().setY(p.y + y);
+  const w = g.carW;
+  const Y = g.scrapyard;
   return {
-    security: { key: "guard:security", points: [new Vector3(g.hq.x, top + 10, g.hq.z), g.toll.p, g.parking.c, g.scrapyard.c, ...ring(new Vector3(g.hq.x, 0, g.hq.z), g.S * 2.6)].map((p) => p.clone()), polar: 0.9, cap: 1 / 3.2, fill: 0.9, az: road },
-    // SENTINEL (deployed): a lower, closer look at the gantry, the car scanned under it
-    toll: { key: "guard:toll", points: [g.toll.p.clone().setY(g.S * 1.1), ...ring(g.toll.p, g.S * 0.95)], polar: 0.6, cap: 1 / 5.4, fill: 0.92, az: road },
-    // the lot from the side away from the HQ and from outside the ward, high: the HQ's tower stands behind it, never over its bays
-    parking: { key: "guard:parking", points: [g.parking.c.clone().setY(g.carW * 2.4), ...ring(g.parking.c, g.parking.w * 0.55)], polar: 0.55, cap: 1 / 6, fill: 0.84, az: awayFrom(g.parking.c, g.hq) },
-    // the yard from its lane's side (the reference's cameras look at the baler over the lane)
-    scrapyard: { key: "guard:scrapyard", points: [g.scrapyard.W(2, 0, -6.5), g.scrapyard.W(20, 0, 1), g.scrapyard.W(11, 5, -3), g.scrapyard.W(2, 0, 1), g.scrapyard.W(20, 0, -6.5)], polar: 0.95, cap: 1 / 8, fill: 0.9, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
-    press: { key: "guard:press", points: [g.scrapyard.W(5.5, 0, -6.5), g.scrapyard.W(13, 0, -3.2), g.scrapyard.W(9, 2.5, -5)], polar: 0.55, cap: 1 / 12, fill: 0.86, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
-    skip: { key: "guard:skip", points: [g.scrapyard.W(12, 0, -6), g.scrapyard.W(20, 0, 0), g.scrapyard.W(16.5, 3, -1.8)], polar: 0.85, cap: 1 / 10, fill: 0.86, az: Math.atan2(g.scrapyard.zHat.x, g.scrapyard.zHat.z) },
-    // the green road from the gantry to the C-Chain's gate, looked at from outside the city: the hub's tower stands behind the car, never in front
-    cchain: { key: "guard:cchain", points: [...g.legs.toCChain.pts.filter((_, i) => i % 3 === 0), g.gate.p.clone(), g.stop.p.clone()].map((p) => p.clone().setY(p.y + g.carW)), polar: 0.75, cap: 1 / 5, fill: 0.86, az: out(g.legs.toCChain.pts[Math.floor(g.legs.toCChain.pts.length / 2)]) },
+    security: { key: "guard:security", points: [lift(g.toll.p, w * 2), g.parking.c, Y.c, Y.skip, g.gate.p, lift(g.P(g.dbg?.dHQ ?? 0, 0), w * 3)], polar: 0.85, cap: 1 / 3.2, fill: 0.9, az: from(1, 0.35) },
+    follow: { key: "guard:follow", points: [...g.legs.approach.pts.filter((_, i) => i % 3 === 0).map((p) => lift(p, w)), lift(g.toll.p, w * 1.5), g.stop.p], polar: 0.72, cap: 1 / 5, fill: 0.86, az: from(1, 0.55) },
+    toll: { key: "guard:toll", points: [lift(g.toll.p, w * 1.8), ...ring(g.toll.p, g.carL * 1.15)], polar: 0.66, cap: 1 / 6, fill: 0.9, az: from(1, 0.4) },
+    // the post from the road's right, outside it: its roof clears while the car waits
+    parking: { key: "guard:parking", points: [lift(g.parking.c, w * 2.2), g.parking.gate, g.parking.exit, g.stop.p, ...ring(g.parking.c, g.parking.d * 0.5, 6)], polar: 0.62, cap: 1 / 6, fill: 0.86, az: from(1, 0.2) },
+    // the yard from its far side, away from the road: the lane, the baler, the crane and the skip ahead of the camera
+    scrapyard: { key: "guard:scrapyard", points: [g.stop.p, Y.W(-5, 0, 0), Y.W(20, 0, 1), Y.W(11, 5, -3), Y.W(2, 0, -6.5), Y.W(20, 0, -6.5)], polar: 0.8, cap: 1 / 7, fill: 0.88, az: from(-1, 0.35) },
+    press: { key: "guard:press", points: [Y.W(5.5, 0, -6.5), Y.W(13, 0, -3.2), Y.W(9, 2.5, -5), Y.W(9, 0, 0.5)], polar: 0.6, cap: 1 / 11, fill: 0.86, az: from(-0.6, 0.8) },
+    skip: { key: "guard:skip", points: [Y.W(12, 0, -6), Y.W(20, 0, 0), Y.W(16.5, 3, -1.8)], polar: 0.75, cap: 1 / 10, fill: 0.86, az: from(-0.7, 0.7) },
+    // the road from the gantry to the C-Chain's gate, from its right side
+    cchain: { key: "guard:cchain", points: [g.stop.p, g.parking.exit, g.gate.p, lift(g.gate.p, w * 2)], polar: 0.7, cap: 1 / 5, fill: 0.86, az: from(1, 0.15) },
     // the C-Chain's gate, close: the visa's car going through it
-    gate: { key: "guard:gate", points: [g.gate.p.clone().setY(g.carW * 2), ...ring(g.gate.p, g.carW * 3.2)], polar: 0.7, cap: 1 / 7, fill: 0.9, az: out(g.gate.p) + Math.PI - 0.6 },
-    follow: { key: "guard:follow", points: [...g.legs.approach.pts.filter((_, i) => i % 4 === 0), g.toll.p.clone().setY(g.S * 1.2), new Vector3(g.hq.x, g.hq.base + g.hq.crest * 0.6, g.hq.z)], polar: 0.8, cap: 1 / 4.5, fill: 0.86, az: road },
+    gate: { key: "guard:gate", points: [lift(g.gate.p, w * 2), ...ring(g.gate.p, g.carW * 3)], polar: 0.66, cap: 1 / 7, fill: 0.9, az: from(1, 0.9) },
   };
+}
+
+/** the campus: a raised pad under the parcel at the blocks' level, its edge a fine dark line, so the road, the gantry,
+    the post and the yard stand on one clean ground (it covers the ring road where it would cross them) */
+function Campus({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
+  const { d0, d1, s0, s1, y } = geo.pad;
+  const c = geo.P((d0 + d1) / 2, (s0 + s1) / 2, 0);
+  const yaw = Math.atan2(geo.F.z, geo.F.x);
+  const dark = theme === "dark";
+  const rim = geo.carW * 0.12;
+  return (
+    <group position={c} rotation={[0, -yaw, 0]}>
+      {/* a fine darker rim under the pad's edge, then the pad's top just under the roads */}
+      <mesh position={[0, (y - 0.06) / 2, 0]}>
+        <boxGeometry args={[d1 - d0 + rim * 2, y - 0.06, s1 - s0 + rim * 2]} />
+        <meshLambertMaterial color={dark ? "#3A404A" : "#CDD1D8"} />
+      </mesh>
+      <mesh position={[0, y / 2, 0]} receiveShadow>
+        <boxGeometry args={[d1 - d0, y, s1 - s0]} />
+        <meshLambertMaterial color={dark ? "#1E2228" : "#F3F4F6"} />
+      </mesh>
+    </group>
+  );
 }
 
 /** the C-Chain's gate on the lane into the hub: two red pillars and a lintel across the lane; a visa's car goes through
@@ -91,7 +107,7 @@ function CChainGate({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
 }
 
 export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot, cameraRef }: Props) {
-  const geo = useMemo(() => guardGeoOf(model, city, routes, streets), [model, city, routes, streets]);
+  const geo = useMemo(() => guardGeoOf(model, city), [model, city]);
   // the city car's materials, shared with the yard's car so the hand-over at PICK does not show
   const carMats = useRef<CarMats | null>(null);
   const shots = useMemo(() => (geo ? shotsOf(geo) : null), [geo]);
@@ -101,13 +117,27 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
   const stillRef = useRef(still);
   stillRef.current = still;
 
+  // the camera follows the protocol only when asked (a click on the car, or F); else the city stays the reader's
+  const follow = useSim((s) => s.follow);
+  const lastShot = useRef<GuardShotName | null>(null);
+  const followRef = useRef(follow);
+  followRef.current = follow;
+  useEffect(() => {
+    if (!shots) return;
+    if (follow) onShot(shots[lastShot.current ?? "follow"]);
+    else onShot(null);
+  }, [follow, shots, onShot]);
+
   useEffect(() => {
     if (!shots) return;
     registerScene({
-      fly: (s) => onShot(shots[s]),
+      fly: (s) => {
+        lastShot.current = s;
+        if (followRef.current) onShot(shots[s]);
+      },
       home: () => {
+        lastShot.current = null;
         onShot(null);
-        cameraRef?.current?.home();
       },
       flashTower: () => {
         HUB_KICK.runs.push({ at: TIME.value, out: true });
@@ -140,14 +170,16 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
   // a test handle: where each door stands on screen now (tools/capture.mjs and the Playwright suite click them)
   const size = useThree((s) => s.size);
   const el = useThree((s) => s.gl.domElement);
+  const scene = useThree((s) => s.scene);
+  const ray = useMemo(() => new Raycaster(), []);
   useEffect(() => {
     if (!geo) return;
     // a few points of each door: the first one the canvas itself takes on screen (an HTML label may lie over another)
     const spots: Record<string, Vector3[]> = {
       toll: [geo.toll.p.clone().setY(geo.S * 0.4)],
-      parking: [geo.parking.slots[0], geo.parking.slots[1], geo.parking.slots[4], geo.parking.slots[5], geo.parking.c].map((v) => v.clone().setY(v.y + 0.4)),
+      parking: [...geo.parking.slots, geo.parking.wait, geo.parking.c].map((v) => v.clone().setY(v.y + 0.4)),
       scrapyard: [geo.scrapyard.c.clone().setY(geo.scrapyard.c.y + 0.3), geo.scrapyard.crusher.clone().setY(geo.carW * 0.6)],
-      registry: [geo.scrapyard.bin.clone().setY(geo.carW * 0.9)],
+      registry: [[16.5, 1.4, -1.8], [18.2, 1.2, -1.8], [14.8, 1.2, -1.8], [16.5, 1.2, -0.6], [16.5, 1.2, -3]].map(([x, y, z]) => geo.scrapyard.W(x, y, z)),
       proof: [geo.proof.clone().setY(geo.proof.y + Math.max(1.6, geo.S * 0.12) * 0.45)],
       // high on the red tower: our HQ stands in front of its foot from the home view
       hub: [0.86, 0.75, 0.55].map((k) => new Vector3(0, geo.hubTop * k, 0)),
@@ -163,6 +195,11 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
       const r = el.getBoundingClientRect();
       let first: [number, number] | null = null;
       for (const v of spots[k] ?? []) {
+        // a spot another building stands in front of (seen from the camera) is not a place to click
+        ray.set(camera.position, v.clone().sub(camera.position).normalize());
+        ray.camera = camera;
+        const hit = ray.intersectObjects(scene.children, true).find((h) => (h.object as { isMesh?: boolean }).isMesh && h.object.visible);
+        if (hit && hit.distance < camera.position.distanceTo(v) - geo.carW * 1.5 && hit.point.distanceTo(v) > geo.carW * 4) continue;
         const p = v.clone().project(camera);
         const at: [number, number] = [Math.round(r.left + (p.x * 0.5 + 0.5) * size.width), Math.round(r.top + (-p.y * 0.5 + 0.5) * size.height)];
         first ??= at;
@@ -170,7 +207,7 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
       }
       return first;
     };
-  }, [geo, camera, size, el, model]);
+  }, [geo, camera, size, el, model, scene, ray]);
 
   // a still city draws on demand: keep it drawing while a transaction plays
   useEffect(() => {
@@ -197,7 +234,8 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
   if (!geo) return null;
   return (
     <group>
-      {SENTINEL_ONLY && <Road geo={geo} theme={theme} />}
+      {SENTINEL_ONLY && <Campus geo={geo} theme={theme} />}
+      <Road geo={geo} theme={theme} />
       <Crown geo={geo} theme={theme} />
       {/* each piece of the parcel is a door to its screen (Door.tsx, sim/nav.ts) */}
       <Door name="guard:parking" at={[geo.parking.c.x, geo.S * 0.5, geo.parking.c.z]} tip={<ParkingTip />} onOpen={OPEN.parking}>

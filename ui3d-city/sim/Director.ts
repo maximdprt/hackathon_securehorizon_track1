@@ -35,9 +35,13 @@ export function enqueue(tx: TxEvent) {
 }
 export const playScene = (k: SceneKey) => enqueue({ ...SCENARIO[k], created_at: new Date().toISOString() });
 
-/** F: the camera back on the car while one runs */
+/** a click on the car, or F: the camera follows the protocol to its end (city3d/AvaGuardRun.tsx flies its shots) */
 export function followCar() {
-  if (sim.get().tx && sim.get().phase !== "idle") fly("follow");
+  if (sim.get().tx && sim.get().phase !== "idle") sim.set({ follow: true });
+}
+/** the reader takes the camera back: the protocol carries on by itself */
+export function stopFollow() {
+  if (sim.get().follow) sim.set({ follow: false });
 }
 
 /** the human's answer for the parked car (Valider / Refuser, or A / R) */
@@ -115,7 +119,7 @@ async function play(tx: TxEvent) {
   const known = sim.get().registry.includes(tx.to.address.toLowerCase());
   const immune = !!tx.registry_hit && known;
   const entry: JournalEntry = { tx_id: tx.tx_id, outcome: "PENDING", via: "Sentinel", amount: tx.amount.value, token: tx.amount.token, to: tx.to.address, at: new Date().toISOString() };
-  sim.set((s) => ({ tx, phase: "approach", step: -1, review: null, journal: [entry, ...s.journal].slice(0, 40), ledger: [{ ...tx, status: "PENDING" as const, via: "Sentinel" as const }, ...s.ledger] }));
+  sim.set((s) => ({ tx, phase: "approach", step: -1, review: null, follow: s.follow && s.phase !== "idle", journal: [entry, ...s.journal].slice(0, 40), ledger: [{ ...tx, status: "PENDING" as const, via: "Sentinel" as const }, ...s.ledger] }));
 
   // 1. out of the Sentinel tower's door, white: nothing is decided yet; it pulls away gently toward the gantry
   motion.visible = true;
@@ -151,6 +155,8 @@ async function play(tx: TxEvent) {
       motion.tone = toneOf(tx.decision);
     });
     repaint(t, paintOf(tx.decision));
+    // the barrier past the gantry lifts for whichever way it takes: the car never drives through it
+    t.to(motion, { barrier: 1, duration: span(TIMINGS.barrier), ease: "power2.out" }, "<");
     t.call(() => sim.set({ step: STEPS.length }));
   });
   if (!busy) return;
@@ -158,12 +164,12 @@ async function play(tx: TxEvent) {
   sim.set((s) => ({ kpi: { ...s.kpi, transactions: s.kpi.transactions + 1, decisionMs: s.kpi.decisionMs + tx.timings_ms.decide, decisions: s.kpi.decisions + 1 } }));
 
   // 4. the road of its colour
-  if (tx.decision === "ALLOW") await allow(tx, "Sentinel");
-  else if (tx.decision === "BLOCK") await block(tx, immune ? "registre" : "Sentinel");
+  if (tx.decision === "ALLOW") await allow(tx, "Sentinel", "toCChain");
+  else if (tx.decision === "BLOCK") await block(tx, immune ? "registre" : "Sentinel", "toScrapyard");
   else await human(tx);
   if (!busy) return;
 
-  sim.set({ phase: "home" });
+  sim.set({ phase: "home", follow: false });
   motion.visible = false;
   hooks.home();
   await wait(TIMINGS.home);
@@ -188,52 +194,51 @@ function finish(tx: TxEvent, outcome: "ALLOW" | "BLOCK", via: "Sentinel" | "huma
 
 /* 4b. green: the barrier lifts, the road to the C-Chain lights in green, the car drives it and goes through the
    C-Chain's gate, cut at its plane (GuardCar): the payment is executed, its visa spent, its proof on-chain */
-async function allow(tx: TxEvent, via: "Sentinel" | "humain") {
+async function allow(tx: TxEvent, via: "Sentinel" | "humain", from: "toCChain" | "parkToCChain") {
   motion.tone = "allow";
-  sim.set({ phase: "allow" });
+  sim.set({ phase: "allow", routeLit: true });
   await run((t) => {
-    t.to(motion, { barrier: 1, duration: span(TIMINGS.barrier), ease: "power2.out" });
-    t.call(() => {
-      fly("cchain");
-      sim.set({ routeLit: true });
-    });
-    t.to(motion, { glow: 1, duration: 0.5 }, "<");
+    t.call(() => fly("cchain"));
+    t.to(motion, { glow: 1, duration: 0.4 });
     const at = t.duration();
-    leg(t, "toCChain", TIMINGS.toCChain, "power1.inOut");
-    if (!still()) t.call(() => fly("gate"), [], at + TIMINGS.toCChain * 0.5);
+    leg(t, from, from === "toCChain" ? TIMINGS.toCChain : TIMINGS.parkToCChain, "power1.inOut");
+    // the barrier falls back once the car has gone past it
+    t.to(motion, { barrier: 0, duration: span(TIMINGS.barrier) }, at + span(1.2));
+    if (!still()) t.call(() => fly("gate"), [], at + (from === "toCChain" ? TIMINGS.toCChain : TIMINGS.parkToCChain) * 0.45);
     t.call(() => {
       motion.visible = false;
       const n = finish(tx, "ALLOW", via);
       toast(`Paiement exécuté sur la C-Chain · visa consommé · preuve bloc #${fmtAmount(n)}`, "allow");
     });
     t.to({}, { duration: span(TIMINGS.arrivalHold) });
-    t.to(motion, { glow: 0, barrier: 0, duration: 0.6 });
+    t.to(motion, { glow: 0, duration: 0.5 });
     t.call(() => sim.set({ routeLit: false }));
   });
 }
 
 /* 4a. red: round to the yard, red from start to end; the crane picks it, the baler crushes it in three strokes into a
    red block that still reads as a car, the block is ejected and laid in the hackers' registry skip */
-async function block(tx: TxEvent, via: "Sentinel" | "humain" | "registre") {
+async function block(tx: TxEvent, via: "Sentinel" | "humain" | "registre", from: "toScrapyard" | "parkToScrapyard") {
   motion.tone = "block";
   sim.set({ phase: "block" });
   await run((t) => {
-    leg(t, "uTurn", TIMINGS.uTurn);
     t.call(() => fly("scrapyard"));
-    leg(t, "toScrapyard", TIMINGS.toScrapyard);
-    // the Guard Yard's own timeline from PICK (components/guard-yard/three/timeline.ts)
+    const at0 = t.duration();
+    leg(t, from, from === "toScrapyard" ? TIMINGS.toScrapyard : TIMINGS.parkToScrapyard, "power1.inOut");
+    t.to(motion, { barrier: 0, duration: span(TIMINGS.barrier) }, at0 + span(1.2));
+    // the Guard Yard's own timeline from PICK (components/guard-yard/three/timeline.ts), a little faster than the
+    // reference; no camera shake
     const Y0 = 10.4;
     const Y1 = 22.2;
     t.call(() => {
       motion.yard = Y0;
     });
     const at = t.duration();
-    const len = span(Y1 - Y0);
+    const len = span((Y1 - Y0) / TIMINGS.yardSpeed);
     const when = (yt: number) => at + ((yt - Y0) / (Y1 - Y0)) * len;
     t.to(motion, { yard: Y1, duration: len, ease: "none" }, at);
     if (!still()) {
       t.call(() => fly("press"), [], when(13.6));
-      for (const hit of [14.6, 15.8, 16.65]) t.call(() => hooks.shake(), [], when(hit));
       t.call(() => fly("skip"), [], when(18.3));
     }
     // the block lands in the skip: the fraudster's address joins the registry, with the proof's block
@@ -247,7 +252,7 @@ async function block(tx: TxEvent, via: "Sentinel" | "humain" | "registre") {
       [],
       when(21.2),
     );
-    t.to({}, { duration: span(1.6) });
+    t.to({}, { duration: span(1.2) });
   });
 }
 
@@ -258,7 +263,7 @@ async function human(tx: TxEvent) {
   sim.set({ phase: "human" });
   await run((t) => {
     t.call(() => fly("parking"));
-    leg(t, "toParking", TIMINGS.toParking);
+    leg(t, "toParking", TIMINGS.toParking, "power1.inOut");
   });
   if (!busy) return;
   sim.set((s) => ({ human: { tx_id: tx.tx_id, deadline: Date.now() + TIMINGS.humanTimeout * 1000 }, ledger: s.ledger.map((l) => (l.tx_id === tx.tx_id ? { ...l, status: "HUMAN" as const } : l)) }));
@@ -274,18 +279,16 @@ async function human(tx: TxEvent) {
   const at = new Date().toISOString();
   sim.set({ human: null, review: { tx_id: tx.tx_id, approve, by: "opérateur Sentinel", at, protocol: approve ? "visa" : "déchetterie" } });
   toast(`${tx.tx_id} ${approve ? "validée" : "refusée"} par l'opérateur à ${new Date(at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · protocole ${approve ? "visa vers la C-Chain" : "déchetterie"}`, approve ? "allow" : "block");
-  // repainted, out of the bay and back to the gantry, then exactly the branch of its new colour
+  // repainted, then straight out of the post by its exit gate, the way of its new colour
   await run((t) => {
     t.call(() => {
       motion.tone = approve ? "allow" : "block";
     });
     repaint(t, approve ? "allow" : "block");
-    t.call(() => fly("security"));
-    leg(t, "fromParking", TIMINGS.fromParking);
   });
   if (!busy) return;
-  if (approve) await allow(tx, "humain");
-  else await block(tx, "humain");
+  if (approve) await allow(tx, "humain", "parkToCChain");
+  else await block(tx, "humain", "parkToScrapyard");
 }
 
 export const STEP_COUNT = STEPS.length;

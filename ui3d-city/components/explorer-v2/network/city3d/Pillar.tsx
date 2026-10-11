@@ -5,7 +5,7 @@ import { useThree } from "@react-three/fiber";
 import { BufferAttribute, BufferGeometry, Color, Mesh, MeshLambertMaterial, type Texture } from "three";
 import { PLATE, PLATE_T } from "@/components/explorer-v2/network/icm-map";
 import { FOOT, HAZE_COLOR, HAZE_GLSL, MIST_COLOR } from "./haze";
-import type { Theme } from "./palette";
+import { SIGNAL3, type Theme } from "./palette"; // AVAGUARD: + SIGNAL3, the band's accent
 import { loadTile, whiteTile } from "./tile";
 import { OPENING } from "./warmup";
 
@@ -38,11 +38,12 @@ const TILE = (2 * Math.PI * SHAFT) / ROUND;
 
 /* the stone's tint over the marble, cool as the brand's grade: a cold white by day, graphite by
    night; and one red band round the necking, the brand's red band device, the column's only color */
+/* AVAGUARD: Sentinel's black and white: by day a black marble under the white plate, so the board reads as a white disc on
+   a dark rim, by night a graphite one under the near-black plate; the band round the necking in the accent (SIGNAL3) */
 const MARBLE: Record<Theme, { stone: string; haze: string }> = {
-  light: { stone: "#F2F4F8", haze: HAZE_COLOR.light },
-  dark: { stone: "#3B484B", haze: HAZE_COLOR.dark },
+  light: { stone: "#2C2C30", haze: HAZE_COLOR.light },
+  dark: { stone: "#2A2A2E", haze: HAZE_COLOR.dark },
 };
-const BRAND_RED = "#E6212F";
 /** the abacus: its depth under the plate's top, deeper than the plate so the rim that carries the motto has weight, and the chamfer under its face */
 const ABACUS = PLATE_T + 4;
 const CHAMFER = 1.4;
@@ -170,7 +171,7 @@ export function Pillar({ theme }: { theme: Theme }) {
 
   const haze = useMemo(() => ({ value: new Color() }), []);
   const mist = useMemo(() => ({ value: new Color() }), []);
-  const red = useMemo(() => ({ value: new Color(BRAND_RED) }), []);
+  const red = useMemo(() => ({ value: new Color(SIGNAL3.line.light) }), []);
   const material = useMemo(() => {
     // a white map until the marble comes, so its coming compiles nothing
     const m = new MeshLambertMaterial({ map: whiteTile() });
@@ -246,9 +247,10 @@ vec3 veinNormal( vec3 surf_pos, vec3 surf_norm, vec2 dHdxy, float faceDir ) {
 
   useEffect(() => {
     material.color.set(MARBLE[theme].stone);
+    red.value.set(SIGNAL3.line[theme]); // AVAGUARD: the band in the theme's accent
     haze.value.set(MARBLE[theme].haze);
     mist.value.set(MIST_COLOR[theme]);
-  }, [material, haze, mist, theme]);
+  }, [material, haze, mist, red, theme]);
 
   const mesh = useMemo(() => {
     const m = new Mesh(geometry, material);

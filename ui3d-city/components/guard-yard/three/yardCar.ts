@@ -18,8 +18,9 @@ export function buildYardCar(parent: Object3D, mats: Record<CarPart, Material>, 
     const geo = src.index ? src.toNonIndexed() : src;
     if (geo !== src) src.dispose();
     const mesh = new Mesh(geo, mats[name]);
+    // no self-shadow: on these thin, stacked parts it streaks the body (shadow acne) and the car looks broken before the press
     mesh.castShadow = name === "Paint";
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;
     mesh.userData.base = (geo.getAttribute("position") as BufferAttribute).array.slice();
     group.add(mesh);
     parts.push(mesh);

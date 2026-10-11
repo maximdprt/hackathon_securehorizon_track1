@@ -61,7 +61,7 @@ test("explorer DOUTE: the car parks and waits for a human, who approves it", asy
   await expect.poll(() => legOf(page), { timeout: 10_000 }).toBe("toParking");
   await expect(page.getByRole("button", { name: /Valider/ })).toBeVisible();
   await page.evaluate(() => (window as unknown as { __ag: Ag }).__ag.answerHuman(true));
-  await expect.poll(() => legOf(page), { timeout: 30_000 }).toMatch(/fromParking|toCChain/);
+  await expect.poll(() => legOf(page), { timeout: 30_000 }).toMatch(/parkToCChain|toCChain/);
   await expect.poll(async () => (await ag(page)).ledger[0]?.status, { timeout: 40_000 }).toBe("ALLOW");
 });
 

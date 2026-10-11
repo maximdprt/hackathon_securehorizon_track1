@@ -5,7 +5,7 @@ import type { AuditTx, Tone, TxEvent } from "./types";
    values (positions, sweeps, gauges) live in `motion`, which GSAP tweens and the scene reads in useFrame. */
 
 export type Phase = "idle" | "approach" | "analysis" | "allow" | "block" | "human" | "home";
-export type Leg = "approach" | "scanPass" | "toCChain" | "uTurn" | "toScrapyard" | "toParking" | "fromParking" | "none";
+export type Leg = "approach" | "scanPass" | "toCChain" | "toScrapyard" | "toParking" | "parkToCChain" | "parkToScrapyard" | "none";
 /** the car's paint: white until Sentinel decides, then the decision's colour, all over the body */
 export type Paint = "white" | "allow" | "block" | "human";
 export type Panel = null | "detail" | "journal" | "registry" | "audit";
@@ -37,6 +37,8 @@ export type SimState = {
   liveStatus: string;
   /** our street lit in green while a visa drives it to the C-Chain */
   routeLit: boolean;
+  /** the camera follows the protocol (a click on the car, or F); else the city stays the reader's, as builders-hub's */
+  follow: boolean;
   /** every transaction played in the city, whole, newest first (the audit screens read it through data/source.ts) */
   ledger: AuditTx[];
   /** the screen open over the city, the transaction it shows, the filter it opened on */
@@ -72,6 +74,7 @@ const initial = (): SimState => ({
   mode: initialMode(),
   liveStatus: "",
   routeLit: false,
+  follow: false,
   ledger: [],
   view: null,
   viewTx: null,

@@ -1,11 +1,12 @@
 "use client";
 
 // AVAGUARD: the human lot (not from builders-hub), redrawn as a closed, covered car park in the city's own grade:
-// a raised slab with a steel edge, a low wall and a railing round three sides and the front, one controlled gate (its
-// gantry, its amber and white barrier, the warden's booth with its beacon), six numbered bays under a carport whose
-// roof carries solar panels, wheel stops, aisle arrows and four lamp posts. The barrier lifts as our car comes through;
-// the roof clears while a car is inside, so the camera sees it parked. Frame: +x outward (the bays' noses), +z along
-// the ring, the gate on the front side (x0). Per-frame values come from `motion` and the store, never React state.
+// a raised slab with a steel edge, a low wall and a railing round it, two controlled gates on its front along the road
+// (in toward the tower, out toward the C-Chain: a drive-through aisle, no reversing), the warden's booth by the aisle
+// where the car waits, numbered bays under a carport whose roof carries solar panels, wheel stops, aisle arrows and four
+// lamp posts. A barrier lifts as our car comes through its gate; the roof clears while a car is inside, so the camera
+// sees it waiting. Frame: +x away from the road (the bays' noses), +z toward the tower, the gates on the front side
+// (x0). Per-frame values come from `motion` and the store, never React state.
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial, Shape, ShapeGeometry, Vector3 } from "three";
@@ -60,7 +61,8 @@ function arrowGeometry(s: number) {
 export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const P = geo.parking;
   const w = geo.carW;
-  const { bay, depth, aisle, x0, x1, z0, z1, gateZ, gateW } = P;
+  const { bay, depth, aisle, x0, x1, z0, z1, gateZ, exitZ, gateW } = P;
+  const nBays = P.slots.length;
   const human = useSim((s) => s.phase === "human");
   const mats = useMemo(
     () => ({
@@ -87,24 +89,27 @@ export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   );
   const arrow = useMemo(() => arrowGeometry(aisle * 0.42), [aisle]);
 
-  const arm = useRef<Group>(null);
+  const arms = useRef<(Group | null)[]>([null, null]);
   const beacon = useRef<Mesh>(null);
-  const lift = useRef(0);
+  const lift = useRef([0, 0]);
   const roofK = useRef(1);
   const car = useMemo(() => new Vector3(), []);
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime;
-    const inLot = motion.visible && (motion.leg === "toParking" || motion.leg === "fromParking");
-    // the barrier lifts while our car is near the gate, then falls back behind it
-    let near = false;
+    const inLot = motion.visible && (motion.leg === "toParking" || motion.leg === "parkToCChain" || motion.leg === "parkToScrapyard");
+    // each gate's barrier lifts while our car is near it, then falls back behind it
+    const near = [false, false];
     if (inLot) {
-      const leg = geo.legs[motion.leg as "toParking" | "fromParking"];
-      poseAt(leg, motion.u, car);
-      near = car.distanceTo(P.gate) < geo.carL * 1.7;
+      poseAt(geo.legs[motion.leg as "toParking" | "parkToCChain" | "parkToScrapyard"], motion.u, car);
+      near[0] = car.distanceTo(P.gate) < geo.carL * 1.1;
+      near[1] = car.distanceTo(P.exit) < geo.carL * 1.1;
     }
-    const k = Math.min(1, dt * 4);
-    lift.current += ((near ? 1 : 0) - lift.current) * k;
-    if (arm.current) arm.current.rotation.x = -lift.current * 1.35;
+    const k = Math.min(1, dt * 5);
+    for (let i = 0; i < 2; i++) {
+      lift.current[i] += ((near[i] ? 1 : 0) - lift.current[i]) * k;
+      const a = arms.current[i];
+      if (a) a.rotation.x = -lift.current[i] * 1.35;
+    }
     // the roof clears while a car is inside, so the shot sees it parked
     const busy = inLot || sim.get().phase === "human";
     roofK.current += ((busy ? 0.3 : 1) - roofK.current) * k;
@@ -127,11 +132,10 @@ export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const post = Math.max(0.22, w * 0.07);
   const roofX0 = -depth / 2 - w * 0.3;
   const roofX1 = depth / 2 + w * 0.35;
-  const gz0 = gateZ - gateW / 2;
-  const gz1 = gateZ + gateW / 2;
-  // the booth stands on the gate's far side from the bays, by the front railing
-  const side = Math.sign(gateZ) || 1;
-  const booth = { x: x0 + w * 0.85, z: gateZ + side * (gateW / 2 + w * 0.62 + post * 2), w: w * 1.3, d: w * 1.25, h: w * 1.05 };
+  const gates = [gateZ, exitZ];
+  // the aisle, between the front railing and the bays; the booth between the aisle and the bays, where the car waits
+  const aisleX = -depth / 2 - aisle / 2;
+  const booth = { x: -depth / 2 + w * 0.42, z: 0, w: w * 0.6, d: w * 1.25, h: w * 1.05 };
   const corners: [number, number][] = [
     [x0 + post * 2, z0 + post * 2],
     [x0 + post * 2, z1 - post * 2],
@@ -150,28 +154,41 @@ export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
         <Railing a={[x1, z0]} b={[x1, z1]} wall={mats.wall} post={mats.steel} rail={mats.steel} h={railH} step={bay * 0.5} t={post} />
         <Railing a={[x0, z0]} b={[x1, z0]} wall={mats.wall} post={mats.steel} rail={mats.steel} h={railH} step={bay * 0.5} t={post} />
         <Railing a={[x0, z1]} b={[x1, z1]} wall={mats.wall} post={mats.steel} rail={mats.steel} h={railH} step={bay * 0.5} t={post} />
-        <Railing a={[x0, z0]} b={[x0, gz0]} wall={mats.wall} post={mats.steel} rail={mats.steel} h={railH} step={bay * 0.5} t={post} />
-        <Railing a={[x0, gz1]} b={[x0, z1]} wall={mats.wall} post={mats.steel} rail={mats.steel} h={railH} step={bay * 0.5} t={post} />
+        <Railing a={[x0, z0]} b={[x0, exitZ - gateW / 2]} wall={mats.wall} post={mats.steel} rail={mats.steel} h={railH} step={bay * 0.5} t={post} />
+        <Railing a={[x0, exitZ + gateW / 2]} b={[x0, gateZ - gateW / 2]} wall={mats.wall} post={mats.steel} rail={mats.steel} h={railH} step={bay * 0.5} t={post} />
+        <Railing a={[x0, gateZ + gateW / 2]} b={[x0, z1]} wall={mats.wall} post={mats.steel} rail={mats.steel} h={railH} step={bay * 0.5} t={post} />
       </group>
 
-      {/* the gate: two pillars, a gantry with its amber band and its word, the barrier hinged at the left pillar */}
-      <group position={[x0, y, 0]}>
-        {[gz0, gz1].map((z) => (
-          <Block key={z} w={post * 2.6} h={w * 1.9} d={post * 2.6} z={z} mat={mats.frame} />
-        ))}
-        <Block w={post * 2.4} h={post * 2.2} d={gateW + post * 2.6} y0={w * 1.9} z={gateZ} mat={mats.frame} />
-        <Block w={post * 2.45} h={post * 0.7} d={gateW * 0.8} y0={w * 1.9 + post * 0.75} z={gateZ} mat={mats.amber} />
-        <group ref={arm} position={[-post * 1.6, w * 0.55, gz0 + post * 1.3]}>
-          {Array.from({ length: 6 }, (_, k) => (
-            <Block key={k} w={post * 0.8} h={post * 0.8} d={(gateW - post * 1.4) / 6} z={(k + 0.5) * ((gateW - post * 1.4) / 6)} mat={k % 2 ? mats.white : mats.amber} />
-          ))}
-        </group>
-        <Word at={[0, w * 1.9 + post * 6, gateZ]} tone={AVAGUARD3.amber[theme]} small near={360}>
-          Validation humaine
-        </Word>
-      </group>
+      {/* the two gates: two pillars, a gantry with its amber band, the barrier hinged at a pillar; the word over the entry */}
+      {gates.map((gz, gi) => {
+        const gz0 = gz - gateW / 2;
+        return (
+          <group key={gi} position={[x0, y, 0]}>
+            {[gz0, gz + gateW / 2].map((z) => (
+              <Block key={z} w={post * 2.6} h={w * 1.9} d={post * 2.6} z={z} mat={mats.frame} />
+            ))}
+            <Block w={post * 2.4} h={post * 2.2} d={gateW + post * 2.6} y0={w * 1.9} z={gz} mat={mats.frame} />
+            <Block w={post * 2.45} h={post * 0.7} d={gateW * 0.8} y0={w * 1.9 + post * 0.75} z={gz} mat={mats.amber} />
+            <group
+              ref={(g) => {
+                arms.current[gi] = g;
+              }}
+              position={[-post * 1.6, w * 0.55, gz0 + post * 1.3]}
+            >
+              {Array.from({ length: 6 }, (_, k) => (
+                <Block key={k} w={post * 0.8} h={post * 0.8} d={(gateW - post * 1.4) / 6} z={(k + 0.5) * ((gateW - post * 1.4) / 6)} mat={k % 2 ? mats.white : mats.amber} />
+              ))}
+            </group>
+            {gi === 0 && (
+              <Word at={[0, w * 1.9 + post * 6, gz]} tone={AVAGUARD3.amber[theme]} small near={360}>
+                Avis humain
+              </Word>
+            )}
+          </group>
+        );
+      })}
 
-      {/* the warden's booth by the gate, its windows lit, the beacon on its roof */}
+      {/* the warden's booth by the aisle, its windows lit, the beacon on its roof */}
       <group position={[booth.x, y, booth.z]}>
         <Block w={booth.w} h={booth.h} d={booth.d} mat={mats.wall} />
         <Block w={booth.w * 1.12} h={post * 0.8} d={booth.d * 1.12} y0={booth.h} mat={mats.frame} />
@@ -184,40 +201,41 @@ export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
 
       {/* the bays: amber lines, numbers, wheel stops; the waiting bay ringed */}
       <group position={[0, y + 0.03, 0]}>
-        {Array.from({ length: 7 }, (_, k) => (
-          <Block key={k} w={depth} h={0.05} d={Math.max(0.22, bay * 0.05)} z={(k - 3) * bay} mat={mats.line} />
+        {Array.from({ length: nBays + 1 }, (_, k) => (
+          <Block key={k} w={depth} h={0.05} d={Math.max(0.22, bay * 0.05)} z={(k - nBays / 2) * bay} mat={mats.line} />
         ))}
-        <Block w={Math.max(0.22, bay * 0.05)} h={0.05} d={bay * 6} x={-depth / 2} mat={mats.line} />
-        {Array.from({ length: 6 }, (_, k) => (
-          <Block key={k} w={w * 0.22} h={w * 0.12} d={bay * 0.5} x={depth / 2 - w * 0.35} z={(k - 2.5) * bay} mat={mats.stop} />
+        <Block w={Math.max(0.22, bay * 0.05)} h={0.05} d={bay * nBays} x={-depth / 2} mat={mats.line} />
+        {Array.from({ length: nBays }, (_, k) => (
+          <Block key={k} w={w * 0.22} h={w * 0.12} d={bay * 0.5} x={depth / 2 - w * 0.35} z={(k - (nBays - 1) / 2) * bay} mat={mats.stop} />
         ))}
-        {Array.from({ length: 6 }, (_, k) => (
-          <Word key={k} at={[-depth / 2 + w * 0.55, 0.2, (k - 2.5) * bay]} tone={AVAGUARD3.amber[theme]} small near={260}>
+        {Array.from({ length: nBays }, (_, k) => (
+          <Word key={k} at={[-depth / 2 + w * 0.55, 0.2, (k - (nBays - 1) / 2) * bay]} tone={AVAGUARD3.amber[theme]} small near={260}>
             {`P${k + 1}`}
           </Word>
         ))}
-        <mesh position={[0, 0.06, (2 - 2.5) * bay]} rotation={[-Math.PI / 2, 0, 0]} material={mats.halo}>
-          <planeGeometry args={[depth * 0.95, bay * 0.92]} />
+        {/* where the car waits for a human, in the aisle by the booth */}
+        <mesh position={[aisleX, 0.06, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.halo}>
+          <planeGeometry args={[aisle * 0.9, geo.carL * 1.1]} />
         </mesh>
-        {/* the aisle's arrows, from the gate toward the bays */}
-        {[gateZ - side * bay * 1.1, gateZ - side * bay * 2.6].map((z) => (
-          <mesh key={z} geometry={arrow} material={mats.arrow} position={[-depth / 2 - aisle * 0.5, 0.07, z]} rotation={[0, side > 0 ? 0 : Math.PI, 0]} />
+        {/* the aisle's arrows, from the entry gate toward the exit */}
+        {[gateZ - bay * 0.9, exitZ + bay * 0.9].map((z) => (
+          <mesh key={z} geometry={arrow} material={mats.arrow} position={[aisleX, 0.07, z]} rotation={[0, Math.PI, 0]} />
         ))}
       </group>
 
       {/* the carport: posts, a flat roof, its solar panels, the amber strip under its front edge */}
       <group position={[0, y, 0]}>
         {[roofX0 + post, roofX1 - post].flatMap((x) =>
-          [-3, -1, 1, 3].map((k) => <Block key={`${x}:${k}`} w={post * 1.6} h={roofH} d={post * 1.6} x={x} z={k * bay} mat={mats.steel} />),
+          [-1, 1].map((k) => <Block key={`${x}:${k}`} w={post * 1.6} h={roofH} d={post * 1.6} x={x} z={(k * nBays * bay) / 2} mat={mats.steel} />),
         )}
-        <Block w={roofX1 - roofX0} h={w * 0.12} d={bay * 6 + w * 0.5} x={(roofX0 + roofX1) / 2} y0={roofH} mat={mats.roof} />
-        <Block w={post} h={w * 0.1} d={bay * 6 + w * 0.3} x={roofX0 + post} y0={roofH - w * 0.1} mat={mats.strip} />
+        <Block w={roofX1 - roofX0} h={w * 0.12} d={bay * nBays + w * 0.5} x={(roofX0 + roofX1) / 2} y0={roofH} mat={mats.roof} />
+        <Block w={post} h={w * 0.1} d={bay * nBays + w * 0.3} x={roofX0 + post} y0={roofH - w * 0.1} mat={mats.strip} />
         {[0, 1].map((row) =>
-          Array.from({ length: 6 }, (_, k) => {
+          Array.from({ length: nBays }, (_, k) => {
             const pw = (roofX1 - roofX0) * 0.44;
             const px = roofX0 + (roofX1 - roofX0) * (row ? 0.73 : 0.27);
             return (
-              <group key={`${row}:${k}`} position={[px, roofH + w * 0.16, (k - 2.5) * bay]} rotation={[0, 0, 0.12]}>
+              <group key={`${row}:${k}`} position={[px, roofH + w * 0.16, (k - (nBays - 1) / 2) * bay]} rotation={[0, 0, 0.12]}>
                 <Block w={pw} h={w * 0.03} d={bay * 0.94} mat={mats.solarEdge} />
                 <Block w={pw * 0.94} h={w * 0.04} d={bay * 0.88} y0={w * 0.01} mat={mats.solar} />
               </group>

@@ -80,7 +80,7 @@ export function buildPortal(scene: Object3D, kit: Kit) {
   const lightsIn = trafficLight(-9.3, 2.35);
   const lightsOut = trafficLight(SX + 3.6, 2.35);
   const barPivot = new Group();
-  barPivot.position.set(SX + 4.2, 1.0, -2.35);
+  barPivot.position.set(SX + 5.4, 1.0, -2.35); // AVAGUARD: a car length and a margin past the beam, so the city car stops short of it
   scene.add(barPivot);
   B(0.35, 1.0, 0.35, mats.yellow, SX + 4.2, 0.5, -2.35, scene);
   const barRed = kit.track(new MeshStandardMaterial({ color: raw("#d02a24"), roughness: 0.5 }));

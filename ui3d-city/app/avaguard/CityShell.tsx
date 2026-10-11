@@ -13,7 +13,7 @@ import type { District } from "@/components/explorer-v2/network/districts";
 import type { Height } from "@/components/explorer-v2/network/city-app";
 import type { PchainNetwork } from "@/lib/pchain-explorer";
 import { AVAGUARD_ID } from "@/components/explorer-v2/network/avaguard";
-import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused } from "@/sim/Director";
+import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused, stopFollow } from "@/sim/Director";
 import { parseMessage, startLiveFeed } from "@/sim/liveFeed";
 import { motion, sim, useSim, type View } from "@/sim/store";
 import { closeView, listenUrl, openView } from "@/sim/nav";
@@ -239,6 +239,7 @@ export default function CityShell() {
         case "escape":
           sim.set({ panel: null });
           setListOpen(false);
+          stopFollow();
           break;
       }
     };

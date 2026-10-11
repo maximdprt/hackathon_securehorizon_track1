@@ -88,7 +88,7 @@ function helipadTexture(): CanvasTexture | null {
   const cv = document.createElement("canvas");
   cv.width = cv.height = 256;
   const x = cv.getContext("2d")!;
-  x.fillStyle = "#4F5B66";
+  x.fillStyle = "#3F3F46"; // AVAGUARD: neutral graphite
   x.beginPath();
   x.arc(128, 128, 127, 0, Math.PI * 2);
   x.fill();
@@ -322,7 +322,7 @@ export function Buildings({
     mats.timber.color.set(ROOF.timber[t]);
     mats.cone.color.set(ROOF.cone[t]);
     mats.steel.color.set(ROOF.steel[t]);
-    mats.pad.color.set(dark ? "#9AA0AE" : "#FFFFFF");
+    mats.pad.color.set(dark ? "#9A9AA4" : "#FFFFFF"); // AVAGUARD: neutral
     mats.solar.color.set(ROOF.solar[t]);
     mats.tree.color.set(GROUND.roofTree[t]);
     mats.trunk.color.set(GROUND.trunk[t]);
@@ -349,7 +349,7 @@ export function Buildings({
   useEffect(() => {
     const t = theme;
     const white = c3(HUB3.strip[t]);
-    const lobby = c3(dark ? "#EBF0FA" : "#F4F6F9");
+    const lobby = c3(dark ? "#EDEDF2" : "#F7F7F8"); // AVAGUARD: neutral whites
     const crownOf = c3(MASS3.wall[t]).lerp(c3("#FFFFFF"), 0.62);
     const cache = new Map<Glass, Color>();
     const glassOf = (g: Glass) => cache.get(g) ?? cache.set(g, c3(GLASS3[g][t])).get(g)!;

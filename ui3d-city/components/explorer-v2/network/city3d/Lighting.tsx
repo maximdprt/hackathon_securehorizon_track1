@@ -87,8 +87,9 @@ export function takeEnv(m: Material): boolean {
    its horizon, the city's cool ground under it, the sun's glow, and at
    night the city's own faint light in the haze */
 const SKY: Record<Theme, { zenith: string; sky: string; haze: string; ground: string; sun: string; sunK: number; city: string; cityK: number }> = {
-  light: { zenith: "#EBF0FA", sky: "#E1E7F0", haze: "#D2D9E2", ground: "#7D8896", sun: "#F5F8FF", sunK: 1.6, city: "#000000", cityK: 0 },
-  dark: { zenith: "#1F1F1F", sky: "#161A21", haze: "#0D1118", ground: "#0A0C0F", sun: "#8E9AAE", sunK: 0.3, city: "#D8D2C6", cityK: 0.1 },
+  // AVAGUARD: the neutral sky the Backdrop now draws (Backdrop.tsx LOOK): no blue in it, and the night's city light a cool white
+  light: { zenith: "#FAFAFA", sky: "#F2F2F3", haze: "#E4E4E6", ground: "#85858C", sun: "#FFFFFF", sunK: 1.6, city: "#000000", cityK: 0 },
+  dark: { zenith: "#08080A", sky: "#0B0B0D", haze: "#111113", ground: "#050506", sun: "#9A9AA4", sunK: 0.3, city: "#D4D4DC", cityK: 0.08 },
 };
 
 function skyMaterial(): ShaderMaterial {
@@ -206,10 +207,11 @@ export function Lighting({ theme, rich }: { theme: Theme; rich: boolean }) {
   return (
     <>
       {/* the sky's cool fill, steel from the ground below; the sun a cool white, the night's moon a steel blue; the low fill in the sun's color, with no shadow */}
-      <hemisphereLight args={[dark ? "#9AA6B8" : "#FFFFFF", dark ? "#3B484B" : "#C9D3DF", dark ? 2.5 : 2.3]} />
+      {/* AVAGUARD: the lights in neutral white and grey, so the black and white model keeps no blue cast */}
+      <hemisphereLight args={[dark ? "#A6A6B0" : "#FFFFFF", dark ? "#3A3A40" : "#D4D4D8", dark ? 2.5 : 2.3]} />
       <directionalLight
         position={SUN.clone().multiplyScalar(1500)}
-        color={dark ? "#BCC8DC" : "#F5F8FF"}
+        color={dark ? "#C8C8D2" : "#FFFFFF"}
         intensity={dark ? 1.7 : 1.05}
         castShadow
         shadow-mapSize={[2048, 2048]}
@@ -223,7 +225,7 @@ export function Lighting({ theme, rich }: { theme: Theme; rich: boolean }) {
         shadow-normalBias={0.45}
         shadow-radius={3}
       />
-      <directionalLight position={FILL.clone().multiplyScalar(1500)} color={dark ? "#BCC8DC" : "#F5F8FF"} intensity={dark ? 0.5 : 0.45} />
+      <directionalLight position={FILL.clone().multiplyScalar(1500)} color={dark ? "#C8C8D2" : "#FFFFFF"} intensity={dark ? 0.5 : 0.45} />
     </>
   );
 }

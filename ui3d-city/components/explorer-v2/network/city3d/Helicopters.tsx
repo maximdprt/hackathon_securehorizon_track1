@@ -76,12 +76,13 @@ const RING_N = 72;
 const RING_MIN_PX = 6;
 
 /* the drone's colors, from the brand: the body and arms slate, the canopy dark glass, the rotor rings slate by day and the block grey by night, so they read as its parts, the nav light red, the beam pale blue, the ring blue */
-const BODY = "#3B484B";
-const CANOPY = "#1E2327";
-const ROTOR: Record<Theme, string> = { light: "#3B484B", dark: "#A2AFB2" };
+// AVAGUARD: Sentinel's grade: a graphite drone, its beam and ring in the accent (SIGNAL3), not our cars' control blue
+const BODY = "#2A2A2E";
+const CANOPY = "#18181B";
+const ROTOR: Record<Theme, string> = { light: "#2A2A2E", dark: "#A1A1AA" };
 const NAV = "#E6212F";
-const BEAM: Record<Theme, [string, string]> = { light: ["#749DD3", "#C5CFF5"], dark: ["#749DD3", "#C5CFF5"] };
-const RING: Record<Theme, string> = { light: "#0061E2", dark: "#5F9DFF" };
+const BEAM: Record<Theme, [string, string]> = { light: ["#8C7AE0", "#D2C9F7"], dark: ["#8C7AE0", "#D2C9F7"] };
+const RING: Record<Theme, string> = { light: "#6E56CF", dark: "#9E8CFC" };
 
 /* the brand's ease, cubic-bezier(0.16, 1, 0.3, 1): quick away, long to settle */
 function bezier(x1: number, y1: number, x2: number, y2: number) {

@@ -105,9 +105,11 @@ const SHADOW = shadowAt(0, new Vector2());
    (the fog); and the clouds' tone: the tile's mean, their contrast round
    it, their color, light and lift into the haze, the plate's shadow, and
    the fog's density */
+// AVAGUARD: Sentinel's neutral grade: an off-white sky over a pale grey sea by day, a near-black sky over a graphite sea by
+// night, the clouds drained of all their color, so the city's black and white and its one accent carry the picture
 const LOOK: Record<Theme, { zenith: string; sky: string; haze: string; mean: string; contrast: number; sat: number; tint: number; lift: number; shade: number; fog: number; flake: string; flakeA: number }> = {
-  light: { zenith: "#EBF0FA", sky: "#E1E7F0", haze: "#D2D9E2", mean: "#A5B1CF", contrast: 0.32, sat: 0.12, tint: 1.18, lift: 0.42, shade: 0.12, fog: 0.62e-4, flake: "#FFFFFF", flakeA: 0.85 },
-  dark: { zenith: "#1F1F1F", sky: "#161A21", haze: "#0D1118", mean: "#2D4A6A", contrast: 0.22, sat: 0.15, tint: 0.26, lift: 0.62, shade: 0.2, fog: 0.9e-4, flake: "#DCE4F0", flakeA: 0.55 },
+  light: { zenith: "#FAFAFA", sky: "#F2F2F3", haze: "#E4E4E6", mean: "#B4B4BA", contrast: 0.28, sat: 0, tint: 1.2, lift: 0.46, shade: 0.12, fog: 0.62e-4, flake: "#FFFFFF", flakeA: 0.85 },
+  dark: { zenith: "#08080A", sky: "#0B0B0D", haze: "#111113", mean: "#2A2A2E", contrast: 0.2, sat: 0, tint: 0.22, lift: 0.6, shade: 0.2, fog: 0.9e-4, flake: "#E4E4E7", flakeA: 0.5 },
 };
 
 /** the sun's and the moon's place: on the key light's line (Lighting.tsx), where the city's own view shows it near its upper left; a height a fixed angle under the frame's top edge, and never under the horizon when the frame shows it; and their size, as angles */
@@ -124,10 +126,11 @@ const LIFT_ROOM = (2.5 * Math.PI) / 180;
 /** the stars' band under the frame's top edge: they stand from its top down, fading out between these two angles */
 const STAR_BAND: [number, number] = [(3 * Math.PI) / 180, (5.5 * Math.PI) / 180];
 /* the sky's lights: the sun's face and the moon's, and each one's glow on the haze, a color at its strength */
-const LIGHTS = { sun: "#FFFFFF", moon: "#D6DEEA", sunGlow: ["#FFFFFF", 0.13] as const, moonGlow: ["#9AA6B8", 0.06] as const };
+// AVAGUARD: a neutral moon and glow, no blue
+const LIGHTS = { sun: "#FFFFFF", moon: "#E4E4E7", sunGlow: ["#FFFFFF", 0.13] as const, moonGlow: ["#A1A1AA", 0.05] as const };
 /** the stars: how many, all round, and their color, a cool white */
 const STARS = 260;
-const STAR = "#E6ECF5";
+const STAR = "#ECECF0"; // AVAGUARD: a neutral white
 /** how fast a theme's switch cross-fades the sky's lights, a share a second */
 const FADE_RATE = 4;
 
@@ -482,8 +485,9 @@ const PEAK_KEY = { off: 100, up: 22 };
 /** the ranges' look by theme: the snow's and the rock's albedo, the key's color at its strength (warm by day, the moon's cool
     by night) and the sky's, so the lit snow is a warm white and its shade a clear blue; and the air's color with distance */
 const PEAK_LOOK: Record<Theme, { snow: string; rock: string; key: [string, number]; sky: [string, number]; air: string }> = {
-  light: { snow: "#F6F8FC", rock: "#4E463F", key: ["#FFE0B8", 1.6], sky: ["#8DAAE0", 1.05], air: "#C3D0E3" },
-  dark: { snow: "#F6F8FC", rock: "#4E463F", key: ["#B8C6E6", 0.42], sky: ["#2E3F66", 0.16], air: "#1B2640" },
+  // AVAGUARD: the massifs in monochrome, a grey render of them: white snow over graphite rock, a neutral key and sky, no warm or blue cast
+  light: { snow: "#F4F4F5", rock: "#3A3A3E", key: ["#FFFFFF", 1.45], sky: ["#B4B4BC", 1.0], air: "#DCDCE0" },
+  dark: { snow: "#E4E4E7", rock: "#2A2A2E", key: ["#C8C8D0", 0.36], sky: ["#2A2A30", 0.14], air: "#111113" },
 };
 /** the air they stand in: how much of its color a massif takes, near and far by the camera's distance, so the nearest stands
     crisp and the farthest bluer and paler; and how much of the sea's fog they shed over their foot, from where to where */
@@ -740,7 +744,7 @@ function paintedTile(): CanvasTexture | null {
   c.width = c.height = n;
   const x = c.getContext("2d");
   if (!x) return null;
-  x.fillStyle = "#A5B1CF";
+  x.fillStyle = "#B4B4BA"; // AVAGUARD: the neutral sea (LOOK)
   x.fillRect(0, 0, n, n);
   const roll = diceOf("clouds");
   for (let i = 0; i < 80; i++) {
@@ -754,8 +758,9 @@ function paintedTile(): CanvasTexture | null {
         const py = cy + oy;
         if (px + r < 0 || px - r > n || py + r < 0 || py - r > n) continue;
         const g = x.createRadialGradient(px, py, 0, px, py, r);
-        g.addColorStop(0, light ? "rgba(226,232,246,0.5)" : "rgba(128,142,178,0.32)");
-        g.addColorStop(1, light ? "rgba(226,232,246,0)" : "rgba(128,142,178,0)");
+        // AVAGUARD: neutral puffs
+        g.addColorStop(0, light ? "rgba(236,236,240,0.5)" : "rgba(140,140,148,0.32)");
+        g.addColorStop(1, light ? "rgba(236,236,240,0)" : "rgba(140,140,148,0)");
         x.fillStyle = g;
         x.fillRect(px - r, py - r, 2 * r, 2 * r);
       }

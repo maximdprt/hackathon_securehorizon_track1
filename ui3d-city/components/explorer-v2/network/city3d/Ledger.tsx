@@ -41,8 +41,9 @@ const LIP = 2;
 /* the cut in each theme: its floor, its shadowed walls, its lit walls, the stone's lit edge under it; by night the lit
    walls are the brand's block grey, as the moon lights a carving */
 const CARVE: Record<Theme, { floor: string; shade: string; lit: string; lip: string }> = {
-  light: { floor: "rgba(70,80,86,0.3)", shade: "rgba(22,28,32,0.75)", lit: "rgba(255,255,255,0.8)", lip: "rgba(255,255,255,0.45)" },
-  dark: { floor: "rgba(0,0,0,0.3)", shade: "rgba(0,0,0,0.65)", lit: "rgba(162,175,178,0.6)", lip: "rgba(162,175,178,0.25)" },
+  // AVAGUARD: cut into Sentinel's black marble by day (Pillar.tsx) and graphite by night, its lit walls a neutral white
+  light: { floor: "rgba(0,0,0,0.35)", shade: "rgba(0,0,0,0.75)", lit: "rgba(255,255,255,0.55)", lip: "rgba(255,255,255,0.22)" },
+  dark: { floor: "rgba(0,0,0,0.3)", shade: "rgba(0,0,0,0.65)", lit: "rgba(200,200,208,0.55)", lip: "rgba(200,200,208,0.22)" },
 };
 
 /** a blank canvas the size of another */

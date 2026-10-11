@@ -1,8 +1,9 @@
-import { arcPath } from "@/components/explorer-v2/network/city-geometry";
-import { PLATE } from "@/components/explorer-v2/network/icm-map";
+import { arcPath, diceOf } from "@/components/explorer-v2/network/city-geometry"; // AVAGUARD: + diceOf, the perimeter's traces
+import { PLATE, RING_IN } from "@/components/explorer-v2/network/icm-map"; // AVAGUARD: + RING_IN, the perimeter's reach
+import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD: the perimeter is the Sentinel city's own
 import type { City } from "@/components/explorer-v2/network/city";
 import type { Ground } from "@/components/explorer-v2/network/ground";
-import { GROUND, FLEET, type Theme } from "./palette";
+import { GROUND, FLEET, SIGNAL3, type Theme } from "./palette"; // AVAGUARD: + SIGNAL3
 import type { Outskirts } from "./model";
 import type { RouteStreets } from "./lanes";
 
@@ -18,6 +19,126 @@ import type { RouteStreets } from "./lanes";
 
 /** the paint's size in pixels: about two to a unit of the plan */
 export const PAINT_PX = 2048;
+
+/* AVAGUARD: Sentinel's protected perimeter, shared by its paint here and its standing parts (Decor.tsx). The river's band,
+   between the city's last houses and the rim, now carries it: a fine bezel of ticks under a fence of slim pylons on the
+   rim, circuit traces out through the band, and a few sentinel monoliths on their pads, all clear of the box our parcel
+   stands in (the other side of the plan, KEEP) and of the hub's plaza. Plan x is the world's x, plan y the world's z. */
+export const PERIMETER = {
+  /** the fence's round, between the ledger's inner edge and the plate's rim */
+  fence: (RING_IN + PLATE) / 2 + 4,
+  /** the band the traces run through: from clear of the parcel's box and the last houses, out to the ledger */
+  band: [352, RING_IN - 8] as [number, number],
+  /** the sentinel monoliths: their plan angle (degrees, from +x toward +z), their radius and their height */
+  monoliths: [
+    { a: -158, r: 466, h: 40 },
+    { a: -122, r: 462, h: 52 },
+    { a: -90, r: 466, h: 60 },
+    { a: -58, r: 462, h: 52 },
+    { a: -22, r: 466, h: 40 },
+  ],
+};
+/** the box our parcel stands in (x from, x to, z from, z to), which nothing of the perimeter may enter, and the hub's plaza */
+export const KEEP = { box: [-215, 130, 80, 270] as [number, number, number, number], plaza: 110 };
+export const kept = (x: number, z: number, pad = 0) =>
+  Math.hypot(x, z) < KEEP.plaza + pad || (x > KEEP.box[0] - pad && x < KEEP.box[1] + pad && z > KEEP.box[2] - pad && z < KEEP.box[3] + pad);
+
+/* AVAGUARD: the perimeter's paint on the plate: a bezel of ticks round the rim under the fence, two hairline rounds bounding
+   the band, a dashed round in the accent through it, and circuit traces out from the city to the rim, each a radial run,
+   a short jog along its round and a run out again, a dot where it starts and a ring where it lands; a pad under each
+   monolith. Neutral hairlines with the accent on a few, faint enough to read as the plate's own engraving */
+function paintPerimeter(ctx: CanvasRenderingContext2D, theme: Theme) {
+  const dark = theme === "dark";
+  const ink = dark ? "rgba(255,255,255,0.085)" : "rgba(0,0,0,0.09)";
+  const inkHi = dark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.18)";
+  const accent = SIGNAL3.line[theme];
+  const accentA = (a: number) => {
+    const n = parseInt(accent.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+  };
+  const [b0, b1] = PERIMETER.band;
+  const P = (r: number, a: number): [number, number] => [r * Math.cos(a), r * Math.sin(a)];
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  const round = (r: number, color: string, w: number, dash: number[] = []) => {
+    ctx.setLineDash(dash);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = w;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  // the band's bounds and the fence's foot
+  round(b0, ink, 0.6);
+  round(b1, ink, 0.6);
+  round(PERIMETER.fence, inkHi, 0.8);
+  round((b0 + b1) / 2 + 18, accentA(dark ? 0.32 : 0.28), 0.6, [3, 5]);
+  // the bezel: a tick every degree and a half under the fence, a longer one every fifteen in the accent
+  const f = PERIMETER.fence;
+  for (let i = 0; i < 240; i++) {
+    const a = (i / 240) * Math.PI * 2;
+    const major = i % 10 === 0;
+    const [x0, y0] = P(f - (major ? 13 : 7), a);
+    const [x1, y1] = P(f - 3, a);
+    ctx.strokeStyle = major ? accentA(dark ? 0.6 : 0.55) : ink;
+    ctx.lineWidth = major ? 0.8 : 0.5;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.stroke();
+  }
+  // the traces, out from the city's side of the band to the rim's
+  const roll = diceOf("sentinel:traces");
+  const N = 44;
+  for (let i = 0; i < N; i++) {
+    const a0 = ((i + 0.5) / N) * Math.PI * 2 + (roll() - 0.5) * 0.05;
+    const r0 = b0 + 6 + roll() * 22;
+    const r1 = r0 + 24 + roll() * 50;
+    const jog = (roll() < 0.5 ? -1 : 1) * (0.03 + roll() * 0.05);
+    const r2 = b1 - 14 - roll() * 36;
+    const pts: [number, number][] = [P(r0, a0), P(r1, a0)];
+    for (let k = 1; k <= 6; k++) pts.push(P(r1, a0 + (jog * k) / 6));
+    pts.push(P(r2, a0 + jog));
+    if (pts.some(([x, y]) => kept(x, y, 12))) continue;
+    const hot = i % 4 === 1;
+    ctx.strokeStyle = hot ? accentA(dark ? 0.5 : 0.42) : inkHi;
+    ctx.lineWidth = hot ? 0.75 : 0.6;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (const p of pts.slice(1)) ctx.lineTo(p[0], p[1]);
+    ctx.stroke();
+    // its ends: a dot at the city's side, a ring where it lands
+    ctx.fillStyle = hot ? accentA(dark ? 0.7 : 0.6) : inkHi;
+    ctx.beginPath();
+    ctx.arc(pts[0][0], pts[0][1], 1.1, 0, Math.PI * 2);
+    ctx.fill();
+    const [ex, ey] = pts[pts.length - 1];
+    ctx.beginPath();
+    ctx.arc(ex, ey, 1.8, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  // a pad under each monolith: a hairline square turned to the centre, its inner edge in the accent
+  for (const m of PERIMETER.monoliths) {
+    const a = (m.a * Math.PI) / 180;
+    const [cx, cy] = P(m.r, a);
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(a);
+    ctx.strokeStyle = inkHi;
+    ctx.lineWidth = 0.6;
+    ctx.strokeRect(-7, -12, 14, 24);
+    ctx.strokeStyle = accentA(dark ? 0.7 : 0.6);
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-7, -12);
+    ctx.lineTo(-7, 12);
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+}
 
 type Pt = [number, number];
 
@@ -163,6 +284,9 @@ export function paintGround(canvas: HTMLCanvasElement, input: PaintInput) {
   ctx.arc(0, 0, city.edge + city.lot * 0.3, 0, Math.PI * 2);
   ctx.fillStyle = c(GROUND.streets);
   ctx.fill();
+
+  // AVAGUARD: the protected perimeter's engraving, in the band the river ran through
+  if (SENTINEL_ONLY) paintPerimeter(ctx, theme);
 
   // the outskirts: their plots, their parks, and each building site's fence
   for (const d of outskirts.pads) {

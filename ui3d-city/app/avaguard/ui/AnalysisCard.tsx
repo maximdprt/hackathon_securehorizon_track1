@@ -5,7 +5,7 @@ import { openView } from "@/sim/nav";
 import { cn } from "@/lib/utils";
 import { PANE, PANEL_W } from "@/components/explorer-v2/network/city-frame";
 import { CAR_PARTS, useCarGeometries } from "@/components/explorer-v2/network/city3d/carModel";
-import { answerHuman } from "@/sim/Director";
+import { answerHuman, followCar, stopFollow } from "@/sim/Director";
 import { motion, useSim } from "@/sim/store";
 import { STEPS } from "@/sim/timings";
 import { CHECK_LABEL, CHECK_ORDER, STATE, fmtAmount, fmtSecs, shortAddr, toneOf, type CheckKey, type Decision } from "@/sim/types";
@@ -152,6 +152,7 @@ export function AnalysisCard() {
   const phase = useSim((s) => s.phase);
   const panel = useSim((s) => s.panel);
   const review = useSim((s) => s.review);
+  const follow = useSim((s) => s.follow);
   const open = !!tx && phase !== "idle" && panel !== "detail";
   const done = step >= STEPS.length;
   const decided = step >= 6;
@@ -179,6 +180,16 @@ export function AnalysisCard() {
               <Badge decision={shown} pending={!decided} />
               <span className="font-mono text-[10.5px] text-zinc-500 dark:text-zinc-400">{decided ? `décidé en ${fmtSecs(tx.timings_ms.decide)}` : STEP_FR[STEPS[Math.max(0, Math.min(step, 6))]]}</span>
             </div>
+          </div>
+          <div className="flex items-center justify-between gap-2 border-b border-zinc-100 px-4 py-2 dark:border-zinc-900">
+            <span className="text-[11.5px] text-zinc-500 dark:text-zinc-400">{follow ? "La caméra suit le protocole" : "Le protocole se déroule tout seul"}</span>
+            <button
+              type="button"
+              onClick={follow ? stopFollow : followCar}
+              className="rounded-md border border-zinc-200 px-2 py-1 text-[11.5px] font-medium text-zinc-700 transition-colors hover:border-zinc-300 hover:text-zinc-900 dark:border-zinc-800 dark:text-zinc-300 dark:hover:text-zinc-50"
+            >
+              {follow ? "Libérer la caméra" : "Suivre la voiture"} <span className="font-mono text-[10px] text-zinc-400">{follow ? "Échap" : "F"}</span>
+            </button>
           </div>
           <div className="px-4 pt-3 text-[13px] text-zinc-700 dark:text-zinc-300">
             {tx.from.agent_id} <span className="text-zinc-400">→</span> {tx.to.label} <span className="text-zinc-400">·</span>{" "}

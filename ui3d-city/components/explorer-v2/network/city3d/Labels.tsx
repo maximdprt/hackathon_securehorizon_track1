@@ -563,8 +563,9 @@ export function Badges({
     const u = (mesh?.material as ShaderMaterial | undefined)?.uniforms;
     if (!u) return;
     u.uShade.value = theme === "dark" ? 0.86 : 1;
-    (u.uPlaque.value as Color).set(theme === "dark" ? "#2A3236" : "#EBF0FA");
-    (u.uInk.value as Color).set(theme === "dark" ? "#A2AFB2" : "#3B484B");
+    // AVAGUARD: neutral plaque and ink, no blue
+    (u.uPlaque.value as Color).set(theme === "dark" ? "#1E1E21" : "#F4F4F5");
+    (u.uInk.value as Color).set(theme === "dark" ? "#A1A1AA" : "#27272A");
   }, [mesh, theme]);
 
   // the logos load one by one; each shows once it is in the atlas

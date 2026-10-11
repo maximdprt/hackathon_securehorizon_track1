@@ -93,7 +93,7 @@ uniform float uRecedeK;
 /* a building recedes into the air while another set is lit by day: its massing, its roof and its glass take uRecedeK of the
    pale air over the plate, so its faces lose their contrast and it stands as a chalk ghost behind the lit ones (a darker
    haze only greyed them, and kept their shading); eased in the brand's motion (aRecede runs from .x to .y from .z) */
-export const RECEDE_U = { uHaze: { value: new Color("#E6EBF3") }, uRecedeK: { value: 0 } };
+export const RECEDE_U = { uHaze: { value: new Color("#E8E8EA") }, uRecedeK: { value: 0 } }; // AVAGUARD: neutral haze, as the sky's
 const RECEDE_BEGIN = /* glsl */ `
 {
   float rc = clamp( ( uTime - aRecede.z ) / ${BOOST_S.toFixed(2)}, 0.0, 1.0 );
@@ -162,7 +162,7 @@ const EDGE_COLOR = /* glsl */ `
 `;
 
 /** the edges' look, which the theme sets */
-export const EDGE_U = { uEdgeColor: { value: new Color("#8C98A6") }, uEdgeK: { value: 0.35 }, uEdgeW: { value: 0.1 } };
+export const EDGE_U = { uEdgeColor: { value: new Color("#8E8E93") }, uEdgeK: { value: 0.35 }, uEdgeW: { value: 0.1 } }; // AVAGUARD: neutral edge
 
 /** the white massing: lit by the sun, darker at its foot, raised with the build-out; with `veil`, its instances may carry aFade; with `edges`, a box's or a drum's crisp edges */
 export function massMaterial(opts: { perInstance?: boolean; riseAt?: { value: number }; foot?: number; key: string; veil?: boolean; edges?: "box" | "rims" }): MeshLambertMaterial {
@@ -227,8 +227,9 @@ export function glassUniforms(): GlassUniforms {
     uFlashGlow: { value: 0.8 },
     uLive: { value: 0 },
     uSky: { value: 0 },
-    uSkyTone: { value: new Color("#EEF2F8") },
-    uSill: { value: new Color("#F7F9FC") },
+    // AVAGUARD: neutral sky tone and sill, no blue
+    uSkyTone: { value: new Color("#F0F0F2") },
+    uSill: { value: new Color("#FAFAFA") },
   };
 }
 
@@ -458,7 +459,7 @@ export function badgeMaterial(atlas: Texture, mono: Texture | null = null): Shad
       uTime: TIME,
       uMaxPx: { value: PLAQUE_MAX_PX },
       uFocal: { value: 1000 },
-      uRing: { value: new Color("#A2AFB2") },
+      uRing: { value: new Color("#A1A1AA") }, // AVAGUARD: neutral
       uShade: { value: 1 },
       uPlaque: { value: new Color("#EBF0FA") },
       uInk: { value: new Color("#3B484B") },
@@ -563,7 +564,7 @@ export function haloMaterial(band: boolean, plain: { value: Color }, base: { val
       uCore: { value: 0.25 },
       uStrength: { value: 0.2 },
       uFlashK: { value: 0.7 },
-      uWarm: { value: new Color("#EBF0FA") },
+      uWarm: { value: new Color("#EDEDF2") }, // AVAGUARD: neutral
     },
     vertexShader: /* glsl */ `
       #define RISE_ATTR

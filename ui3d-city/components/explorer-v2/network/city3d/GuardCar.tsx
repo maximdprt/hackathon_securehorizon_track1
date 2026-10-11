@@ -9,7 +9,8 @@ import { useMemo, useRef, type MutableRefObject } from "react";
 import { useFrame } from "@react-three/fiber";
 import { AdditiveBlending, Color, EdgesGeometry, Group, LineBasicMaterial, MeshBasicMaterial, MeshLambertMaterial, MeshPhongMaterial, Plane, ShaderMaterial, Vector3, type Material } from "three";
 import { motion, useSim, type Paint } from "@/sim/store";
-import { CarTip, Door, OPEN } from "./Door";
+import { CarTip, Door } from "./Door";
+import { followCar } from "@/sim/Director";
 import type { Theme } from "./palette";
 import { poseAt, type GuardGeo } from "./guardGeo";
 import { YARD_FROM } from "./CityYard";
@@ -113,7 +114,7 @@ export function GuardCar({ geo, theme, share }: { geo: GuardGeo; theme: Theme; s
       dir.set(Math.cos(geo.toll.yaw), 0, Math.sin(geo.toll.yaw));
       v = dir.dot(geo.toll.p);
     } else if (motion.xray > 0.5) v = -1e9;
-    else if (motion.leg === "toCChain" && Math.hypot(p.x - geo.gate.p.x, p.z - geo.gate.p.z) < geo.carL * 1.5) {
+    else if ((motion.leg === "toCChain" || motion.leg === "parkToCChain") && Math.hypot(p.x - geo.gate.p.x, p.z - geo.gate.p.z) < geo.carL * 1.5) {
       // only at the gate: the lane winds round the hub, a plane further would cut the car on its way
       dir.set(Math.cos(geo.gate.yaw), 0, Math.sin(geo.gate.yaw));
       v = dir.dot(geo.gate.p);
@@ -128,7 +129,7 @@ export function GuardCar({ geo, theme, share }: { geo: GuardGeo; theme: Theme; s
   const tx = useSim((s) => s.tx);
   return (
     <group ref={root} visible={false}>
-      <Door name="guard:car" at={[0, w * 1.4, 0]} tip={tx ? <CarTip tx={tx} /> : null} onOpen={() => tx && OPEN.car(tx.tx_id)}>
+      <Door name="guard:car" at={[0, w * 1.4, 0]} tip={tx ? <CarTip tx={tx} /> : null} onOpen={followCar}>
         <group>
           {/* the car: its six parts, a lane's width across, its front ahead */}
           <group scale={[w, w, w]}>
