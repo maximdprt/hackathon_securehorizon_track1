@@ -8,7 +8,7 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
-import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard";
+import { SENTINEL_ONLY, SENTINEL_RING } from "@/components/explorer-v2/network/avaguard";
 import { SIGNAL3, type Theme } from "./palette";
 import { PERIMETER } from "./paint";
 import { OPENING } from "./warmup";
@@ -186,7 +186,8 @@ export function Decor({ theme }: { theme: Theme }) {
     if (grow()) invalidate();
   });
 
-  if (!SENTINEL_ONLY) return null;
+  // the ring round the protocol fills the band the perimeter stood in: the city keeps the ledger's own rim
+  if (!SENTINEL_ONLY || SENTINEL_RING) return null;
   return (
     <group ref={group}>
       {parts.meshes.map((m) => (

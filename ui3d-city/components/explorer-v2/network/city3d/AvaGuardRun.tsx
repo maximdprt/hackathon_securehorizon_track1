@@ -6,16 +6,16 @@
 // Shot), flashes the C-Chain (their HubTower, HUB_KICK) and shakes. Mounted in City3D.tsx inside <Rise>.
 import { Suspense, useEffect, useMemo, useRef, type RefObject } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { Raycaster, Vector3, type Object3D } from "three";
+import { AdditiveBlending, Color, DoubleSide, MeshBasicMaterial, MeshLambertMaterial, NormalBlending, Raycaster, ShaderMaterial, Vector3, type Object3D } from "three";
 import gsap from "gsap";
 import type { City } from "@/components/explorer-v2/network/city";
 import type { CameraHandle, Route } from "@/components/explorer-v2/network/icm-map";
 import { registerScene, type Shot as GuardShotName } from "@/sim/Director";
-import { sim, useSim } from "@/sim/store";
+import { motion, sim, useSim } from "@/sim/store";
 import { HUB_KICK } from "./HubTower";
 import type { RouteStreets } from "./lanes";
 import type { CityModel } from "./model";
-import type { Theme } from "./palette";
+import { HUB3, MASS3, type Theme } from "./palette";
 import type { Shot } from "./Rig";
 import { TIME } from "./shaders";
 import { guardGeoOf, poseAt, type GuardGeo } from "./guardGeo";
@@ -24,14 +24,20 @@ import { CityYard } from "./CityYard";
 import { HumanLot } from "./HumanLot";
 import { GuardCar, type CarMats } from "./GuardCar";
 import { Road } from "./Road";
-import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard";
+import { HOME_AZ, SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard";
 import { Door, OPEN, ParkingTip, ProofTip } from "./Door";
+
+/** a payment plays on the stage (shotsOf) unless the page says ?stage=0 */
+const STAGE = typeof window === "undefined" || new URLSearchParams(window.location.search).get("stage") !== "0";
 
 type Props = { model: CityModel; city: City; routes: Route[]; streets: RouteStreets[]; theme: Theme; still: boolean; onShot: (s: Shot | null) => void; cameraRef?: RefObject<CameraHandle | null> };
 
 /** the camera's shots over our parcel, framed by their Rig from points (Rig.tsx Shot). Each looks from aside the
-    straight road (from v: the camera stands that way of what it frames), so no tower ever stands between it and the car */
-function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
+    straight road (from v: the camera stands that way of what it frames), so no tower ever stands between it and the car.
+    The stage is the whole protocol at once, as the city's own view comes closer (its turn, HOME_AZ, and a little higher):
+    the control tower's door, the gantry, the human post, the yard, the C-Chain's gate, the skyline behind; it is where a
+    payment plays when the reader has not taken the camera */
+function shotsOf(g: GuardGeo): Record<GuardShotName | "stage", Shot> {
   const ring = (c: Vector3, r: number, n = 8) => Array.from({ length: n }, (_, i) => new Vector3(c.x + r * Math.cos((i / n) * Math.PI * 2), c.y, c.z + r * Math.sin((i / n) * Math.PI * 2)));
   const from = (r: number, f: number) => {
     const v = g.R.clone().multiplyScalar(r).addScaledVector(g.F, f);
@@ -41,6 +47,15 @@ function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
   const w = g.carW;
   const Y = g.scrapyard;
   return {
+    stage: {
+      key: "guard:stage",
+      points: [g.P(g.dbg?.dHQ ?? 0, 0), lift(g.toll.p, w * 2), g.parking.c, g.parking.gate, g.parking.exit, Y.c, Y.skip, Y.W(-5, 0, 0), Y.W(20, 0, 1), lift(Y.crusher, w * 2), g.gate.p, g.out],
+      polar: 0.82,
+      cap: 1 / 3.6,
+      fill: 0.9,
+      slow: true,
+      az: HOME_AZ,
+    },
     security: { key: "guard:security", points: [lift(g.toll.p, w * 2), g.parking.c, Y.c, Y.skip, g.gate.p, lift(g.P(g.dbg?.dHQ ?? 0, 0), w * 3)], polar: 0.85, cap: 1 / 3.2, fill: 0.9, az: from(1, 0.35) },
     follow: { key: "guard:follow", points: [...g.legs.approach.pts.filter((_, i) => i % 3 === 0).map((p) => lift(p, w)), lift(g.toll.p, w * 1.5), g.stop.p], polar: 0.72, cap: 1 / 5, fill: 0.86, az: from(1, 0.55) },
     toll: { key: "guard:toll", points: [lift(g.toll.p, w * 1.8), ...ring(g.toll.p, g.carL * 1.15)], polar: 0.66, cap: 1 / 6, fill: 0.9, az: from(1, 0.4) },
@@ -57,26 +72,69 @@ function shotsOf(g: GuardGeo): Record<GuardShotName, Shot> {
   };
 }
 
-/** the C-Chain's gate on the lane into the hub: two red pillars and a lintel across the lane; a visa's car goes through
-    it and is gone (GuardCar cuts it at the gate's plane) */
+/** the C-Chain's gate on the road into the hub: two dark pylons with a strip of the C-Chain's red down their inner faces,
+    a lintel lit underneath, and a curtain of red light across the opening that brightens as a visa's car goes through it
+    (on into the C-Chain's tower, where it is gone: guardGeo legs end at the tower's foot) */
 function CChainGate({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const { p, yaw, w } = geo.gate;
-  const h = geo.carW * 1.7;
-  const t = geo.carW * 0.22;
-  const red = "#D7263D"; // the city's red (palette.ts)
+  const h = geo.carW * 1.9;
+  const t = geo.carW * 0.3;
+  const dark = theme === "dark";
+  const red = HUB3.mark[theme]; // the city's red (palette.ts)
+  const mats = useMemo(
+    () => ({
+      pylon: new MeshLambertMaterial({ color: MASS3.frame[theme] }),
+      strip: new MeshBasicMaterial({ color: new Color(red).multiplyScalar(dark ? 1.35 : 1), toneMapped: false }),
+      veil: new ShaderMaterial({
+        uniforms: { uColor: { value: new Color(red) }, uA: { value: 0 } },
+        transparent: true,
+        depthWrite: false,
+        side: DoubleSide,
+        blending: dark ? AdditiveBlending : NormalBlending,
+        vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }",
+        // strongest at the lintel and at the pylons, a light falling across the opening
+        fragmentShader: "uniform vec3 uColor; uniform float uA; varying vec2 vUv; void main() { float e = max( pow( vUv.y, 3.0 ), pow( abs( vUv.x - 0.5 ) * 2.0, 6.0 ) ); gl_FragColor = vec4( uColor, uA * ( 0.25 + 0.75 * e ) ); }",
+      }),
+    }),
+    [theme, red, dark],
+  );
+  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
+  // the curtain: faint at rest, bright while a visa's car comes through
+  const at = useMemo(() => new Vector3(), []);
+  useFrame((_, dt) => {
+    let want = dark ? 0.1 : 0.06;
+    if (motion.visible && (motion.leg === "toCChain" || motion.leg === "parkToCChain")) {
+      const { p: car } = poseAt(geo.legs[motion.leg], motion.u, at);
+      const d = car.distanceTo(p);
+      want = Math.max(want, 0.6 * Math.max(0, 1 - d / (geo.carL * 2.2)));
+    }
+    const u = mats.veil.uniforms.uA;
+    u.value += (want - u.value) * Math.min(1, dt * 6);
+  });
   return (
     <group position={p} rotation={[0, -yaw, 0]}>
       {[-1, 1].map((side) => (
-        <mesh key={side} position={[0, h / 2, (side * (w + t)) / 2]} castShadow>
-          <boxGeometry args={[t, h, t]} />
-          <meshLambertMaterial color={red} />
-        </mesh>
+        <group key={side} position={[0, 0, (side * (w + t)) / 2]}>
+          <mesh position={[0, h / 2, 0]} material={mats.pylon} castShadow>
+            <boxGeometry args={[t, h, t]} />
+          </mesh>
+          {/* the strip down its inner face */}
+          <mesh position={[0, h * 0.48, -side * (t / 2 + 0.03)]} material={mats.strip}>
+            <boxGeometry args={[t * 0.34, h * 0.86, 0.06]} />
+          </mesh>
+        </group>
       ))}
-      <mesh position={[0, h + t / 2, 0]} castShadow>
-        <boxGeometry args={[t, t, w + t * 2]} />
-        <meshLambertMaterial color={red} />
+      <mesh position={[0, h + t * 0.45, 0]} material={mats.pylon} castShadow>
+        <boxGeometry args={[t * 1.15, t * 0.9, w + t * 2]} />
       </mesh>
-      <Word at={[0, h + geo.carW * 0.9, 0]} tone={red} small>
+      <mesh position={[0, h - 0.04, 0]} material={mats.strip}>
+        <boxGeometry args={[t * 0.4, 0.08, w]} />
+      </mesh>
+      {/* the curtain across the opening */}
+      <mesh position={[0, h / 2, 0]} rotation={[0, Math.PI / 2, 0]} material={mats.veil} renderOrder={3}>
+        <planeGeometry args={[w, h]} />
+      </mesh>
+      <Word at={[0, h + geo.carW * 1.05, 0]} tone={red} small>
         C-Chain · entrée
       </Word>
     </group>
@@ -94,15 +152,17 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
   const stillRef = useRef(still);
   stillRef.current = still;
 
-  // the camera follows the protocol only when asked (a click on the car, or F); else the city stays the reader's
+  /* the camera follows the protocol shot by shot only when asked (a click on the car, or F); else, while a payment plays
+     and the reader has not taken the camera, it stands on the stage, the whole protocol in view (?stage=0 leaves it home) */
   const follow = useSim((s) => s.follow);
   const lastShot = useRef<GuardShotName | null>(null);
   const followRef = useRef(follow);
   followRef.current = follow;
+  const staged = useRef(false);
   useEffect(() => {
     if (!shots) return;
     if (follow) onShot(shots[lastShot.current ?? "follow"]);
-    else onShot(null);
+    else onShot(staged.current ? shots.stage : null);
   }, [follow, shots, onShot]);
 
   useEffect(() => {
@@ -111,9 +171,14 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
       fly: (s) => {
         lastShot.current = s;
         if (followRef.current) onShot(shots[s]);
+        else if (STAGE && !staged.current && !cameraRef?.current?.moved) {
+          staged.current = true;
+          onShot(shots.stage);
+        }
       },
       home: () => {
         lastShot.current = null;
+        staged.current = false;
         onShot(null);
       },
       flashTower: () => {

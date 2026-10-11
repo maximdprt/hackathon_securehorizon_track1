@@ -15,7 +15,7 @@ export { DISTRICT_GLASS, EDGE, FLOOR, GLASS, GROUND, LIGHTS_MS, MASS, TALL, type
 export { HUB_CHAMFER, HUB_FACES, HUB_LOBBY, HUB_LOBBY_W, HUB_PLINTH, HUB_STEP, HUB_TAPER, chamferOf, hubMast, hubScale } from "@/components/explorer-v2/network/hub-tower";
 import { arcPath, diceOf, TILT } from "@/components/explorer-v2/network/city-geometry";
 import { BLOCK_GRAY, PICK_BLUE } from "@/components/explorer-v2/network/icm-parts";
-import type { City } from "@/components/explorer-v2/network/city";
+import type { City, Ward } from "@/components/explorer-v2/network/city"; // AVAGUARD: + Ward
 import type { District } from "@/components/explorer-v2/network/districts";
 import type { CityData } from "@/components/explorer-v2/network/city-data";
 import type { PchainNetwork } from "@/lib/pchain-explorer";
@@ -534,25 +534,30 @@ export function outskirtsOf(city: City, sites: Site[], terrain: Ground) {
   const out = { pads: [] as string[], parks: [] as string[], fences: [] as string[], masses: [] as Mass[], trees: [] as [number, number][], sites: [] as { site: Site; x: number; y: number; w: number }[] };
   // a small town's plots, whatever size the city's lots grew to
   const plot = Math.min(city.lot, 20);
-  const rIn = city.edge + 10;
   const rOut = RING_IN - 12;
   const depth = plot * 0.78;
   const road = plot * 0.34;
-  const rows = Math.min(3, Math.floor((rOut - rIn + road) / (depth + road)));
+  // AVAGUARD: with the ring round the protocol (city.ts withRing) each ward's outskirts start past its own last block, and
+  // the protocol's open arc takes as many rows as reach the ledger; else every ward's start past the city's edge, three rows
+  const ringed = !!city.roads;
+  const rInOf = (t: Ward) => (ringed ? t.r1 : city.edge) + 10;
+  const rows = Math.max(0, ...city.wards.map((t) => Math.min(ringed ? 12 : 3, Math.floor((rOut - rInOf(t) + road) / (depth + road)))));
   if (rows < 1 || !city.wards.length) return out;
   const roll = diceOf("outskirts");
   const at = (r: number, a: number): [number, number] => [CX + r * Math.cos(a), CY + r * Math.sin(a) * TILT];
   const frontier = city.wards.find((t) => t.district === "frontier") ?? [...city.wards].sort((a, b) => b.a1 - b.a0 - (a.a1 - a.a0))[0];
   const waiting = [...sites];
   for (let i = 0; i < rows; i++) {
-    const r0 = rIn + i * (depth + road);
+    for (const t of city.wards) {
+    const r0 = rInOf(t) + i * (depth + road);
     const r1 = r0 + depth;
+    if (r1 > rOut || (!ringed && i >= 3)) continue;
     const rm = (r0 + r1) / 2;
     const lotA = (plot * 0.74) / rm;
     const laneA = (plot * 0.3) / rm;
     // the city's boulevards run on out to the ledger between the wards, as roads (ground.ts)
-    const gapA = (city.avenue * 0.64 + 8) / rm;
-    for (const t of city.wards) {
+    const gapA = ((t.avenue ?? city.avenue) * 0.64 + 8) / rm;
+    {
       let a = t.a0 + gapA / 2;
       const end = t.a1 - gapA / 2;
       while (a + lotA <= end) {
@@ -585,6 +590,7 @@ export function outskirtsOf(city: City, sites: Site[], terrain: Ground) {
         }
         a = b1 + laneA;
       }
+    }
     }
   }
   out.masses.sort((a, b) => a.y - b.y);

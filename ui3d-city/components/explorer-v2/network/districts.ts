@@ -9,16 +9,17 @@
 // AVAGUARD: an eighth district, "security": agents protected, payment checks and audit proofs (our L1 stands in it)
 export type District = "gaming" | "culture" | "enterprise" | "finance" | "security" | "ai" | "infrastructure" | "frontier";
 
+// AVAGUARD: the page is in French, so are the districts' names and what they are for
 export const DISTRICTS: { key: District; label: string; about: string }[] = [
-  { key: "gaming", label: "Gaming", about: "Game worlds and their economies" },
-  { key: "culture", label: "Culture", about: "Sports, music, media and fans" },
-  { key: "enterprise", label: "Enterprise", about: "Industry, identity, loyalty and telecom" },
-  { key: "finance", label: "Finance", about: "Payments, trading, settlement and real-world assets" },
+  { key: "gaming", label: "Jeux", about: "Mondes de jeu et leurs économies" },
+  { key: "culture", label: "Culture", about: "Sport, musique, médias et fans" },
+  { key: "enterprise", label: "Entreprise", about: "Industrie, identité, fidélité et télécoms" },
+  { key: "finance", label: "Finance", about: "Paiements, échanges, règlement et actifs réels" },
   // AVAGUARD: right after Finance, so our ward stands beside the front ward, toward the viewer
-  { key: "security", label: "Security", about: "Agents protégés, contrôles de paiement et preuves d'audit" },
-  { key: "ai", label: "AI", about: "Agents, models and the data they learn from" },
-  { key: "infrastructure", label: "Infrastructure", about: "Data, connectivity and general-purpose chains" },
-  { key: "frontier", label: "Frontier", about: "L1s the directory does not describe yet, and the week's new L1s" },
+  { key: "security", label: "Sécurité", about: "Agents protégés, contrôles de paiement et preuves d'audit" },
+  { key: "ai", label: "IA", about: "Agents, modèles et les données dont ils apprennent" },
+  { key: "infrastructure", label: "Infrastructure", about: "Données, connectivité et chaînes généralistes" },
+  { key: "frontier", label: "Frontière", about: "Les L1 que l'annuaire ne décrit pas encore, et les nouvelles L1 de la semaine" },
 ];
 
 /** the order the list and the phone's browser show the districts in, finance first; the city's plan keeps DISTRICTS' order */

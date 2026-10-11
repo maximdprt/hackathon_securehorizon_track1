@@ -46,9 +46,10 @@ import { OPENING } from "./warmup";
    lined top to the paint, and what stands on it comes up as the wave passes. */
 
 /** the river's water, by day and by night: pale steel by day, a dark steel by night that keeps a sheen, and the light it takes */
+// AVAGUARD: by night the water a shade under the plate, its sheen a cool steel that only the light's angle brings up
 const RIVER = {
   light: { color: "#B9C7D6", specular: "#FFFFFF" },
-  dark: { color: "#1B2530", specular: "#5A6E84" },
+  dark: { color: "#0B1219", specular: "#2E3F52" },
 };
 
 /* the paint's wave: its front runs from the plate's middle out past the rim as OPENING.paint goes from 0 to 1, this share of the

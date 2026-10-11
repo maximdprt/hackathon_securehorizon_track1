@@ -39,15 +39,18 @@ export function Streetlights({
   const posts = useMemo(() => {
     const out: { x: number; z: number; pool: number; b: number }[] = [];
     const seams = city.wards.map((w) => w.a0);
-    city.rings.forEach((r, ri) => {
+    // AVAGUARD: each ring road at its own pitch and along its own arc, where the city has more than one plan (city.ts withRing)
+    const roads = city.roads ?? city.rings.map((r) => ({ r, pitch: city.lot, span: null }));
+    const avenueOf = (pitch: number) => (city.avenue * pitch) / city.lot;
+    roads.forEach(({ r, pitch, span }, ri) => {
       for (const side of [-1, 1]) {
-        const rr = r + side * city.lot * 0.29;
+        const rr = r + side * pitch * 0.29;
         if (rr <= 4) continue;
-        const step = (city.lot * 1.05) / rr;
-        const start = (ri % 2 ? 0.5 : 0) * step + (side > 0 ? step / 2 : 0);
-        for (let a = start; a < Math.PI * 2; a += step) {
+        const step = (pitch * 1.05) / rr;
+        const start = (span ? span[0] : 0) + (ri % 2 ? 0.5 : 0) * step + (side > 0 ? step / 2 : 0);
+        for (let a = start; a < (span ? span[1] : Math.PI * 2); a += step) {
           // a boulevard crosses here: its paving stays clear
-          const clear = (city.avenue * 0.62 + 3) / rr;
+          const clear = (avenueOf(pitch) * 0.62 + 3) / rr;
           if (seams.length > 1 && seams.some((s) => Math.abs(Math.atan2(Math.sin(a - s), Math.cos(a - s))) < clear)) continue;
           const x = rr * Math.cos(a);
           const z = rr * Math.sin(a);
@@ -60,7 +63,7 @@ export function Streetlights({
               b = i;
             }
           });
-          out.push({ x, z, pool: (r + side * city.lot * 0.12) / rr, b });
+          out.push({ x, z, pool: (r + side * pitch * 0.12) / rr, b });
         }
       }
     });

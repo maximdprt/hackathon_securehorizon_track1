@@ -3,10 +3,10 @@
 // AVAGUARD: our parcel's small pieces (not from builders-hub), on the city's own grade (palette.ts MASS3, ROOF, AVAGUARD3):
 // the words over the scene in the districts' own style (Labels.tsx HALO), the proof column at the HQ's foot and the HQ's
 // crown. The X-ray gantry and the baler yard are CityYard.tsx; the human lot is HumanLot.tsx.
-import { useMemo, useRef, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
-import { Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshLambertMaterial, Vector3 } from "three";
+import { BoxGeometry, Color, DoubleSide, EdgesGeometry, Group, LineBasicMaterial, Mesh, MeshBasicMaterial, MeshLambertMaterial, Vector3 } from "three";
 import { cn } from "@/lib/utils";
 import { motion, useSim } from "@/sim/store";
 import { HALO } from "./Labels";
@@ -53,22 +53,56 @@ export function Block({ w, h, d, x = 0, y0 = 0, z = 0, mat }: { w: number; h: nu
 /* the proof column                                                    */
 /* ------------------------------------------------------------------ */
 
+/** how many proofs the column shows (the latest), its blocks' share of the pad's size, and the gap between two */
+const PROOFS = 8;
+const CUBE = 0.52;
+const GAP = 0.07;
+
+/* the proof column at the HQ's foot: a glass column on a stepped plinth, eight blocks high, that stands even before its
+   first proof, so it reads as the ledger it is; each decision lays one block in it, green for a visa, red for a refusal,
+   lit from within at night, the latest on top; its words over it name the latest block */
 export function ProofStack({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const blocks = useSim((s) => s.blocks);
   const size = Math.max(1.6, geo.S * 0.12);
-  const mats = useMemo(() => ({ allow: lambert(AVAGUARD3.proof[theme]), block: lambert(AVAGUARD3.registry[theme]), base: lambert(MASS3.frame[theme]) }), [theme]);
+  const cube = size * CUBE;
+  const pitch = cube * (1 + GAP);
+  const base = size * 0.5;
+  const tall = PROOFS * pitch + cube * GAP;
+  const dark = theme === "dark";
+  const mats = useMemo(() => {
+    const lit = (c: string, k: number) => new MeshLambertMaterial({ color: c, emissive: new Color(c), emissiveIntensity: k });
+    return {
+      allow: lit(AVAGUARD3.proof[theme], dark ? 0.55 : 0.12),
+      block: lit(AVAGUARD3.registry[theme], dark ? 0.55 : 0.12),
+      base: lambert(MASS3.frame[theme]),
+      step: lambert(MASS3.wall[theme]),
+      glass: new MeshBasicMaterial({ color: AVAGUARD3.proof[theme], transparent: true, opacity: dark ? 0.07 : 0.1, depthWrite: false, side: DoubleSide }),
+      edge: new LineBasicMaterial({ color: AVAGUARD3.proof[theme], transparent: true, opacity: dark ? 0.42 : 0.6 }),
+      line: basic(AVAGUARD3.proof[theme]),
+    };
+  }, [theme, dark]);
+  const column = useMemo(() => new EdgesGeometry(new BoxGeometry(cube * 1.24, tall, cube * 1.24)), [cube, tall]);
+  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
+  useEffect(() => () => column.dispose(), [column]);
+  const shown = blocks.slice(-PROOFS);
   return (
     <group position={geo.proof}>
-      {/* a pedestal, stepped, so the column stands even before its first proof */}
-      <Block w={size * 2} h={size * 0.3} d={size * 2} mat={mats.base} />
-      <Block w={size * 1.5} h={size * 0.3} d={size * 1.5} y0={size * 0.3} mat={mats.base} />
-      <Block w={size * 1.5} h={size * 0.06} d={size * 1.5} y0={size * 0.6} mat={mats.allow} />
-      {blocks.map((b, i) => (
-        <mesh key={b.n} position={[0, size * 0.66 + size * (i + 0.5) * 1.08, 0]} material={b.tone === "allow" ? mats.allow : mats.block}>
-          <boxGeometry args={[size, size, size]} />
+      {/* the plinth, stepped, its top edged with the proof's green */}
+      <Block w={size * 2} h={size * 0.25} d={size * 2} mat={mats.base} />
+      <Block w={size * 1.5} h={size * 0.25} d={size * 1.5} y0={size * 0.25} mat={mats.step} />
+      <Block w={size * 1.52} h={size * 0.035} d={size * 1.52} y0={size * 0.5} mat={mats.line} />
+      {/* the glass column the blocks stack in, and its edges */}
+      <mesh position={[0, base + tall / 2, 0]} material={mats.glass} renderOrder={2}>
+        <boxGeometry args={[cube * 1.24, tall, cube * 1.24]} />
+      </mesh>
+      <lineSegments geometry={column} material={mats.edge} position={[0, base + tall / 2, 0]} />
+      <Block w={cube * 1.4} h={size * 0.08} d={cube * 1.4} y0={base + tall} mat={mats.base} />
+      {shown.map((b, i) => (
+        <mesh key={b.n} position={[0, base + cube * GAP + pitch * i + cube / 2, 0]} material={b.tone === "allow" ? mats.allow : mats.block}>
+          <boxGeometry args={[cube, cube, cube]} />
         </mesh>
       ))}
-      <Word at={[0, size * 0.66 + size * (blocks.length + 1.2) * 1.08, 0]} tone={AVAGUARD3.proof[theme]} small>
+      <Word at={[0, base + tall + size * 1.1, 0]} tone={AVAGUARD3.proof[theme]} small>
         Preuve on-chain{blocks.length ? ` · #${blocks[blocks.length - 1].n}` : ""}
       </Word>
     </group>

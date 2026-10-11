@@ -45,6 +45,8 @@ export interface CityLot extends Stop {
   rank: number;
   /** distance from downtown, 0 to 1 of the city's edge */
   reach: number;
+  // AVAGUARD: a lot of the ring round the protocol (ringCity) has a pitch of its own, the city's lot being the campus's
+  pitch?: number;
 }
 
 /** an annular sector in plan: angles in radians, clockwise on screen from the right; radii in plan px */
@@ -60,10 +62,22 @@ export interface Ward extends Arc {
   label: string;
   /** the ward's sets, largest first */
   ids: string[];
+  /** AVAGUARD: its lots' pitch and its boulevards' width, where they are not the city's (the ring round the protocol) */
+  pitch?: number;
+  avenue?: number;
 }
 
 export interface Block extends Arc {
   district: District;
+  /** AVAGUARD: its lots' pitch, where it is not the city's */
+  pitch?: number;
+}
+
+/** AVAGUARD: a ring road, its lots' pitch, and the arc it runs along where it does not go all the way round */
+export interface RingRoad {
+  r: number;
+  pitch: number;
+  span: [number, number] | null;
 }
 
 export interface City {
@@ -81,6 +95,8 @@ export interface City {
   rings: number[];
   /** the boulevards' width in plan */
   avenue: number;
+  /** AVAGUARD: every ring road with its own pitch and arc, where the city has more than one plan (the ring round the protocol) */
+  roads?: RingRoad[];
 }
 
 export interface CityGeometry {
@@ -112,16 +128,18 @@ const weightOf = (n: number) => Math.pow(n, 0.8) + 0.8;
    front ward faces the viewer: the wards before it in the city's order
    share the right half, the ones after it the left, and it stands between
    the two runs that weigh most alike. */
-function arcsOf(counts: { key: District; n: number }[]): { key: District; a0: number; a1: number }[] {
+// AVAGUARD: on an arc of the circle as well as on the whole of it (the ring round the protocol): `from` and `span` the
+// arc, `mid` where the front ward faces; by default the whole circle from behind downtown, the front ward toward the viewer
+function arcsOf(counts: { key: District; n: number }[], from = -Math.PI / 2, span = 2 * Math.PI, mid = Math.PI / 2): { key: District; a0: number; a1: number }[] {
   const front = counts.find((c) => c.key === FRONT);
   const rest = counts.filter((c) => c.key !== FRONT);
   // AVAGUARD: our ward claims room for its toll, its parking and its scrapyard beside its one lot
   const w = (c: { key: District; n: number }) => weightOf(c.key === "security" ? Math.max(c.n, SECURITY_ROOM) : c.n);
   const total = counts.reduce((a, c) => a + w(c), 0);
   if (!front || rest.length < 2) {
-    let at = -Math.PI / 2;
+    let at = from;
     return counts.map((c) => {
-      const s = (2 * Math.PI * w(c)) / total;
+      const s = (span * w(c)) / total;
       at += s;
       return { key: c.key, a0: at - s, a1: at };
     });
@@ -137,7 +155,7 @@ function arcsOf(counts: { key: District; n: number }[]): { key: District; a0: nu
       split = j;
     }
   }
-  const f = (2 * Math.PI * w(front)) / total;
+  const f = (span * w(front)) / total;
   const out: { key: District; a0: number; a1: number }[] = [];
   const lay = (run: typeof rest, from: number, to: number) => {
     const sum = run.reduce((a, c) => a + w(c), 0);
@@ -153,11 +171,13 @@ function arcsOf(counts: { key: District; n: number }[]): { key: District; a0: nu
   const right = rest.slice(0, split).reduce((a, c) => a + w(c), 0);
   const left = rest.slice(split).reduce((a, c) => a + w(c), 0);
   const even = Math.max(right, left) <= 2 * Math.min(right, left);
-  const r = even ? Math.PI - f / 2 : (2 * Math.PI * right) / total;
-  const l = even ? Math.PI - f / 2 : (2 * Math.PI * left) / total;
-  lay(rest.slice(0, split), Math.PI / 2 - f / 2 - r, Math.PI / 2 - f / 2);
-  out.push({ key: front.key, a0: Math.PI / 2 - f / 2, a1: Math.PI / 2 + f / 2 });
-  lay(rest.slice(split), Math.PI / 2 + f / 2, Math.PI / 2 + f / 2 + l);
+  const r = even ? span / 2 - f / 2 : (span * right) / total;
+  const l = even ? span / 2 - f / 2 : (span * left) / total;
+  // round the whole circle the front ward faces the viewer whatever the runs; on an arc, where the runs leave it room
+  const at = span >= 2 * Math.PI - 1e-9 ? mid : Math.min(from + span - f / 2 - l, Math.max(from + r + f / 2, mid));
+  lay(rest.slice(0, split), at - f / 2 - r, at - f / 2);
+  out.push({ key: front.key, a0: at - f / 2, a1: at + f / 2 });
+  lay(rest.slice(split), at + f / 2, at + f / 2 + l);
   return out;
 }
 
@@ -349,6 +369,97 @@ export function planCity(chains: CityChain[], g: CityGeometry): City {
   const pairs = Math.round((edge - core - ROAD * lot) / ((2 + ROAD) * lot)) + 1;
   const rings = Array.from({ length: Math.max(1, pairs) }, (_, p) => core + (ROAD * lot) / 2 + p * (2 + ROAD) * lot);
   return { lots, wards, blocks, lot, core, edge, rings, avenue: AVENUE * lot };
+}
+
+/* AVAGUARD: the ring round the protocol (not from builders-hub). In the Sentinel city the protocol keeps a plan of its
+   own (planCity with our L1 alone: the campus on its block, the C-Chain's plaza at the middle), and every other L1 of
+   the network stands round it as the skyline: the wards on the ring's arc in the city's order, Finance where the ring
+   faces the viewer, each building out in rings of blocks from the ring road past the campus, as a ward builds out from
+   downtown. Its group photo is taken from the camera's home: the tallest sets on the lots farthest from it, the lowest
+   and the newest nearest. Its lots have a pitch of their own, the largest with which every ward fits between that ring
+   road and the reach; null when even the smallest does not. */
+export function ringCity(chains: CityChain[], g: CityGeometry, ring: { road: number; span: [number, number]; facing: number; lotMax: number }): City | null {
+  const groups = new Map<District, CityChain[]>();
+  for (const c of chains) {
+    const list = groups.get(c.district);
+    if (list) list.push(c);
+    else groups.set(c.district, [c]);
+  }
+  for (const list of groups.values())
+    list.sort(
+      (a, b) =>
+        Number(a.newAt !== null) - Number(b.newAt !== null) ||
+        (a.newAt ?? 0) - (b.newAt ?? 0) ||
+        b.validators - a.validators ||
+        b.talks - a.talks ||
+        a.id.localeCompare(b.id),
+    );
+  const order = DISTRICTS.map((d) => d.key).filter((k) => (groups.get(k)?.length ?? 0) > 0);
+  if (!order.length) return null;
+  const [A0, A1] = ring.span;
+  // the front ward faces the viewer from across the ring: the camera's home looks from `facing`
+  const across = ring.facing + Math.PI;
+  const mid = A0 + ((((across - A0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI));
+  const arcs = arcsOf(
+    order.map((k) => ({ key: k, n: groups.get(k)!.length })),
+    A0,
+    A1 - A0,
+    mid,
+  );
+  order.splice(0, order.length, ...arcs.map((a) => a.key));
+  let lot = ring.lotMax;
+  let plots: (Plot | null)[] = [];
+  // the ring's own core: the inner edge of the ring road it shares with the campus's plan
+  const coreOf = (l: number) => ring.road - (ROAD * l) / 2;
+  for (; lot >= LOT_MIN; lot -= 0.5) {
+    plots = order.map((k, i) => plotWard(groups.get(k)!.length, arcs[i].a0, arcs[i].a1, lot, coreOf(lot), g.reach));
+    if (plots.every(Boolean)) break;
+  }
+  if (lot < LOT_MIN) return null;
+  const core = coreOf(lot);
+  const screen = (r: number, a: number): [number, number] => [g.cx + r * Math.cos(a), g.cy + r * Math.sin(a) * g.tilt];
+  // how far a plan point stands toward the camera's home: the group photo's order, the farthest first
+  const toward = (r: number, a: number) => r * Math.cos(a - ring.facing);
+  const lots = new Map<string, CityLot>();
+  const wards: Ward[] = [];
+  const blocks: Block[] = [];
+  let edge = core;
+  order.forEach((k, i) => {
+    const plot = plots[i]!;
+    const members = groups.get(k)!;
+    const spots = [...plot.lots].sort((p, q) => toward(p.r, p.a) - toward(q.r, q.a) || p.a - q.a);
+    members.forEach((c, rank) => {
+      const sp = spots[rank];
+      if (!sp) return;
+      const [x, y] = screen(sp.r, sp.a);
+      lots.set(c.id, { x, y, district: k, rank, reach: 0, r: sp.r, a: sp.a, road: sp.road, span: [arcs[i].a0, arcs[i].a1], pitch: lot });
+    });
+    for (const b of plot.blocks) blocks.push({ ...b, district: k, pitch: lot });
+    const r1 = Math.max(...plot.blocks.map((b) => b.r1));
+    edge = Math.max(edge, r1);
+    wards.push({ district: k, label: districtLabel(k), ids: members.map((c) => c.id), a0: arcs[i].a0, a1: arcs[i].a1, r0: core, r1, pitch: lot, avenue: AVENUE * lot });
+  });
+  for (const l of lots.values()) l.reach = Math.min(1, l.r / edge);
+  const pairs = Math.round((edge - core - ROAD * lot) / ((2 + ROAD) * lot)) + 1;
+  const rings = Array.from({ length: Math.max(1, pairs) }, (_, p) => core + (ROAD * lot) / 2 + p * (2 + ROAD) * lot);
+  return { lots, wards, blocks, lot, core, edge, rings, avenue: AVENUE * lot, roads: rings.map((r) => ({ r, pitch: lot, span: [A0, A1] })) };
+}
+
+/* AVAGUARD: the protocol's plan with the ring round it, as one city: the campus's lot stays the city's lot (the
+   protocol's scale, guardGeo.ts), the plaza and its ring road stay the city's first; our ward keeps the ring's open arc,
+   so its words and its light stand over the campus; the ring road past the campus goes all the way round it */
+export function withRing(inner: City, ring: City | null, open: [number, number]): City {
+  if (!ring) return inner;
+  const edge = Math.max(inner.edge, ring.edge);
+  const lots = new Map<string, CityLot>();
+  for (const [id, l] of [...inner.lots, ...ring.lots]) lots.set(id, { ...l, reach: Math.min(1, l.r / edge) });
+  const shared = (r: number) => ring.rings.some((q) => Math.abs(q - r) < 1);
+  const roads: RingRoad[] = [
+    ...inner.rings.map((r) => ({ r, pitch: shared(r) ? ring.lot : inner.lot, span: null })),
+    ...(ring.roads ?? []).filter((q) => !inner.rings.some((r) => Math.abs(q.r - r) < 1)),
+  ].sort((a, b) => a.r - b.r);
+  const wards = [...inner.wards.map((w) => ({ ...w, a0: open[0], a1: open[1], avenue: ring.avenue })), ...ring.wards];
+  return { lots, wards, blocks: [...inner.blocks, ...ring.blocks], lot: inner.lot, core: inner.core, edge, rings: roads.map((q) => q.r), avenue: inner.avenue, roads };
 }
 
 /** a street route in plan: [radius, angle] points, each leg along a ring road (an arc) or straight out a boulevard */

@@ -1,7 +1,7 @@
 import type { City } from "@/components/explorer-v2/network/city";
 import { arcPath, diceOf, TILT } from "@/components/explorer-v2/network/city-geometry";
-// AVAGUARD: the Sentinel-only city has no river (its outer band carries our perimeter instead, city3d/Decor.tsx)
-import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard";
+// AVAGUARD: the bare Sentinel-only city has no river; with the ring round the protocol it runs through the ring's open arc
+import { RING_SPAN, SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard";
 
 /* The city's ground as a model maker lays it: every block cut into its
    plots, the plots no L1 stands on laid to lawn with a tree or two, trees
@@ -59,6 +59,8 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
 
   /* the plots: a block holds two rows of lots, `size` across */
   city.blocks.forEach((b, i) => {
+    // AVAGUARD: a block of the ring round the protocol has its own pitch
+    const lot = b.pitch ?? city.lot;
     const m = b.r0 + lot;
     const size = Math.max(1, Math.round(((b.a1 - b.a0) * m) / lot));
     const step = (b.a1 - b.a0) / size;
@@ -95,8 +97,9 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
 
   /* the boulevards: each runs down the seam between two wards, out from
      downtown's ring road; trees stand along both sides, off the ring roads */
-  const roadHalf = lot * 0.25 + 2.5;
-  const onRing = (r: number) => city.rings.some((c) => Math.abs(r - c) < roadHalf);
+  // AVAGUARD: each ring road at its own pitch, and each ward's boulevards at its own (the ring round the protocol)
+  const ringRoads = city.roads ?? city.rings.map((r) => ({ r, pitch: lot, span: null }));
+  const onRing = (r: number) => ringRoads.some((c) => Math.abs(r - c.r) < c.pitch * 0.25 + 2.5);
   if (city.wards.length > 1) {
     for (const w of city.wards) {
       const seam = w.a0;
@@ -106,12 +109,14 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
       });
       const out = Math.max(w.r1, next?.r1 ?? w.r1);
       const roll = diceOf(`avenue:${w.district}`);
-      for (let r = city.core + lot * 0.9; r < out; r += lot * 1.3) {
+      const pitch = w.pitch ?? lot;
+      const avenue = w.avenue ?? city.avenue;
+      for (let r = w.r0 + pitch * 0.9; r < out; r += pitch * 1.3) {
         if (onRing(r)) continue;
         for (const side of [-1, 1]) {
-          const a = seam + (side * (city.avenue / 2 - 1.8)) / r;
+          const a = seam + (side * (avenue / 2 - 1.8)) / r;
           // a tree stands on a block's side, not out on open ground
-          if (!city.blocks.some((b) => r > b.r0 && r < b.r1 && Math.min(Math.abs(past(a, b.a0)), Math.abs(past(b.a1, a))) * r < city.avenue * 0.6)) continue;
+          if (!city.blocks.some((b) => r > b.r0 && r < b.r1 && Math.min(Math.abs(past(a, b.a0)), Math.abs(past(b.a1, a))) * r < avenue * 0.6)) continue;
           const [x, y] = screen(r + (roll() - 0.5) * 2, a);
           trees.push([x, y, 1.5 + roll() * 0.6]);
         }
@@ -122,13 +127,17 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
   /* the river, round the city's front through the outskirts, clockwise
      against the wards' order from just short of the Frontier */
   const frontier = city.wards.find((w) => w.district === "frontier");
-  const start = (frontier ? frontier.a0 : RIVER_START) - 5 * DEG;
+  // AVAGUARD: with the ring round the protocol (city.ts withRing), in from under the ledger just past the ring's start, round
+  // the front of the campus through the ring's open arc, and out under the ledger just past the ring's end
+  const ringed = SENTINEL_ONLY && !!city.roads;
+  const start = ringed ? RING_SPAN[0] + 20 * DEG : (frontier ? frontier.a0 : RIVER_START) - 5 * DEG;
+  const SPAN = ringed ? start - (RING_SPAN[1] - 2 * Math.PI - 22 * DEG) : RIVER_SPAN;
   const room = g.ringIn - city.edge;
   let river: River | null = null;
   let centre: (t: number) => number = () => -1;
   let width: (t: number) => number = () => 0;
   // AVAGUARD: no river in the Sentinel-only city: no bed, no banks, no bridges, no mouths at the rim
-  if (!SENTINEL_ONLY && city.wards.length && room > 40) {
+  if ((!SENTINEL_ONLY || ringed) && city.wards.length && room > 40) {
     // the city's edge at an angle: the last block of the ward it falls in
     const edgeAt = (a: number) => {
       const w = city.wards.find((o) => past(a, o.a0) <= past(o.a1, o.a0));
@@ -136,7 +145,7 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
     };
     const N = 150;
     const raw = Array.from({ length: N + 1 }, (_, i) => {
-      const a = start - (RIVER_SPAN * i) / N;
+      const a = start - (SPAN * i) / N;
       // clear of the city's last blocks by a street's width, however big its lots are
       const lo = edgeAt(a) + 12;
       const hi = g.ringIn - 14;
@@ -168,7 +177,7 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
       const outer: string[] = [];
       for (let i = 0; i <= N; i++) {
         const t = i / N;
-        const a = start - RIVER_SPAN * t;
+        const a = start - SPAN * t;
         const c = centre(t);
         const h = width(t) / 2 + grow;
         inner.push(P(c - h, a));
@@ -180,7 +189,7 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
     const roll = diceOf("river");
     for (let i = 0; i <= N; i++) {
       const t = i / N;
-      const a = start - RIVER_SPAN * t;
+      const a = start - SPAN * t;
       const c = centre(t);
       if (t > 0.1 && t < 0.9) mid.push(P(c, a));
       // trees along the banks' lawns, now one side, now the other
@@ -196,7 +205,7 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
     // a bridge where each boulevard crosses, clear of the river's mouths
     const bridges: string[] = [];
     for (const w of city.wards) {
-      const t = past(start, w.a0) / RIVER_SPAN;
+      const t = past(start, w.a0) / SPAN;
       if (t < 0.16 || t > 0.84) continue;
       const c = centre(t);
       // the deck spans the water and both banks' lawns
@@ -208,7 +217,7 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
   }
   const wet = (r: number, a: number) => {
     if (!river) return false;
-    const t = past(start, a) / RIVER_SPAN;
+    const t = past(start, a) / SPAN;
     if (t > 1.03) return false;
     return Math.abs(r - centre(Math.min(1, t))) < width(Math.min(1, t)) / 2 + 5;
   };
@@ -216,8 +225,8 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
   const roads: string[] = [];
   if (city.wards.length > 1) {
     for (const w of city.wards) {
-      const from = Math.max(w.r1, city.wards.find((o) => { const d = past(o.a1, w.a0); return d < 1e-6 || d > 2 * Math.PI - 1e-6; })?.r1 ?? w.r1) + lot * 0.2;
-      const half = (city.avenue * 0.32) / from;
+      const from = Math.max(w.r1, city.wards.find((o) => { const d = past(o.a1, w.a0); return d < 1e-6 || d > 2 * Math.PI - 1e-6; })?.r1 ?? w.r1) + (w.pitch ?? lot) * 0.2;
+      const half = ((w.avenue ?? city.avenue) * 0.32) / from;
       if (from < g.ringIn) roads.push(arcPath(w.a0 - half, w.a0 + half, from, g.ringIn + 4));
     }
   }

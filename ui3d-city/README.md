@@ -1,8 +1,27 @@
 # Sentinel City
 
 La City 3D de l'explorer Avalanche Builder Hub (code open source, BSD-3), reprise telle quelle, avec un quartier
-**Security** où vit **Sentinel L1** : un péage qui analyse chaque paiement d'agent IA, un parking de validation humaine,
+**Sécurité** où vit **Sentinel L1** : un péage qui analyse chaque paiement d'agent IA, un parking de validation humaine,
 une déchetterie avec le registre des hackers, et une colonne de preuves on-chain.
+
+## La ville
+
+Au centre, le protocole sur son campus (liseré vert) : la tour Sentinel (vitrage sarcelle, couronne verte), la route
+éclairée jusqu'à la C-Chain, le portique de radiographie, le poste d'avis humain, la presse et le registre, la colonne de
+preuves en verre où chaque décision pose un bloc (vert visa, rouge refus), la porte rouge de la C-Chain dont le rideau de
+lumière s'allume au passage d'un visa. Autour, **le reste du réseau** : les 229 autres L1 de Fuji, réelles (instantané),
+debout en amphithéâtre ouvert côté caméra (`city.ts` `ringCity`, `withRing`), les plus hautes au fond, rien entre le
+lecteur et la route ; une rivière passe devant le campus, la banlieue basse remplit le reste du plateau. Les quartiers,
+les infobulles et la légende sont en français.
+
+Pendant un paiement, si le lecteur n'a pas pris la caméra, elle se pose sur **la scène** (le protocole entier, vu de plus
+près) puis revient ; `F` ou un clic sur la voiture la fait suivre plan par plan.
+
+| Réglage | Effet |
+| --- | --- |
+| `?ring=0` ou `NEXT_PUBLIC_CITY_RING=0` | la ville du protocole seul (sans le réseau autour, avec son périmètre) |
+| `?stage=0` | la caméra reste sur la vue d'ensemble pendant un paiement |
+| `NEXT_PUBLIC_CITY_FULL=1` | la ville de builders-hub d'origine, toutes les chaînes à leur place |
 
 > City 3D d'après le code open source Avalanche Builder Hub (BSD-3) · Concept Sentinel · simulation.
 > Ce projet n'est ni affilié ni approuvé par Ava Labs. Licence d'origine : `LICENSES/builders-hub-LICENSE`.
@@ -92,7 +111,7 @@ Sans `NEXT_PUBLIC_SENTINEL_API`, tout tourne sur la simulation locale.
 ## Scripts
 
 ```bash
-npm test                  # vitest : city-wards (+ cas Security), Director (4 scènes), source des écrans
+npm test                  # vitest : city-wards (+ cas Security), city-ring (l'anneau du réseau), Director (4 scènes), source des écrans
 npm run test:visual       # Playwright (Chrome installé) : captures home / péage / déchetterie, et chaque porte, dans docs/captures
 npm run extract           # ré-extraire la City depuis un clone de builders-hub
 npm run snapshot          # ré-enregistrer l'instantané Fuji (une fois)
@@ -101,6 +120,7 @@ node tools/capture.mjs <plan.json>   # captures et images pour GIF via Chrome he
 
 ## Données
 
-Les chiffres Chains, Validators et ICM·24H sont réels et datés (instantané Fuji). Le flux ICM de Fuji étant vide au
+Les chiffres Chains, Validators et ICM·24H sont réels et datés (instantané Fuji), comme les tours de l'anneau (une par L1,
+hauteur selon ses validateurs). Le flux ICM de Fuji étant vide au
 moment de l'instantané, le trafic des rues est simulé et signalé comme tel (« ICM traffic · 24H · simulé »). Tout ce qui
 concerne Sentinel (transactions, visas, registre, montants) est simulé.

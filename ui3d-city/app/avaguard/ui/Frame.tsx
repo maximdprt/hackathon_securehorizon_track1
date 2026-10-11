@@ -131,8 +131,9 @@ const dot = (hex: string, label: string) => (
   </span>
 );
 
-/** the key, in the bottom left corner as city-key.tsx stands: what the city shows, in words */
-export function SentinelKey() {
+/** the key, in the bottom left corner as city-key.tsx stands: what the city shows, in words; `network` the other L1s that
+    stand round the protocol (the ring), 0 when the city is the protocol alone */
+export function SentinelKey({ network = 0 }: { network?: number }) {
   return (
     <div className={cn("rounded-2xl px-4 py-3", GLASS)} style={{ width: KEY_W }}>
       <p className="text-[12px] leading-snug text-zinc-700 dark:text-zinc-200">
@@ -152,6 +153,7 @@ export function SentinelKey() {
         {keyRow("Casse", "la fraude refusée, l'escroc banni")}
         {keyRow("Parking", "attend l'avis d'un humain")}
         {keyRow("Tours", "Sentinel, et la C-Chain où l'argent arrive")}
+        {network > 0 && keyRow("Ville", `les ${network.toLocaleString("fr-FR")} autres L1 d'Avalanche Fuji, réelles`)}
       </div>
       <p className="mt-2.5 border-t border-zinc-100 pt-2 font-mono text-[9px] text-zinc-400 dark:border-zinc-900 dark:text-zinc-500">Ville 3D d&apos;après Avalanche Builder Hub (open source, BSD-3) · Voiture d&apos;après « Ferrari 458 Italia » par vicent091036 (Sketchfab), simplifiée</p>
     </div>
