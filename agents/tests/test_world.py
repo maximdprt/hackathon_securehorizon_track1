@@ -347,6 +347,7 @@ def test_server_reports_llm_failures_and_refuses_what_it_should(server, monkeypa
     with urllib.request.urlopen(server + "/api/world") as r:
         w = json.loads(r.read())
     assert len(w["sites"]) == 5 and w["default_model"] in w["models"] and "wallet" not in w["sites"][0] and w["sites"][0]["preview"] == "/shop/nimbus/"
+    assert [s["color"] for s in w["sites"]] == list(world.COLORS.values())
     assert w["profile"] == {"name": "Camille Martin", "city": "Lyon", "card": "•••• •••• •••• 4242"}
 
 

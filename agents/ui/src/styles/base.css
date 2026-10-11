@@ -1,3 +1,16 @@
+/* La palette commune : toute couleur d'état, de geste ou de mouvement vient d'ici, en aplats, sans dégradé. */
+:root {
+  --ok: #1F9D55; --ok-soft: #E3F5EA;           /* validé, payé */
+  --danger: #D64545; --danger-soft: #FBE9E9;   /* bloqué, erreur */
+  --warn: #C77700; --warn-soft: #FFF1D6;       /* validation humaine, attention */
+  --k-search: #2F6FDB; --k-search-soft: #E6EEFB; /* geste : recherche et navigation */
+  --k-click: #0F9D8A; --k-click-soft: #E0F4F1;   /* geste : clic */
+  --k-type: #7A4FD6; --k-type-soft: #EEE8FB;     /* geste : saisie */
+  --k-pay: #C77700; --k-pay-soft: #FFF1D6;       /* geste : paiement */
+  --ease: cubic-bezier(.22, .8, .26, 1);       /* sortie douce : ce qui apparaît ou arrive */
+  --ease-move: cubic-bezier(.45, .05, .25, 1); /* aller-retour : ce qui se déplace */
+  --t-fast: 140ms; --t-med: 260ms; --t-slow: 420ms;
+}
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body { margin: 0; background: #E9EAEE; font-family: system-ui, sans-serif; }

@@ -49,6 +49,8 @@ PRODUCTS = {
                     "blurb": "Câble de recharge magnétique rapide vers USB-C.", "specs": ["Longueur 2 m", "Recharge rapide"]},
 }
 WATCHES = ["se-40", "series-10-42", "series-10-46", "ultra-2"]
+# la couleur d'identité de chaque boutique : la même sur son site, dans les résultats de recherche et dans l'interface
+COLORS = {"nimbus": "#2B3440", "orchard": "#2F6B3F", "meridian": "#1D6FD8", "techbazaar": "#7A3FD1", "tempo": "#C2541B"}
 
 
 def _site(name, domain, kind, why, tagline, wallet, prices, age_days, shop, extra=None):

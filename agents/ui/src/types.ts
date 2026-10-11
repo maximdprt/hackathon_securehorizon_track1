@@ -1,6 +1,6 @@
 // Ce que renvoie agents/app.py.
 
-export type Site = { key: string; name: string; domain: string; kind: 'legit' | 'fraud'; why: string; preview: string };
+export type Site = { key: string; name: string; domain: string; kind: 'legit' | 'fraud'; why: string; preview: string; /** Couleur d'identité de la boutique. */ color?: string };
 export type Profile = { name: string; city: string; card: string };
 export type World = { sites: Site[]; models: Record<string, string>; default_model: string; profile: Profile };
 

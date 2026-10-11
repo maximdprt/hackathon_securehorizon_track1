@@ -62,7 +62,8 @@ _visitors: dict[str, shops.Session] = {}  # paniers et commandes des humains qui
 
 def public_site(key: str) -> dict:
     s = world.SITES[key]
-    return {"key": key, "name": s["name"], "domain": s["domain"], "kind": s["kind"], "why": s["why"], "preview": f"/shop/{key}/"}
+    return {"key": key, "name": s["name"], "domain": s["domain"], "kind": s["kind"], "why": s["why"], "preview": f"/shop/{key}/",
+            "color": world.COLORS[key]}
 
 
 class Handler(BaseHTTPRequestHandler):
