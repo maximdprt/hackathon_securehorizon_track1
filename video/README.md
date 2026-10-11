@@ -47,3 +47,37 @@ Pour vérifier une mise en page sans tout rendre : `node video/render.mjs "$CAP"
 **Relancer le serveur de démo avant chaque capture du chat.** Le garde garde en mémoire les adresses déjà refusées : une 2ᵉ capture montrerait « déjà signalé » (confiance 18) au lieu de la première rencontre (35).
 
 Les temps des plans sont dans `compose.html` (`T`, `AGENT`, `CITY`, `EXP`, `CAPTIONS`). Ils suivent les repères écrits par `capture.mjs` dans `<plan>.marks.json` ; une nouvelle capture peut décaler ces repères de quelques dixièmes de seconde.
+
+## La visite produit, sans texte (2 min 26 s)
+
+`tour.html` parcourt le produit dans l'ordre, sans aucun mot ajouté. Le motion design se fait par des zooms, des
+projecteurs, des anneaux, des lueurs à la couleur de la décision, un retour arrière et des intermèdes en icônes
+(agent → bouclier MCP → bloc → ville).
+
+1. **Sans nous** : le garde coupé, l'agent paie la fausse boutique et sa carte fuite.
+2. **Avec nous** : le même achat est arrêté au clic, jugé par le MCP (23/100), écrit sur SentinelL1. L'explorer montre cette transaction-là, la ville en fait une voiture rouge.
+3. **Un humain dans la boucle** : un montant inhabituel attend à 65/100, « Approuver » est cliqué, le visa est émis et la voiture repart verte.
+4. **Un paiement ordinaire** : visa 100/100, la voiture entre dans la C-Chain.
+5. **Immunité** : la même fausse boutique, refusée tout de suite (déjà signalée).
+
+Ici les décisions **sont écrites sur SentinelL1**, comme le produit le fait (`agent_server.py --chain --log`). La ville
+reçoit ensuite exactement les messages que l'API lui a envoyés pour ces décisions (`capture.mjs city-replay`).
+
+```bash
+CAP=/tmp/tour/cap
+.venv/bin/python video/agent_server.py --chain --log /tmp/tour/chain_log.json &
+node video/capture.mjs chat "$CAP" c1_off    "Achète une Apple Watch Ultra 2 au meilleur prix" off
+node video/capture.mjs chat "$CAP" c2_block  "Achète une Apple Watch Ultra 2 au meilleur prix"
+node video/capture.mjs chat "$CAP" c3_human  "Achète une Apple Watch Ultra 2 chez Nimbus Store" approve
+node video/capture.mjs chat "$CAP" c4_allow  "Achète une Apple Watch SE 40 mm"
+node video/capture.mjs chat "$CAP" c5_immune "Achète une Apple Watch Ultra 2 au meilleur prix"
+kill %1
+node video/capture.mjs explorer-tx "$CAP" x_flag <flag tx du refus, dans chain_log.json>
+node video/capture.mjs city-replay "$CAP" city /tmp/tour/chain_log.json
+FILM_PAGE=video/tour.html node video/render.mjs "$CAP" /tmp/tour/video.mp4
+.venv/bin/python video/audio.py /tmp/tour/audio.wav video/tour_audio.json
+ffmpeg -i /tmp/tour/video.mp4 -i /tmp/tour/audio.wav -c:v copy -c:a aac -b:a 192k -shortest AvaGuard_Visite_Produit_1080p.mp4
+```
+
+Les temps des plans sont dans `tour.html` (`SHOTS`). Ils suivent les repères des captures ; une nouvelle capture
+peut les décaler de quelques dixièmes de seconde.

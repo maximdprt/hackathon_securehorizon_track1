@@ -3,6 +3,7 @@
 //
 //   node video/render.mjs <capDir> <out.mp4>              the whole film (video only; video/audio.sh adds the sound)
 //   node video/render.mjs <capDir> <outDir> --stills 3,40  stills at those times, to check a layout
+//   FILM_PAGE=video/tour.html node video/render.mjs …       the wordless tour instead of the first film
 import { spawn } from "node:child_process";
 import { mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -11,7 +12,7 @@ import { chromium } from "../ui3d-city/node_modules/playwright/index.mjs";
 
 const [, , capDir, out, flag, list] = process.argv;
 const FPS = 30;
-const page_url = `${pathToFileURL(resolve("video/compose.html")).href}?cap=${encodeURIComponent(pathToFileURL(resolve(capDir)).href + "/")}`;
+const page_url = `${pathToFileURL(resolve(process.env.FILM_PAGE || "video/compose.html")).href}?cap=${encodeURIComponent(pathToFileURL(resolve(capDir)).href + "/")}`;
 
 const browser = await chromium.launch({ channel: "chrome", args: ["--allow-file-access-from-files", "--autoplay-policy=no-user-gesture-required", "--hide-scrollbars"] });
 const page = await browser.newPage({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });

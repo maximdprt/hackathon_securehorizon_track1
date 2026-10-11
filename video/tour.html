@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AvaGuard+ · la visite</title>
+<style>
+  /* The product tour without a word: real footage of the product in its order, framed, zoomed and lit by the
+     decision's colour; between the shots, icons only (the agent, the MCP's shield, the chain's block, the city). */
+  :root { --bg: #0D1118; --line: #2A3440; --allow: #3FD08F; --block: #FF5D57; --human: #F2B33D; --scan: #6FA8FF; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); }
+  #stage { position: absolute; inset: 0; overflow: hidden; background: var(--bg); }
+  #grid { position: absolute; inset: -40px; background-image: radial-gradient(rgba(232,235,240,.07) 1.2px, transparent 1.3px); background-size: 34px 34px; }
+  #glow { position: absolute; left: 50%; top: 50%; width: 2200px; height: 1500px; margin: -750px 0 0 -1100px; border-radius: 50%; filter: blur(90px); opacity: .0; }
+  .screen { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 50% 50%; border-radius: 22px; overflow: hidden; opacity: 0;
+            box-shadow: 0 0 0 1px #2A3440, 0 50px 140px rgba(0,0,0,.6); background: #000; }
+  .wrap { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  .wrap video { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  .ring { position: absolute; border-radius: 14px; border: 5px solid; opacity: 0; }
+  .spot { position: absolute; border-radius: 16px; box-shadow: 0 0 0 4000px rgba(8, 10, 15, .62); opacity: 0; }
+  .ripple { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; border-radius: 50%; border: 4px solid; opacity: 0; }
+  #fx { position: absolute; inset: 0; pointer-events: none; }
+  .ico { position: absolute; opacity: 0; }
+  #black { position: absolute; inset: 0; background: #000; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="grid"></div>
+  <div id="glow"></div>
+  <div id="screens"></div>
+  <svg id="fx" width="1920" height="1080" viewBox="0 0 1920 1080"></svg>
+  <div id="black"></div>
+</div>
+<script>
+const CAP = new URLSearchParams(location.search).get("cap") || "./cap/";
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const out = (k) => 1 - Math.pow(1 - k, 3);
+/** keyframes [[t, v], …], eased between them, held before and after */
+const kf = (t, pts) => {
+  if (t <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) if (t <= pts[i][0]) return lerp(pts[i - 1][1], pts[i][1], ease(prog(t, pts[i - 1][0], pts[i][0])));
+  return pts[pts.length - 1][1];
+};
+/** the source time of a shot: [[film t, source t], …], linear between them (a speed, a freeze, a rewind) */
+const lin = (t, pts) => {
+  if (t <= pts[0][0]) return pts[0][1];
+  for (let i = 1; i < pts.length; i++) if (t <= pts[i][0]) return lerp(pts[i - 1][1], pts[i][1], prog(t, pts[i - 1][0], pts[i][0]));
+  return pts[pts.length - 1][1];
+};
+const win = (t, a, b, fi = 0.35, fo = 0.35) => Math.min(ease(prog(t, a, a + fi)), 1 - ease(prog(t, b - fo, b)));
+const C = { scan: [111, 168, 255], block: [255, 93, 87], allow: [63, 208, 143], human: [242, 179, 61], none: [13, 17, 24] };
+
+/* page regions (1920×1080 captures of the chat): the guard's switch, the « Payer » button, the chat's verdict card,
+   the order paid to the fake shop, its leaked card, the « Approuver » button, the card's proof links */
+const R = {
+  toggle: [1484, 192, 1898, 236], pay: [292, 806, 984, 876], card: [1478, 290, 1906, 1010],
+  paid: [1522, 520, 1900, 925], leak: [1532, 782, 1892, 868], approve: [1540, 795, 1710, 838],
+  proof2: [1522, 866, 1900, 912], first5: [1522, 596, 1900, 690], confirm: [200, 1180 - 1080, 1030, 760],
+};
+
+/* ---------- the shots ---------- */
+// each: clip, [in, out], src map, frame keyframes (s scale, z zoom, fx/fy zoom focus, rx tilt, cy lift), marks
+const SHOTS = [
+  { id: "cityA", clip: "city", t: [5.2, 11.6], src: [[5.2, 0.2], [11.6, 3.0]], s: [[5.2, 1.06], [11.6, 1.0]], cy: [[5.2, 0]], bleed: true },
+
+  // 1. without us: the guard switched off, the agent pays the fake shop, the card leaks
+  { id: "c1", clip: "c1_off", t: [11.2, 31.3], glow: [[12, "scan"], [24.4, "block"]],
+    src: [[11.2, 0.0], [14.6, 2.9], [21.8, 29.6], [24.2, 30.35], [25.0, 30.35], [30.0, 38.6], [31.3, 26.0]],
+    s: [[11.2, 0.6], [12.4, 0.8]], rx: [[11.2, 16], [12.4, 0]],
+    z: [[12.4, 1], [13.3, 2.1], [14.4, 2.1], [15.2, 1], [21.6, 1], [22.6, 2.3], [24.8, 2.3], [25.6, 1], [26.3, 1], [27.3, 2.0], [30.4, 2.0], [31.0, 1]],
+    fx: [[12.4, 1690], [15.2, 1690], [15.21, 960], [21.6, 960], [22.6, 638], [25.6, 638], [25.61, 1711], [31, 1711]],
+    fy: [[12.4, 214], [15.2, 214], [15.21, 540], [21.6, 540], [22.6, 841], [25.6, 841], [25.61, 720], [31, 720]],
+    blur: [[30.3, 0], [30.7, 6], [31.3, 10]], sat: [[30.3, 1], [31.2, 0.2]],
+    marks: [{ r: "toggle", c: "block", t: [12.9, 15.0], spot: true }, { r: "pay", c: "block", t: [22.6, 25.4], ripple: [638, 841, 23.9] },
+            { r: "paid", c: "block", t: [27.0, 30.6], spot: true }, { r: "leak", c: "block", t: [28.2, 30.6] }] },
+
+  // 2. with us: the guard on, the same request, stopped at « Payer », judged by the MCP, refused, written on-chain
+  { id: "c2", clip: "c2_block", t: [31.0, 45.4], glow: [[31.5, "allow"], [34.5, "scan"], [42, "human"]],
+    src: [[31.0, 0.6], [34.0, 1.2], [40.6, 27.7], [43.0, 28.4], [45.4, 28.4]],
+    s: [[31.0, 0.8]], blur: [[31.0, 8], [31.6, 0]], sat: [[31.0, 0.3], [31.8, 1]],
+    z: [[31.4, 1], [32.3, 2.1], [33.8, 2.1], [34.6, 1], [40.4, 1], [41.6, 2.4], [45.4, 2.6]],
+    fx: [[31.4, 1690], [34.6, 1690], [34.61, 960], [40.4, 960], [41.6, 638]],
+    fy: [[31.4, 214], [34.6, 214], [34.61, 540], [40.4, 540], [41.6, 841]],
+    marks: [{ r: "toggle", c: "allow", t: [32.1, 34.4], spot: true }, { r: "pay", c: "human", t: [41.6, 45.2], pulse: true, ripple: [638, 841, 42.2] }] },
+  { id: "c2b", clip: "c2_block", t: [50.4, 59.6], glow: [[50.4, "block"]],
+    src: [[50.4, 32.9], [59.6, 37.5]], s: [[50.4, 0.72], [51.4, 0.8]],
+    z: [[50.4, 1.0], [51.6, 1.9], [54.5, 1.9], [56.0, 2.5], [59.6, 2.5]],
+    fx: [[50.4, 1692], [59.6, 1700]], fy: [[50.4, 540], [51.6, 470], [54.5, 470], [56.0, 880]],
+    marks: [{ r: "card", c: "block", t: [51.4, 55.2], spot: true }, { r: "proof2", c: "allow", t: [56.2, 59.4] }] },
+  { id: "xf", clip: "x_flag", t: [59.2, 65.6], glow: [[59.2, "allow"]], src: [[59.2, 0], [62.4, 0.2], [65.6, 4]],
+    s: [[59.2, 0.62], [60.2, 0.78]], rx: [[59.2, -14], [60.2, 0]], z: [[60.2, 1], [61.2, 1.5], [65.6, 1.5]], fx: [[60.2, 960], [61.2, 700]], fy: [[60.2, 540], [61.2, 300], [62.6, 300], [63.4, 520]] },
+
+  // the city: the same decision as a car, white, scanned, red, to the yard, its address to the registry
+  { id: "cityB", clip: "city", t: [65.2, 81.4], glow: [[65.2, "scan"], [70, "block"]], src: [[65.2, 3.0], [81.4, 24.7]], s: [[65.2, 0.86], [66.4, 0.9]], cy: [[65.2, -10]] },
+
+  // 3. a human in the loop: an unusual amount, held; « Approuver »; the visa; the parked car leaves green
+  { id: "c3", clip: "c3_human", t: [81.0, 97.6], glow: [[81.2, "scan"], [86, "human"], [93.6, "allow"]],
+    src: [[81.0, 3.4], [85.6, 28.4], [86.4, 32.7], [92.2, 37.9], [94.6, 40.6], [97.6, 44.2]],
+    s: [[81.0, 0.62], [82.0, 0.8]], rx: [[81.0, 14], [82.0, 0]],
+    z: [[81, 1], [86.2, 1], [87.2, 1.9], [91.4, 1.9], [92.4, 2.6], [94.8, 2.6], [95.6, 1.9]],
+    fx: [[81, 960], [86.2, 960], [87.2, 1692], [91.4, 1692], [92.4, 1625], [94.8, 1625], [95.6, 1692]],
+    fy: [[81, 540], [86.2, 540], [87.2, 560], [91.4, 650], [92.4, 816], [94.8, 816], [95.6, 760]],
+    marks: [{ r: "card", c: "human", t: [87.2, 91.6], spot: true }, { r: "approve", c: "allow", t: [91.8, 95.2], pulse: true, ripple: [1625, 816, 93.4] }] },
+  { id: "cityC", clip: "city", t: [97.2, 104.2], glow: [[97.2, "human"], [101.2, "allow"]], src: [[97.2, 30.6], [104.2, 44.0]], s: [[97.2, 0.86], [98.2, 0.9]], cy: [[97.2, -10]] },
+
+  // 4. an ordinary payment: through at once, the order confirmed, the visa, the car into the C-Chain
+  { id: "c4", clip: "c4_allow", t: [103.8, 114.4], glow: [[104, "scan"], [109, "allow"]],
+    src: [[103.8, 3.3], [108.4, 27.3], [114.4, 36.9]], s: [[103.8, 0.62], [104.8, 0.8]], rx: [[103.8, -14], [104.8, 0]],
+    z: [[103.8, 1], [108.6, 1], [109.6, 1.7], [111.4, 1.7], [112.4, 1.9], [114.4, 1.9]],
+    fx: [[103.8, 960], [108.6, 960], [109.6, 560], [111.4, 560], [112.4, 1692]], fy: [[103.8, 540], [108.6, 540], [109.6, 500], [111.4, 500], [112.4, 560]],
+    marks: [{ r: "card", c: "allow", t: [112.2, 114.2], spot: true }] },
+  { id: "cityD", clip: "city", t: [114.0, 120.6], glow: [[114, "allow"]], src: [[114.0, 46.2], [120.6, 57.2]], s: [[114.0, 0.86], [115.0, 0.9]], cy: [[114.0, -10]] },
+
+  // 5. immunity: the same fake shop again, refused at once; the city's car to the yard
+  { id: "c5", clip: "c5_immune", t: [120.2, 130.0], glow: [[120.4, "scan"], [125.2, "block"]],
+    src: [[120.2, 3.4], [124.6, 28.4], [125.4, 32.7], [130.0, 37.3]], s: [[120.2, 0.62], [121.2, 0.8]], rx: [[120.2, 14], [121.2, 0]],
+    z: [[120.2, 1], [125.0, 1], [126.0, 1.9], [130, 2.1]], fx: [[120.2, 960], [125.0, 960], [126.0, 1692]], fy: [[120.2, 540], [125.0, 540], [126.0, 470], [127.6, 470], [128.6, 640]],
+    marks: [{ r: "first5", c: "block", t: [127.8, 129.8] }] },
+  { id: "cityE", clip: "city", t: [129.6, 137.6], glow: [[129.6, "block"]], src: [[129.6, 58.0], [137.6, 79.7]], s: [[129.6, 0.86], [130.6, 0.9]], cy: [[129.6, -10]] },
+  { id: "cityF", clip: "city", t: [137.2, 146], src: [[137.2, 79.7], [146, 84.0]], s: [[137.2, 0.9], [146, 1.04]], bleed: true },
+];
+const END = 146;
+
+/* ---------- the icon interludes (no word) ---------- */
+const ICON = {
+  agent: `<svg width="150" height="150" viewBox="0 0 64 64"><rect x="8" y="12" width="48" height="34" rx="9" fill="#121620" stroke="#E8EBF0" stroke-width="2.5"/><path d="M20 46 L16 56 L30 46" fill="#121620" stroke="#E8EBF0" stroke-width="2.5" stroke-linejoin="round"/><circle cx="24" cy="29" r="3.2" fill="#6FA8FF"/><circle cx="40" cy="29" r="3.2" fill="#6FA8FF"/></svg>`,
+  shield: `<svg width="260" height="260" viewBox="0 0 64 64"><path id="shp" d="M32 8 L50 15 V31 C50 42 42 50 32 55 C22 50 14 42 14 31 V15 Z" fill="#0f2a1f" stroke="#3FD08F" stroke-width="2.4" stroke-linejoin="round"/><path id="chk" d="M24.5 32 L30 37.5 L40 26.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  block: `<svg width="170" height="170" viewBox="0 0 64 64"><path d="M32 6 L56 19 V45 L32 58 L8 45 V19 Z" fill="#121620" stroke="#3FD08F" stroke-width="2.4" stroke-linejoin="round"/><path d="M8 19 L32 32 L56 19 M32 32 V58" fill="none" stroke="#3FD08F" stroke-width="2" opacity=".7"/></svg>`,
+  city: `<svg width="180" height="150" viewBox="0 0 72 60"><path d="M4 56 H68" stroke="#E8EBF0" stroke-width="2.4"/><rect x="10" y="30" width="10" height="26" fill="#1C222B" stroke="#E8EBF0" stroke-width="2"/><rect x="24" y="16" width="12" height="40" fill="#1C222B" stroke="#E8EBF0" stroke-width="2"/><rect x="40" y="6" width="10" height="50" fill="#2a0d12" stroke="#D7263D" stroke-width="2"/><rect x="54" y="26" width="10" height="30" fill="#1C222B" stroke="#E8EBF0" stroke-width="2"/></svg>`,
+  logo: `<svg width="360" height="360" viewBox="0 0 64 64"><circle id="lgc" cx="32" cy="32" r="30" fill="#0f2a1f" stroke="#3FD08F" stroke-width="1.2" opacity=".9"/><path id="lgs" d="M32 12 L48 18 V31 C48 41 41 48 32 52 C23 48 16 41 16 31 V18 Z" fill="none" stroke="#3FD08F" stroke-width="3" stroke-linejoin="round"/><path id="lgk" d="M24.5 32 L30 37.5 L40 26.5" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+};
+// the MCP interlude (45.2–50.8): the click flies from the agent to the shield; seven layers light, two of them red; the
+// verdict's arc closes short, red; a block forms. The chain interlude rides on the same pieces.
+const LAYERS = 7;
+
+function build() {
+  const clips = [...new Set(SHOTS.map((s) => s.clip))];
+  const holder = $("screens");
+  for (const s of SHOTS) {
+    const scr = document.createElement("div"); scr.className = "screen"; scr.id = "scr_" + s.id;
+    const wrap = document.createElement("div"); wrap.className = "wrap"; wrap.id = "wrap_" + s.id;
+    const v = document.createElement("video"); v.muted = true; v.preload = "auto"; v.src = CAP + s.clip + ".mp4"; v.id = "v_" + s.id;
+    wrap.appendChild(v);
+    for (const [i, m] of (s.marks || []).entries()) {
+      const [x0, y0, x1, y1] = R[m.r];
+      const col = `rgb(${C[m.c].join(",")})`;
+      if (m.spot) { const sp = document.createElement("div"); sp.className = "spot"; sp.id = `sp_${s.id}_${i}`; Object.assign(sp.style, { left: x0 - 10 + "px", top: y0 - 10 + "px", width: x1 - x0 + 20 + "px", height: y1 - y0 + 20 + "px" }); wrap.appendChild(sp); }
+      const rg = document.createElement("div"); rg.className = "ring"; rg.id = `rg_${s.id}_${i}`;
+      Object.assign(rg.style, { left: x0 - 10 + "px", top: y0 - 10 + "px", width: x1 - x0 + 20 + "px", height: y1 - y0 + 20 + "px", borderColor: col, boxShadow: `0 0 36px rgba(${C[m.c].join(",")},.55)` });
+      wrap.appendChild(rg);
+      if (m.ripple) { const rp = document.createElement("div"); rp.className = "ripple"; rp.id = `rp_${s.id}_${i}`; Object.assign(rp.style, { left: m.ripple[0] + "px", top: m.ripple[1] + "px", borderColor: col }); wrap.appendChild(rp); }
+    }
+    scr.appendChild(wrap);
+    if (s.bleed) { scr.style.borderRadius = "0"; scr.style.boxShadow = "none"; }
+    holder.appendChild(scr);
+  }
+  for (const [k, svg] of Object.entries(ICON)) { const d = document.createElement("div"); d.className = "ico"; d.id = "ico_" + k; d.innerHTML = svg; $("stage").insertBefore(d, $("fx")); }
+  const fx = $("fx");
+  fx.innerHTML = `
+    <defs><filter id="gl"><feGaussianBlur stdDeviation="6" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+    <path id="beam" fill="none" stroke="#6FA8FF" stroke-width="5" stroke-linecap="round" filter="url(#gl)" opacity="0"/>
+    <circle id="packet" r="11" fill="#E8EBF0" filter="url(#gl)" opacity="0"/>
+    <g id="orbit">${Array.from({ length: LAYERS }, (_, i) => `<circle id="ly${i}" r="17" fill="#121620" stroke="#2A3440" stroke-width="4" opacity="0"/>`).join("")}</g>
+    <circle id="arcbg" cx="960" cy="540" r="250" fill="none" stroke="#1C222B" stroke-width="14" opacity="0"/>
+    <circle id="arc" cx="960" cy="540" r="250" fill="none" stroke="#FF5D57" stroke-width="14" stroke-linecap="round" transform="rotate(-90 960 540)" opacity="0"/>
+    <g id="chain">${[0, 1, 2, 3].map((i) => `<g id="cb${i}" opacity="0"><path d="M0 -60 L52 -30 V30 L0 60 L-52 30 V-30 Z" fill="#121620" stroke="#2A3440" stroke-width="4" stroke-linejoin="round"/><path d="M-52 -30 L0 0 L52 -30 M0 0 V60" fill="none" stroke="#2A3440" stroke-width="3"/></g>`).join("")}</g>`;
+}
+
+const seekTo = (v, at) => new Promise((resolve) => {
+  at = Math.max(0, Math.min(at, (v.duration || 1e9) - 0.03));
+  if (Math.abs(v.currentTime - at) < 1 / 120 && v.readyState >= 2) return resolve();
+  const done = () => { v.removeEventListener("seeked", done); resolve(); };
+  v.addEventListener("seeked", done); v.currentTime = at; setTimeout(done, 3000);
+});
+const place = (id, x, y, sc, o) => { const e = $(id); e.style.opacity = o; e.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${sc})`; e.style.left = "0"; e.style.top = "0"; };
+
+async function renderAt(t) {
+  const waits = [];
+  let glowCol = null, glowO = 0;
+  for (const s of SHOTS) {
+    const scr = $("scr_" + s.id);
+    const [a, b] = s.t;
+    const vis = t >= a && t < b;
+    scr.style.visibility = vis ? "visible" : "hidden";
+    if (!vis) { scr.style.opacity = 0; continue; }
+    const o = win(t, a, b, 0.45, 0.45);
+    scr.style.opacity = o;
+    waits.push(seekTo($("v_" + s.id), lin(t, s.src)));
+    const sc = kf(t, s.s || [[0, 0.8]]), rx = kf(t, s.rx || [[0, 0]]), cy = kf(t, s.cy || [[0, -20]]);
+    const z = kf(t, s.z || [[0, 1]]), fx = kf(t, s.fx || [[0, 960]]), fy = kf(t, s.fy || [[0, 540]]);
+    scr.style.transform = `translate(-50%, calc(-50% + ${cy}px)) perspective(2600px) rotateX(${rx}deg) scale(${sc})`;
+    const tx = clamp(960 - fx * z, 1920 - 1920 * z, 0), ty = clamp(540 - fy * z, 1080 - 1080 * z, 0);
+    $("wrap_" + s.id).style.transform = `translate(${tx}px, ${ty}px) scale(${z})`;
+    const blur = kf(t, s.blur || [[0, 0]]), sat = kf(t, s.sat || [[0, 1]]);
+    scr.style.filter = blur > 0.05 || sat < 0.99 ? `blur(${blur}px) saturate(${sat})` : "none";
+    for (const [i, m] of (s.marks || []).entries()) {
+      const k = win(t, m.t[0], m.t[1], 0.4, 0.4);
+      const pulse = m.pulse ? 0.7 + 0.3 * Math.sin((t - m.t[0]) * 7) : 1;
+      $(`rg_${s.id}_${i}`).style.opacity = k * pulse;
+      if (m.spot) $(`sp_${s.id}_${i}`).style.opacity = k;
+      if (m.ripple) { const rp = $(`rp_${s.id}_${i}`); const r = prog(t, m.ripple[2], m.ripple[2] + 0.9); rp.style.opacity = r > 0 && r < 1 ? 1 - r : 0; rp.style.transform = `scale(${1 + r * 5})`; }
+    }
+    if (s.glow) { const g = s.glow.filter(([gt]) => t >= gt).pop(); if (g) { glowCol = C[g[1]]; glowO = Math.max(glowO, o); } }
+  }
+  /* the ambient glow, in the decision's colour */
+  if (glowCol) { $("glow").style.background = `radial-gradient(closest-side, rgba(${glowCol.join(",")},.30), rgba(${glowCol.join(",")},0))`; }
+  $("glow").style.opacity = glowO;
+  $("grid").style.transform = `translate(${(t * 6) % 34}px, ${(t * 3) % 34}px)`;
+
+  /* opening: the shield draws itself, then opens onto the city */
+  {
+    const k = win(t, 0.3, 6.0, 0.6, 0.9);
+    place("ico_logo", 960, 540, lerp(0.9, 1.0, out(prog(t, 0.3, 3))) * lerp(1, 2.6, ease(prog(t, 4.6, 6.0))), k);
+    const L = 150, d = 1 - ease(prog(t, 0.6, 2.6)), kk = 1 - ease(prog(t, 2.2, 3.2));
+    const lgs = document.getElementById("lgs"), lgk = document.getElementById("lgk");
+    if (lgs) { lgs.style.strokeDasharray = L; lgs.style.strokeDashoffset = L * d; lgk.style.strokeDasharray = 30; lgk.style.strokeDashoffset = 30 * kk; }
+    // the outro: the shield again, over the city
+    if (t > 139) { place("ico_logo", 960, 520, lerp(0.7, 0.8, ease(prog(t, 139.5, 142))), win(t, 139.5, 146, 1.2, 1.0)); if (lgs) { lgs.style.strokeDashoffset = 0; lgk.style.strokeDashoffset = 0; } }
+  }
+
+  /* the MCP interlude (45.2–50.8): agent → shield (seven layers) → the verdict's arc, short and red → a block */
+  {
+    const k = win(t, 45.2, 50.8, 0.4, 0.5);
+    const ag = [330, 540], sh = [960, 540], bl = [1590, 540];
+    place("ico_agent", ag[0], ag[1], 1, k * (1 - prog(t, 49.6, 50.2)));
+    place("ico_shield", sh[0], sh[1], lerp(0.85, 1, out(prog(t, 45.4, 46.2))), k);
+    const p = ease(prog(t, 45.6, 46.6));
+    $("packet").setAttribute("cx", lerp(ag[0] + 80, sh[0] - 130, p)); $("packet").setAttribute("cy", ag[1]);
+    $("packet").setAttribute("opacity", t > 45.6 && t < 46.7 ? 1 : 0);
+    $("beam").setAttribute("d", `M${ag[0] + 80} ${ag[1]} L${lerp(ag[0] + 80, sh[0] - 130, p)} ${ag[1]}`);
+    $("beam").setAttribute("opacity", k * (t < 47.4 ? 1 : 1 - prog(t, 47.4, 47.9)) * (t > 45.6 ? 1 : 0));
+    for (let i = 0; i < LAYERS; i++) {
+      const ang = -Math.PI / 2 + (i * 2 * Math.PI) / LAYERS, rr = 250;
+      const c = $("ly" + i); c.setAttribute("cx", sh[0] + rr * Math.cos(ang)); c.setAttribute("cy", sh[1] + rr * Math.sin(ang));
+      const lit = t > 46.7 + i * 0.16;
+      const bad = i === 1 || i === 3 || i === 4; // the layers that flag this order: mandate (rule), counterparty, transaction
+      c.setAttribute("opacity", k * clamp((t - 46.5 - i * 0.16) * 4));
+      c.setAttribute("stroke", lit ? (bad ? "#FF5D57" : "#6FA8FF") : "#2A3440");
+      c.setAttribute("fill", lit && bad ? "#2a0d12" : "#121620");
+    }
+    const circ = 2 * Math.PI * 250, closes = ease(prog(t, 48.0, 49.1)) * 0.23; // trust 23/100: the arc closes short
+    $("arcbg").setAttribute("opacity", k * prog(t, 47.8, 48.1));
+    $("arc").setAttribute("opacity", k * prog(t, 47.9, 48.1));
+    $("arc").setAttribute("stroke-dasharray", `${circ * closes} ${circ}`);
+    // the shield turns red: refused
+    const red = prog(t, 49.0, 49.3);
+    const shp = document.getElementById("shp"); if (shp) { shp.setAttribute("stroke", red > 0.5 ? "#FF5D57" : "#3FD08F"); shp.setAttribute("fill", red > 0.5 ? "#2a0d12" : "#0f2a1f"); }
+    const chk = document.getElementById("chk"); if (chk) chk.setAttribute("d", red > 0.5 ? "M25 25 L39 39 M39 25 L25 39" : "M24.5 32 L30 37.5 L40 26.5");
+    place("ico_block", bl[0], bl[1], lerp(0.6, 1, out(prog(t, 49.6, 50.2))), k * prog(t, 49.6, 50.0));
+  }
+
+  /* the chain interlude, over the explorer (59.2–65.6): three blocks, a fourth drops in and locks, green */
+  {
+    const k = win(t, 59.0, 65.4, 0.4, 0.5);
+    for (let i = 0; i < 4; i++) {
+      const g = $("cb" + i);
+      const x = 200 + i * 0, y = 290 + i * 150;
+      const drop = i === 3 ? out(prog(t, 60.2, 61.0)) : 1;
+      g.setAttribute("transform", `translate(${150}, ${y - (1 - drop) * 160}) scale(${0.8})`);
+      g.setAttribute("opacity", k * (i < 3 ? clamp((t - 59.2 - i * 0.12) * 3) : drop));
+      const lock = i === 3 && t > 61.0;
+      g.querySelectorAll("path").forEach((p) => p.setAttribute("stroke", lock ? "#3FD08F" : "#2A3440"));
+    }
+  }
+  place("ico_city", 0, 0, 1, 0);
+
+  $("black").style.opacity = Math.max(1 - prog(t, 0, 0.6), prog(t, END - 1.2, END));
+  await Promise.all(waits);
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+}
+
+window.FILM = { END, renderAt, ready: (async () => {
+  build();
+  await Promise.all([...document.querySelectorAll("video")].map((v) => new Promise((r) => { if (v.readyState >= 2) r(); else v.addEventListener("loadeddata", r, { once: true }); })));
+  return true;
+})() };
+</script>
+</body>
+</html>

@@ -2,8 +2,10 @@
 discreet effects on the action (a tick per check, a dull thud on a refusal, a clear chime on a visa, a breath between
 acts). Times follow video/compose.html's timeline.
 
-    .venv/bin/python video/audio.py <out.wav>
+    .venv/bin/python video/audio.py <out.wav>                      # the first film's cues
+    .venv/bin/python video/audio.py <out.wav> video/tour_audio.json  # another film's: {"end", "whoosh": [t…], "cues": [[name, t]…]}
 """
+import json
 import subprocess
 import sys
 
@@ -35,6 +37,10 @@ CUES = [
     *[("tick", 124.3 + i * 0.35) for i in range(4)],
     ("end", 131.2),
 ]
+
+if len(sys.argv) > 2:  # another film's timeline
+    spec = json.loads(open(sys.argv[2], encoding="utf-8").read())
+    END, WHOOSH, CUES = spec["end"], spec["whoosh"], [tuple(c) for c in spec["cues"]]
 
 inputs, chains, labels = [], [], []
 inputs += ["-f", "lavfi", "-i", f"aevalsrc='{PAD}|{PAD_R}':s=48000:d={END}"]

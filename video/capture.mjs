@@ -175,3 +175,114 @@ if (shot === "explorer") {
     mark("end");
   }, { scheme: "dark" });
 }
+
+// node video/capture.mjs chat <outDir> <name> "<request>" [off|approve]
+//   one run in the chat: optionally with the guard switched off, or a human approving a held payment from the card
+if (shot === "chat") {
+  const [, , , , name, request, how = ""] = process.argv;
+  await record(name, "http://127.0.0.1:8765/", async (page, { go, mark }) => {
+    await page.getByRole("heading", { level: 1 }).first().waitFor();
+    await page.waitForTimeout(800);
+    await go();
+    await page.waitForTimeout(1200);
+    mark("ready");
+    if (how === "off") {
+      const sw = page.getByRole("checkbox", { name: /Garde/ });
+      await sw.locator("xpath=..").hover();
+      await page.waitForTimeout(500);
+      mark("switch");
+      await sw.locator("xpath=..").click();
+      await page.waitForTimeout(1200);
+      mark("switched");
+    }
+    const box = page.getByLabel("Demande pour l'agent");
+    await box.click();
+    mark("typing");
+    await box.pressSequentially(request, { delay: 45 });
+    await page.waitForTimeout(400);
+    await box.press("Enter");
+    mark("sent");
+    await page.getByText(/Choisit /).first().waitFor({ timeout: 120_000 });
+    mark("chose");
+    await page.getByText(/Clique sur « Payer/).first().waitFor({ timeout: 180_000 });
+    mark("pay");
+    // the end: the order (no guard), or the SentinelL1 card
+    if (how === "off") {
+      await page.getByText(/Commande passée chez/).first().waitFor({ timeout: 60_000 });
+      mark("paid");
+      await page.getByText(/Bac à sable/).first().scrollIntoViewIfNeeded().catch(() => {});
+      await page.waitForTimeout(6000);
+    } else {
+      const card = page.getByRole("region", { name: "Vérification SentinelL1" });
+      await card.waitFor({ timeout: 90_000 });
+      mark("card");
+      await card.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(4500);
+      if (how === "approve") {
+        const ok = card.getByRole("button", { name: "Approuver" });
+        await ok.scrollIntoViewIfNeeded();
+        await ok.hover();
+        await page.waitForTimeout(700);
+        mark("approve");
+        await ok.click();
+        await card.getByText(/Approuvé par un humain/).waitFor({ timeout: 90_000 });
+        mark("approved");
+        await page.waitForTimeout(3500);
+      }
+    }
+    mark("end");
+  });
+}
+
+// node video/capture.mjs explorer-tx <outDir> <name> <txHash>: one transaction's page (read only)
+if (shot === "explorer-tx") {
+  const [, , , , name, hash] = process.argv;
+  await record(name, `https://explorer.petroi.fr/tx/${hash}`, async (page, { go, mark }) => {
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForTimeout(2500);
+    await go();
+    await page.waitForTimeout(1000);
+    mark("tx");
+    await page.mouse.wheel(0, 420);
+    await page.waitForTimeout(2200);
+    mark("data");
+    await page.waitForTimeout(3000);
+    mark("end");
+  });
+}
+
+// node video/capture.mjs city-replay <outDir> <name> <messages.json>: the city receiving, in order, the messages the
+// chain's API sent it for these decisions (the same verdicts, contexts and proofs), each car followed to its end
+if (shot === "city-replay") {
+  const [, , , , name, file] = process.argv;
+  const msgs = JSON.parse((await import("node:fs")).readFileSync(file, "utf-8"));
+  await record(name, "https://city.petroi.fr/?live=0", async (page, { go, mark }) => {
+    await until(page, () => !!window.__ag);
+    await page.waitForTimeout(11_000);
+    await go();
+    await page.waitForTimeout(3000);
+    mark("wide");
+    for (const [i, m] of msgs.entries()) {
+      // a settled answer moves the parked car: it is sent once that car waits at the post
+      if (m.verdict.approved_by) await until(page, () => !!window.__ag.sim.get().human, null, 120_000);
+      await page.evaluate((x) => window.__ag.receive(window.__ag.parseMessage(x)), { verdict: m.verdict, context: m.context, proof: m.proof });
+      mark(`msg${i}-${m.verdict.verdict}${m.verdict.approved_by ? "-human" : ""}`);
+      if (!m.verdict.approved_by) {
+        await until(page, () => window.__ag.sim.get().tx && window.__ag.sim.get().phase !== "idle", null, 60_000);
+        await page.keyboard.press("f");
+        if (m.verdict.verdict === "needs_approval") {
+          await until(page, () => !!window.__ag.sim.get().human, null, 120_000);
+          mark(`msg${i}-parked`);
+          await page.waitForTimeout(2500);
+          continue;
+        }
+      }
+      await until(page, () => window.__ag.sim.get().phase === "idle", null, 150_000);
+      mark(`msg${i}-done`);
+      await page.waitForTimeout(800);
+    }
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(3500);
+    mark("end");
+  });
+}
