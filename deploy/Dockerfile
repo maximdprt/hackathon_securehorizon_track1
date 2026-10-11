@@ -18,7 +18,10 @@ RUN rm -rf agents/out demo/out data/decisions.jsonl data/pending.json data/nonce
 
 ENV AGENTS_OUT_DIR=/tmp/agents_out \
     GUARD_LLM=off \
+    GUARD_BACKEND=engine \
+    SENTINEL_API=https://rpc.petroi.fr \
     AGENT_MODEL_ID=us.anthropic.claude-haiku-4-5-20251001-v1:0 \
+    LAMBDA_MAX_TURNS=18 \
     PYTHONUNBUFFERED=1
 
 CMD ["lambda_handler.handler"]

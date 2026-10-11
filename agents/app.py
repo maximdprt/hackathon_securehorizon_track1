@@ -52,6 +52,7 @@ npm install
 npm run build</pre>
 <p>Puis recharge cette page.</p></body></html>"""
 MODELS = {  # modèles proposés pour un agent
+    "us.anthropic.claude-haiku-4-5-20251001-v1:0": "Claude Haiku 4.5",
     "us.mistral.pixtral-large-2502-v1:0": "Pixtral Large",
     "us.amazon.nova-lite-v1:0": "Nova Lite",
     "us.anthropic.claude-sonnet-4-6": "Claude Sonnet 4.6",
