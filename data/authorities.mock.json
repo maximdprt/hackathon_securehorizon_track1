@@ -1,7 +1,32 @@
 {
-  "0xa11ce00000000000000000000000000000000001": {"active": true, "max_amount": 100, "role": "treasury-agent"},
-  "0xa11ce00000000000000000000000000000000002": {"active": true, "max_amount": 300, "role": "shopping-agent"},
-  "0xa11ce00000000000000000000000000000000003": {"active": true, "max_amount": 0, "role": "reader"},
-  "0xa11ce00000000000000000000000000000000004": {"active": true, "max_amount": 5, "role": "service-agent"},
-  "0xa11ce00000000000000000000000000000000009": {"active": false, "max_amount": 0, "role": "revoked-agent"}
+  "0xa11ce00000000000000000000000000000000001": {
+    "active": true,
+    "max_amount": 100,
+    "role": "treasury-agent"
+  },
+  "0xa11ce00000000000000000000000000000000002": {
+    "active": true,
+    "max_amount": 300,
+    "role": "shopping-agent"
+  },
+  "0xa11ce00000000000000000000000000000000003": {
+    "active": true,
+    "max_amount": 0,
+    "role": "reader"
+  },
+  "0xa11ce00000000000000000000000000000000004": {
+    "active": true,
+    "max_amount": 5,
+    "role": "service-agent"
+  },
+  "0xa11ce00000000000000000000000000000000009": {
+    "active": false,
+    "max_amount": 0,
+    "role": "revoked-agent"
+  },
+  "0xa11ce00000000000000000000000000000000005": {
+    "active": true,
+    "max_amount": 300,
+    "role": "finance-agent"
+  }
 }

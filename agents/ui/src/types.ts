@@ -60,7 +60,9 @@ export type RunEvent =
   | { type: 'click'; ref: string; label: string; kind: string; why: string; view: View }
   | { type: 'fill'; ref: string; label: string; value: string; why: string; view: View }
   | { type: 'choose'; merchant: string; site: string | null; why: string; considered: Considered[] }
-  | { type: 'pay'; site: string; order: Order; items: string[]; submitted: Record<string, string> }
+  | { type: 'pay'; site?: string | null; order: Order; items?: string[]; submitted?: Record<string, string> | null; why?: string; asset?: string }
+  | { type: 'search'; query: string; results: { id: string; name: string; snippet: string }[]; why: string }
+  | { type: 'research'; asset: string; name: string; why: string }
   | { type: 'invalid'; tool: string; message: string }
   | { type: 'submit'; network: string }
   | ({ type: 'onchain' } & Onchain)

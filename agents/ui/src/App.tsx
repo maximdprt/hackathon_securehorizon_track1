@@ -97,6 +97,7 @@ export default function App() {
   const [tab, setTab] = useState<'chat' | 'agents'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
+  const [mode, setMode] = useState<'shop' | 'finance'>('shop');
   /** L'étape passée que l'on revoit dans le navigateur. null : on suit l'agent en direct. */
   const [pin, setPin] = useState<{ id: string; frame: number } | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -143,7 +144,7 @@ export default function App() {
       let ended = false;
       let said = ''; // la dernière explication écrite dans le fil
       try {
-        for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model }, abort.signal)) {
+        for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model, mode }, abort.signal)) {
           ended ||= ev.type === 'end' || ev.type === 'error';
           patch((m) => applyEvent(m, ev, shopName));
           const narrated = spoken(ev) !== '' && spoken(ev) !== said;
@@ -258,6 +259,14 @@ export default function App() {
           </button>
           <button type="button" role="tab" className="chat__tab" aria-selected={tab === 'agents'} onClick={() => setTab('agents')}>
             Agents et consignes
+          </button>
+        </div>
+        <div className="chat__mode" role="group" aria-label="Type de tâche">
+          <button type="button" className="chat__mode-btn" aria-pressed={mode === 'shop'} disabled={running} onClick={() => setMode('shop')}>
+            Boutiques
+          </button>
+          <button type="button" className="chat__mode-btn" aria-pressed={mode === 'finance'} disabled={running} onClick={() => setMode('finance')}>
+            Finance
           </button>
         </div>
 
