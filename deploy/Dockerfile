@@ -4,7 +4,7 @@
 FROM public.ecr.aws/lambda/python:3.12
 
 # dépendances runtime (mêmes bornes que pyproject.toml ; web3 non nécessaire au mock)
-RUN pip install --no-cache-dir "mcp>=2.0" "beautifulsoup4>=4.12" "boto3>=1.34" "pycryptodome>=3.20"
+RUN pip install --no-cache-dir "mcp>=2.0" "beautifulsoup4>=4.12" "boto3>=1.34" "pycryptodome>=3.20" "web3>=6.0"
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 COPY guard/ guard/

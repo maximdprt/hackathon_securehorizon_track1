@@ -119,7 +119,10 @@ class Engine:
             del best["amount_over_onchain_cap"]
         signals = list(best.values())
 
-        rec_flag = self.source.is_flagged(o.recipient)[0] if o.recipient else False
+        try:
+            rec_flag = self.source.is_flagged(o.recipient)[0] if o.recipient else False
+        except Exception as e:  # une source chaîne injoignable ne doit jamais casser un verdict
+            log.warning("is_flagged failed: %s", e); rec_flag = False
         iss_flag = bool(auth and auth.flagged)
         hard = any(s.hard for s in signals)
 
