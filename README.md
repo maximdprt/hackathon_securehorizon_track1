@@ -1,4 +1,4 @@
-# Sentinel — le garde des paiements d'agents IA
+# Sentinel : le garde des paiements d'agents IA
 
 > **ESSECKATHON Secure Horizons · Track 01 Fintech Security.** Un pare-feu qui vérifie *qui a le droit de payer* avant qu'un
 > agent IA n'exécute un paiement, délivre un **visa on-chain** si c'est légitime, bloque si c'est une arnaque, escalade à un
@@ -103,7 +103,7 @@ python mcp_server.py
 | Évasion | `python redteam/evasion.py` | 850 mutations tenues |
 | **Adversaire réel adaptatif** | `python redteam/adaptive_cap.py` | attaquant Claude en boucle, ~24 mutations : **0 bypass** |
 | Preuve on-chain E2E | `python redteam/validate_onchain.py` | dépôt → pay sans visa REVERT → visa → pay OK → re-pay REVERT |
-| Latence | — | **< 1 ms** (heuristiques) · ~3 s (fusion IA) |
+| Latence | (mesure) | **< 1 ms** (heuristiques) · ~3 s (fusion IA) |
 
 L'attaquant adaptatif (Claude Sonnet 4.5) reçoit à chaque tour le verdict + les raisons du garde et mute pour les contourner.
 L'allowlist bloque le détournement de fonds, le plafond de mandat escalade à l'humain, la fusion Claude bloque la manipulation.
