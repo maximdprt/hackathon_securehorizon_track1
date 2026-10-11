@@ -90,7 +90,7 @@ test('the browser shows what the agent does, step by step, up to the confirmed o
 
   await ask('Achète une Apple Watch Series 10 46 mm');
   expect(await screen.findByText('Commande passée chez Meridian Watch Co.')).toBeInTheDocument();
-  expect(bodies).toEqual([{ prompt: 'Achète une Apple Watch Series 10 46 mm', agent: 'Chasseur de prix', model: 'm.pixtral', instructions: expect.stringContaining('prix le plus bas') }]);
+  expect(bodies).toEqual([{ prompt: 'Achète une Apple Watch Series 10 46 mm', agent: 'Chasseur de prix', model: 'm.pixtral', mode: 'shop', instructions: expect.stringContaining('prix le plus bas') }]);
 
   // le navigateur est sur la dernière page : la confirmation de commande
   expect(screen.getByText('meridian-watch.example/confirmation/MER-1001', { selector: '.browser__url' })).toBeInTheDocument();
@@ -165,7 +165,7 @@ test('agents and their instructions are managed in their own tab', async () => {
   await ready();
   await agentsTab();
   expect(screen.getByRole('button', { name: /Chasseur de prix/, pressed: true })).toHaveClass('panel__row');
-  expect(screen.getAllByRole('button', { pressed: false })).toHaveLength(2);
+  expect(screen.getAllByRole('button', { pressed: false }).filter((b) => b.classList.contains('panel__row'))).toHaveLength(2);
   expect(screen.getByText(/Camille Martin, Lyon\. Carte de test •••• •••• •••• 4242\./)).toBeInTheDocument();
 
   await userEvent.click(screen.getByRole('button', { name: 'Modifier les consignes' }));

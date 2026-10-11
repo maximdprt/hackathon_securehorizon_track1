@@ -34,6 +34,7 @@ sys.path.insert(0, str(ROOT))
 
 from agents import shops, world  # noqa: E402
 from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
+from agents.hermes_agent import run_hermes  # noqa: E402
 from agents.guard_client import GuardClient  # noqa: E402
 from agents.llm import MODEL_ID, BedrockLLM  # noqa: E402
 from agents.sentinel_chain import API as CHAIN_API, SentinelChain  # noqa: E402
@@ -145,6 +146,7 @@ class Handler(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(length))
             prompt, model = body["prompt"].strip(), body.get("model") or MODEL_ID
             instructions, agent = str(body.get("instructions", "")).strip(), str(body.get("agent", "")).strip()
+            mode = body.get("mode") if body.get("mode") in ("shop", "finance") else "shop"
             assert prompt and len(prompt) <= 2000 and len(instructions) <= 4000 and len(agent) <= 80 and model in MODELS
         except Exception:
             return self._json(400, {"error": "bad request"})
@@ -160,6 +162,19 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
+            if mode == "finance":  # l'agent Hermès généraliste : analyse d'actifs puis pay/approve/swap via le garde
+                run = run_hermes(prompt, llm, guard=_guard, chain=_chain, instructions=instructions, emit=emit)
+                run.update(agent=agent, model=model, mode=mode, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+                OUT.mkdir(exist_ok=True)
+                with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
+                    f.write(json.dumps(run, ensure_ascii=False, default=str) + "\n")
+                request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères lus par l'agent>"}
+                emit({"type": "end", "outcome": run["outcome"], "order": run["order"], "chosen": run.get("asset") or "", "why": run["why"],
+                      "considered": [], "submitted": None, "confirmation": None, "expected": None, "final_text": run["final_text"],
+                      "turns": run["turns"], "site": None, "request": request,
+                      **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], _guard.backend if _guard else None),
+                          "onchain": run.get("onchain")} if run["verdict"] else {})})
+                return
             # l'agent ne connaît pas le garde ; run_browser appelle guard.verify au clic "Payer" et ne paie que si allow
             run = run_browser(prompt, llm, guard=_guard, instructions=instructions, emit=emit, pace=PACE)
             if run["verdict"] and _chain:  # la transaction entre dans SentinelL1 : le garde a jugé, on inscrit la décision

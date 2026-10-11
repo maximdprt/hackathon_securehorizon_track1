@@ -14,7 +14,7 @@ export type Frame = View & {
 /** Un geste de l'agent dans le fil : on peut cliquer dessus pour revoir la page à ce moment-là. */
 export type Step = {
   id: number;
-  kind: 'search' | 'open' | 'click' | 'page' | 'fill' | 'choose' | 'pay' | 'submit' | 'invalid' | 'thought';
+  kind: 'search' | 'research' | 'open' | 'click' | 'page' | 'fill' | 'choose' | 'pay' | 'submit' | 'invalid' | 'thought';
   label: string;
   meta?: string;
   why?: string;
@@ -81,8 +81,12 @@ export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: stri
     }
     case 'choose':
       return add({ kind: 'choose', label: `Choisit ${(shopName(ev.site) ?? ev.merchant).replace(/\.$/, '')}`, why: ev.why, considered: ev.considered, site: ev.site });
+    case 'search':
+      return add({ kind: 'search', label: `Recherche « ${ev.query} »`, meta: `${ev.results.length} résultat(s)`, why: ev.why });
+    case 'research':
+      return add({ kind: 'research', label: `Analyse ${ev.name}`, why: ev.why });
     case 'pay':
-      return add({ kind: 'pay', label: `Envoie le paiement de ${amount(ev.order.amount)} ${ev.order.currency === 'EUR' ? '€' : ev.order.currency}`, meta: ev.items.join(', '), site: ev.site });
+      return add({ kind: 'pay', label: `Envoie le paiement de ${amount(ev.order.amount)} ${ev.order.currency === 'EUR' ? '€' : ev.order.currency}`, meta: (ev.items ?? []).join(', '), site: ev.site ?? null, why: ev.why });
     case 'invalid':
       return add({ kind: 'invalid', label: 'Geste impossible', meta: ev.message });
     case 'submit':

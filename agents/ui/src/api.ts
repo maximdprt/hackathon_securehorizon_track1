@@ -6,7 +6,7 @@ export async function fetchWorld(): Promise<World> {
   return res.json();
 }
 
-export type RunRequest = { prompt: string; agent: string; instructions: string; model: string };
+export type RunRequest = { prompt: string; agent: string; instructions: string; model: string; mode?: 'shop' | 'finance' };
 
 /** Lance un run et rend ses étapes au fil de l'eau. `signal` permet de l'interrompre. */
 export async function* streamRun(body: RunRequest, signal: AbortSignal): AsyncGenerator<RunEvent> {
