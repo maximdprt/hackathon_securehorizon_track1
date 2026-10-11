@@ -11,6 +11,24 @@ export const AVAGUARD_NAME = "Sentinel L1";
 /** SENTINEL (the deployed sentinel-city-3d): the demo city is only our L1 and the C-Chain hub it reports to, one main
     road between them and one hero car, no ambient fleet. NEXT_PUBLIC_CITY_FULL=1 stands every Fuji chain again. */
 export const SENTINEL_ONLY = process.env.NEXT_PUBLIC_CITY_FULL !== "1";
+/** SENTINEL: the rest of the network stands round the protocol, every other Fuji L1 a tower of the skyline, as an
+    amphitheatre open on the camera's side, so nothing stands between the reader and the road (city.ts ringCity). The
+    protocol's campus keeps its own plan and scale; the ring has its own lots, past the campus. NEXT_PUBLIC_CITY_RING=0
+    (or ?ring=0) keeps the bare protocol city */
+export const SENTINEL_RING =
+  SENTINEL_ONLY && process.env.NEXT_PUBLIC_CITY_RING !== "0" && (typeof window === "undefined" || new URLSearchParams(window.location.search).get("ring") !== "0");
+const DEG = Math.PI / 180;
+/** the camera's home turn in the Sentinel city (Rig.tsx Shot az): a little from the right, so our straight road runs
+    diagonally away from the control tower and nothing stands in front of it; and the plan angle it looks from */
+export const HOME_AZ = 1.1;
+export const RING_FACING = Math.PI / 2 - HOME_AZ;
+/** the ring's span, as plan angles (from +x toward +z, the camera's home looking from about 27 degrees): it opens on the
+    campus (66 to 130 degrees, the yard included) and on the foreground between it and the camera, and wraps the rest */
+export const RING_SPAN: [number, number] = [138 * DEG, 372 * DEG];
+/** the ring's first ring road: the one past the campus's block (city.ts rings[1]), so the two plans share it */
+export const RING_ROAD = 252.2;
+/** the ring's lots: as large as fit, and never larger than this (a tower half the campus's lot) */
+export const RING_LOT_MAX = 26;
 /** its validator set today: one node (NodeID-5dd7CBhH8UDU3QCUbSWBFSckXZrC4mHi9) */
 export const AVAGUARD_VALIDATORS = 1;
 /** our HQ is a skyline landmark whatever its validator count, so it reads from the home view */

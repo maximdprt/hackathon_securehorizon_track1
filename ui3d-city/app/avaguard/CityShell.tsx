@@ -12,7 +12,7 @@ import type { CameraHandle, Inset, SizeBy } from "@/components/explorer-v2/netwo
 import type { District } from "@/components/explorer-v2/network/districts";
 import type { Height } from "@/components/explorer-v2/network/city-app";
 import type { PchainNetwork } from "@/lib/pchain-explorer";
-import { AVAGUARD_ID } from "@/components/explorer-v2/network/avaguard";
+import { AVAGUARD_ID, SENTINEL_RING } from "@/components/explorer-v2/network/avaguard";
 import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused, stopFollow } from "@/sim/Director";
 import { parseMessage, startLiveFeed } from "@/sim/liveFeed";
 import { motion, sim, useSim, type View } from "@/sim/store";
@@ -356,7 +356,7 @@ export default function CityShell() {
         {/* the search over the city's top, the situations to play under it (city-app.tsx's search and question chips) */}
         <div className="pointer-events-none absolute top-(--frame) z-30 flex justify-center transition-[left,right] duration-300 ease-out" style={{ left: searchLeft, right: searchRight }}>
           <div className="pointer-events-auto flex w-full max-w-[34rem] flex-col items-center gap-2">
-            <label className={cn("relative flex h-11 w-full items-center gap-2 rounded-2xl px-3.5", GLASS)}>
+            <label data-city-chrome className={cn("relative flex h-11 w-full items-center gap-2 rounded-2xl px-3.5", GLASS)}>
               <Search className="h-4 w-4 text-zinc-400" />
               <span className="sr-only">Rechercher</span>
               <input
@@ -374,7 +374,7 @@ export default function CityShell() {
               />
               <span className="rounded border border-zinc-200 px-1.5 font-mono text-[10px] text-zinc-400 dark:border-zinc-800">Ctrl K</span>
             </label>
-            <div role="group" aria-label="Voir un cas" className="flex flex-wrap justify-center gap-1.5">
+            <div role="group" aria-label="Voir un cas" data-city-chrome className="flex flex-wrap justify-center gap-1.5">
               {SCENES.map((c) => (
                 <button
                   key={c.k}
@@ -393,7 +393,7 @@ export default function CityShell() {
 
         {/* the key in the bottom left corner (city-key.tsx's place), hidden under the open list */}
         <div className={cn("absolute bottom-(--frame) left-(--frame) z-30 hidden transition-opacity duration-200 xl:block", listOpen && "pointer-events-none opacity-0")}>
-          <SentinelKey />
+          <SentinelKey network={SENTINEL_RING ? Math.max(0, data.nodes.length - 2) : 0} />
         </div>
 
         <AnalysisCard />

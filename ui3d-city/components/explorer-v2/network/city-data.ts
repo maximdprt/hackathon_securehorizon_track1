@@ -6,7 +6,7 @@ import { useNewcomers, type Newcomer, type Site } from "@/components/explorer-v2
 import { GUEST_LOGOS } from "@/components/explorer-v2/network/guest-logos";
 import { HUB_PLINTH } from "@/components/explorer-v2/network/hub-tower";
 import { HUB_W, TILT } from "@/components/explorer-v2/network/city-geometry";
-import { planCity, streetRoute, turn, type City, type Stop, type Street } from "@/components/explorer-v2/network/city";
+import { planCity, ringCity, streetRoute, turn, withRing, type City, type Stop, type Street } from "@/components/explorer-v2/network/city"; // AVAGUARD: + ringCity, withRing
 import { districtOf } from "@/components/explorer-v2/network/districts";
 import { CITY_REACH, CX, CY, H_MAX, H_MIN, H_TOP_MIN, validatorHeight, type Node, type Route, type SizeBy } from "@/components/explorer-v2/network/icm-map";
 import { overviewStatsUrl } from "@/components/explorer-v2/network/network-reads";
@@ -15,7 +15,7 @@ import { C_CHAIN_ID, MAINNET_COUNTERPART, catalogBySubnet, catalogOf, resolveCat
 import type { PchainNetwork } from "@/lib/pchain-explorer";
 import { PRIMARY_SUBNET_ID } from "@/lib/pchain-node";
 import type { L1Chain } from "@/types/stats";
-import { AVAGUARD_CHAIN, AVAGUARD_FLOW, AVAGUARD_ID, SENTINEL_ONLY, SENTINEL_SUBNET, AVAGUARD_MIN_H, simulatedFlows } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD
+import { AVAGUARD_CHAIN, AVAGUARD_FLOW, AVAGUARD_ID, RING_FACING, RING_LOT_MAX, RING_ROAD, RING_SPAN, SENTINEL_ONLY, SENTINEL_RING, SENTINEL_SUBNET, AVAGUARD_MIN_H, simulatedFlows } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD
 
 /* The city's data, apart from the map that draws it (icm-map.tsx): the
    feeds, the catalog that names the chains, and the plan of lots and
@@ -205,10 +205,12 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
     // AVAGUARD: our L1 joins the chain feed before the plan, and its street to the C-Chain joins the flows; a network
     // whose feed has no ICM at all (Fuji today) gets plausible flows between the C-Chain and its most validated chains
     // SENTINEL: in the demo city only the C-Chain hub stands beside our L1, so the main road, the toll and the car read clearly
-    const fed = chains ? [...chains.filter((c) => String(c.chainId) !== AVAGUARD_ID && (!SENTINEL_ONLY || String(c.chainId) === hubId)), AVAGUARD_CHAIN] : null;
+    // SENTINEL: with the ring, every other chain stands again, round the protocol, with no street of its own: the one road
+    // the city paints is ours
+    const fed = chains ? [...chains.filter((c) => String(c.chainId) !== AVAGUARD_ID && (!SENTINEL_ONLY || SENTINEL_RING || String(c.chainId) === hubId)), AVAGUARD_CHAIN] : null;
     const icmSimulated = !!fed && !flows.some((f) => f.messageCount > 0);
     const allFlows = [
-      ...(icmSimulated ? simulatedFlows(fed!, hubId) : flows),
+      ...(SENTINEL_ONLY ? [] : icmSimulated ? simulatedFlows(fed!, hubId) : flows),
       { sourceChainId: AVAGUARD_ID, targetChainId: hubId, messageCount: AVAGUARD_FLOW.out },
       { sourceChainId: hubId, targetChainId: AVAGUARD_ID, messageCount: AVAGUARD_FLOW.in },
     ];
@@ -316,7 +318,7 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
     // AVAGUARD: SentinelL1's own registry row (a guest on the Frontier) gives way to our HQ, so it stands once
     const base = [...listed.map((c) => (freshAt.has(c.id) ? { ...c, newAt: freshAt.get(c.id)! } : c)), ...guests.filter((g) => g.subnetId !== SENTINEL_SUBNET && g.blockchainId !== AVAGUARD_ID)].filter(
       // SENTINEL: and no other listed chain nor P-Chain guest
-      (c) => !SENTINEL_ONLY || c.id === hubId || c.id === AVAGUARD_ID,
+      (c) => !SENTINEL_ONLY || SENTINEL_RING || c.id === hubId || c.id === AVAGUARD_ID,
     );
 
     const metric = (c: (typeof base)[number]) => (byMessages ? c.out + c.in : c.validators);
@@ -328,10 +330,16 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
     const hub = base.find((c) => c.id === hubId);
     const hubH = hub ? height(hub) : 0;
     const others = base.filter((c) => c.id !== hubId);
-    const city = planCity(
-      others.map((c) => ({ id: c.id, district: c.district, talks: c.out + c.in, validators: c.validators, newAt: c.newAt })),
-      { cx: CX, cy: CY, tilt: TILT, reach: CITY_REACH, hub: { w: HUB_W, h: hubH } },
-    );
+    const geometry = { cx: CX, cy: CY, tilt: TILT, reach: CITY_REACH, hub: { w: HUB_W, h: hubH } };
+    const asChain = (c: (typeof base)[number]) => ({ id: c.id, district: c.district, talks: c.out + c.in, validators: c.validators, newAt: c.newAt });
+    // SENTINEL: the protocol's own plan (our L1 alone round the plaza), and the ring of the network round it
+    const city = SENTINEL_RING
+      ? withRing(
+          planCity(others.filter((c) => c.id === AVAGUARD_ID).map(asChain), geometry),
+          ringCity(others.filter((c) => c.id !== AVAGUARD_ID).map(asChain), geometry, { road: RING_ROAD, span: RING_SPAN, facing: RING_FACING, lotMax: RING_LOT_MAX }),
+          [RING_SPAN[1] - 2 * Math.PI, RING_SPAN[0]],
+        )
+      : planCity(others.map(asChain), geometry);
     // the week's arrivals, newest first, for the order they rise in
     const newRank = new Map(
       others
@@ -346,7 +354,7 @@ export function useCityData({ days, sizeBy, network = "mainnet" }: { days: numbe
       if (!lot) continue;
       const talker = c.out + c.in > 0;
       // a set that talks takes four fifths of its lot, a quiet one three fifths
-      placed.push({ ...c, x: lot.x, y: lot.y, w: city.lot * (talker ? 0.4 : 0.31), h: height(c), role: talker ? "talker" : "quiet", order: lot.rank, reach: lot.reach, newRank: newRank.get(c.id) ?? 0 });
+      placed.push({ ...c, x: lot.x, y: lot.y, w: (lot.pitch ?? city.lot) * (talker ? 0.4 : 0.31), h: height(c), role: talker ? "talker" : "quiet", order: lot.rank, reach: lot.reach, newRank: newRank.get(c.id) ?? 0 }); // AVAGUARD: + the lot's own pitch
     }
 
     // where each set's traffic starts and ends: its lot, or downtown's plaza

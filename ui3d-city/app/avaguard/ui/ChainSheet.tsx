@@ -31,8 +31,8 @@ export function ChainSheet({ node, partner, onClose, simulated }: { node: Node; 
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-[11.5px]">
         {(
           [
-            ["Validators", node.validators.toLocaleString("fr-FR")],
-            [simulated ? "Messages ICM (simulés)" : "Messages ICM · 24 h", node.out + node.in > 0 ? `${fmtCompact(node.out)} out · ${fmtCompact(node.in)} in` : "aucun sur 24 h"],
+            ["Validateurs", node.validators.toLocaleString("fr-FR")],
+            [simulated ? "Messages ICM (simulés)" : "Messages ICM · 24 h", node.out + node.in > 0 ? `${fmtCompact(node.out)} envoyés · ${fmtCompact(node.in)} reçus` : "aucun sur 24 h"],
             ["Partenaire principal", partner ?? "…"],
             ["Paiements Sentinel", "0 (simulé)"],
           ] as const

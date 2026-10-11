@@ -1,9 +1,9 @@
 import { arcPath, diceOf } from "@/components/explorer-v2/network/city-geometry"; // AVAGUARD: + diceOf, the perimeter's traces
 import { PLATE, RING_IN } from "@/components/explorer-v2/network/icm-map"; // AVAGUARD: + RING_IN, the perimeter's reach
-import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD: the perimeter is the Sentinel city's own
+import { SENTINEL_ONLY, SENTINEL_RING } from "@/components/explorer-v2/network/avaguard"; // AVAGUARD: the perimeter is the bare Sentinel city's own
 import type { City } from "@/components/explorer-v2/network/city";
 import type { Ground } from "@/components/explorer-v2/network/ground";
-import { GROUND, FLEET, SIGNAL3, type Theme } from "./palette"; // AVAGUARD: + SIGNAL3
+import { AVAGUARD3, GROUND, FLEET, SIGNAL3, type Theme } from "./palette"; // AVAGUARD: + SIGNAL3, AVAGUARD3
 import type { Outskirts } from "./model";
 import type { RouteStreets } from "./lanes";
 
@@ -286,7 +286,7 @@ export function paintGround(canvas: HTMLCanvasElement, input: PaintInput) {
   ctx.fill();
 
   // AVAGUARD: the protected perimeter's engraving, in the band the river ran through
-  if (SENTINEL_ONLY) paintPerimeter(ctx, theme);
+  if (SENTINEL_ONLY && !SENTINEL_RING) paintPerimeter(ctx, theme);
 
   // the outskirts: their plots, their parks, and each building site's fence
   for (const d of outskirts.pads) {
@@ -368,8 +368,10 @@ export function paintGround(canvas: HTMLCanvasElement, input: PaintInput) {
   // the blocks' tops, their plots, and the ones no L1 stands on laid to lawn
   for (const b of city.blocks) {
     const d = arcPath(b.a0, b.a1, b.r0 + 1.5, b.r1 - 1.5);
-    fill(d, c(GROUND.blockTop));
-    stroke(d, c(GROUND.blockEdge), 0.6);
+    // AVAGUARD: the protocol's campus, its block a breath of the crown's green with a green hairline, so it reads as a place
+    const ours = SENTINEL_ONLY && b.district === "security";
+    fill(d, ours ? mixHex(c(GROUND.blockTop), c(AVAGUARD3.crown), theme === "dark" ? 0.07 : 0.06) : c(GROUND.blockTop));
+    stroke(d, ours ? mixHex(c(GROUND.blockTop), c(AVAGUARD3.crown), theme === "dark" ? 0.45 : 0.5) : c(GROUND.blockEdge), ours ? 0.8 : 0.6);
   }
   if (terrain.gardens) lawn(terrain.gardens, c(GROUND.garden));
   if (terrain.plots) stroke(terrain.plots, c(GROUND.plotLine), 0.5);

@@ -1,10 +1,11 @@
 "use client";
 
 // AVAGUARD: the ring road carrying on up the tower's block to our control tower (guardGeo.ts road), drawn as the city
-// draws its streets: the same paving (FLEET.roadHi) and the same white dashes down its middle (FLEET.mark). While a
-// visa drives it (sim routeLit) its middle lights in the visa's green, as the City's lit lane did. No other road: the
-// car takes the ring road itself to the yard.
-import { useMemo } from "react";
+// draws its streets: the same paving (FLEET.roadHi) and the same white dashes down its middle (FLEET.mark), and a fine
+// line of light down each edge, so the protocol's road reads from the city's home view, from the control tower to the
+// C-Chain. While a visa drives it (sim routeLit) its middle and its edges light in the visa's green, as the City's lit
+// lane did. No other road: the car takes the ring road itself to the yard.
+import { useEffect, useMemo } from "react";
 import { DoubleSide, MeshBasicMaterial, Vector3 } from "three";
 import { useSim } from "@/sim/store";
 import { AVAGUARD3, FLEET, type Theme } from "./palette";
@@ -44,7 +45,7 @@ function Strip({ geo, material }: { geo: { position: Float32Array; index: Uint32
 }
 
 export function Road({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
-  const { road, dashes, center } = useMemo(() => {
+  const { road, dashes, center, edges } = useMemo(() => {
     // the road's axis, from the ring road's outer edge to the tower's door, on the ground the car drives
     const along = [...geo.legs.approach.pts, ...geo.legs.scanPass.pts.slice(1), ...geo.legs.toCChain.pts.slice(1)];
     const dOf = (p: Vector3) => -p.dot(geo.F);
@@ -64,10 +65,20 @@ export function Road({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
       } else run = [];
     }
     if (run.length > 1) dashes.push(run);
+    // the edges' lines, a hair in from the paving's edge
+    const side = (o: number) => pts.map((p, i) => {
+      const a = pts[Math.max(0, i - 1)];
+      const b = pts[Math.min(pts.length - 1, i + 1)];
+      const len = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+      return new Vector3(p.x - ((b.z - a.z) / len) * o, p.y, p.z + ((b.x - a.x) / len) * o);
+    });
+    const edgeW = Math.max(0.2, geo.carW * 0.045);
+    const inset = geo.road.half - edgeW * 1.6;
     return {
       road: ribbon(pts, geo.road.half, 0.03),
       dashes: dashes.map((d) => ribbon(d, Math.max(0.25, geo.carW * 0.06), 0.06)),
       center: ribbon(pts, Math.max(0.3, geo.carW * 0.09), 0.07),
+      edges: [ribbon(side(inset), edgeW, 0.065), ribbon(side(-inset), edgeW, 0.065)],
     };
   }, [geo]);
   const lit = useSim((s) => s.routeLit);
@@ -76,13 +87,19 @@ export function Road({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
       paving: new MeshBasicMaterial({ color: FLEET.roadHi[theme], toneMapped: false, side: DoubleSide }),
       mark: new MeshBasicMaterial({ color: "#FFFFFF", transparent: true, opacity: theme === "dark" ? 0.3 : 0.95, toneMapped: false, side: DoubleSide, depthWrite: false }),
       lit: new MeshBasicMaterial({ color: AVAGUARD3.allow[theme], transparent: true, opacity: 0.95, toneMapped: false, side: DoubleSide, depthWrite: false }),
+      // the edges' light: a cool white at night, strong enough to draw the road from afar; a steel line by day
+      edge: new MeshBasicMaterial({ color: theme === "dark" ? "#CFE0F2" : "#8E8E93", transparent: true, opacity: theme === "dark" ? 0.75 : 0.8, toneMapped: false, side: DoubleSide, depthWrite: false }),
     }),
     [theme],
   );
+  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
   return (
     <group>
       <Strip geo={road} material={mats.paving} />
       {lit ? <Strip geo={center} material={mats.lit} /> : dashes.map((d, i) => <Strip key={i} geo={d} material={mats.mark} />)}
+      {edges.map((e, i) => (
+        <Strip key={i} geo={e} material={lit ? mats.lit : mats.edge} />
+      ))}
     </group>
   );
 }

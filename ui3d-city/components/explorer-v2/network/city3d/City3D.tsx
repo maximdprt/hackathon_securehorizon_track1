@@ -45,7 +45,7 @@ import { PRIVATE_IDS } from "@/components/explorer-v2/network/private";
 import { AvaGuardRun } from "./AvaGuardRun";
 import { Decor } from "./Decor";
 import { AVAGUARD3 } from "./palette";
-import { SENTINEL_ONLY, guardKey } from "@/components/explorer-v2/network/avaguard";
+import { AVAGUARD_ID, HOME_AZ, SENTINEL_ONLY, guardKey } from "@/components/explorer-v2/network/avaguard";
 import { useSim } from "@/sim/store";
 
 /* The city in 3D: the same plan, towers, streets and traffic as the map
@@ -66,6 +66,9 @@ export type City3DProps = CityViewProps & {
   /** a click on a route's lane or pod picks it, a second lets it go */
   onRoute?: (pair: string | null) => void;
 };
+
+/** AVAGUARD: an age in the page's French, from its short form (format.ts ageShort): "il y a 3 j" */
+const agoFr = (unixSecs: number) => `il y a ${ageShort(unixSecs).replace(/^(\d+)([smhd])$/, (_, n: string, u: string) => `${n} ${{ s: "s", m: "min", h: "h", d: "j" }[u as "s" | "m" | "h" | "d"]}`)}`;
 
 /** a version's minor line, as the strip names it: 1.15 of v1.15.2 */
 const minorOf = (v: string) => /^v?(\d+\.\d+)/.exec(v)?.[1] ?? v;
@@ -491,10 +494,11 @@ export default function City3D({ data: incoming, network, versions = null, targe
   // a picked district's towers, a picked set's, and a picked route's two ends wear their district's glass at full color; the rest keep the calm grade
   // by day an answer's or a search's towers wear their district glass whole and a shade deeper (the boost's excess over 1), so they read on the white model
   const day = theme !== "dark";
+  // AVAGUARD: our control tower always wears its ward's guard-teal glass whole, so it reads as the protocol's own in the skyline
   const boost = useMemo(
     () =>
       Float32Array.from(model.buildings, (b) =>
-        day && !pair && litSet?.has(b.id) ? 1 + LIT_DEEPEN : (focus !== null && b.n.district === focus) || b.id === pickedId || pair?.has(b.id) ? 1 : 0,
+        day && !pair && litSet?.has(b.id) ? 1 + LIT_DEEPEN : (focus !== null && b.n.district === focus) || b.id === pickedId || pair?.has(b.id) || b.id === AVAGUARD_ID ? 1 : 0,
       ),
     [model, focus, pickedId, pair, day, litSet],
   );
@@ -571,7 +575,7 @@ export default function City3D({ data: incoming, network, versions = null, targe
     for (const b of model.buildings) points.push(new Vector3(b.x, b.base + b.crest + 14, b.z));
     // AVAGUARD: the Sentinel-only city is looked at a little from the right, so our straight road runs diagonally away
     // from the control tower and nothing stands in front of it (city3d/guardGeo.ts)
-    return { key: "home", points, polar: HOME_POLAR, cap: 0, fill: 0.95, ...(SENTINEL_ONLY ? { az: 1.1 } : {}) };
+    return { key: "home", points, polar: HOME_POLAR, cap: 0, fill: 0.95, ...(SENTINEL_ONLY ? { az: HOME_AZ } : {}) };
   }, [model]);
   const shot = useMemo<Shot>(() => {
     if (guardShot) return guardShot; // AVAGUARD
@@ -669,10 +673,12 @@ export default function City3D({ data: incoming, network, versions = null, targe
   }, [selected, focus, route]);
   const wardOn = hoverDistrict ?? focus;
   const sectorWard = wardOn ? city.wards.find((w) => w.district === wardOn) : null;
+  // AVAGUARD: a ward of the ring round the protocol lights from its own first ring road, at its own pitch
   const sectorArc: [number, number, number, number] = sectorWard
     ? (() => {
-        const side = city.avenue / 2 / Math.max(1, (city.core + sectorWard.r1) / 2);
-        return [sectorWard.a0 + side, sectorWard.a1 - side, city.core + city.lot * 0.18, sectorWard.r1 + city.lot * 0.18];
+        const pitch = sectorWard.pitch ?? city.lot;
+        const side = (sectorWard.avenue ?? city.avenue) / 2 / Math.max(1, (sectorWard.r0 + sectorWard.r1) / 2);
+        return [sectorWard.a0 + side, sectorWard.a1 - side, sectorWard.r0 + pitch * 0.18, sectorWard.r1 + pitch * 0.18];
       })()
     : [0, 0, 0, 0];
 
@@ -701,12 +707,13 @@ export default function City3D({ data: incoming, network, versions = null, targe
   const tags = useMemo<Tag[]>(() => {
     const out: Tag[] = city.wards.map((t) => {
       const mid = (t.a0 + t.a1) / 2;
+      const pitch = t.pitch ?? city.lot; // AVAGUARD: a ring ward's own pitch
       if (rules) {
         // on a rule from its ward's outer edge, out from the city: under the front wards, over the back ones
-        const r = t.r1 + city.lot * 0.2;
+        const r = t.r1 + pitch * 0.2;
         return { key: `d:${t.district}`, at: new Vector3(r * Math.cos(mid), BLOCK_H, r * Math.sin(mid)), lifts: [22, 38, 54, 70, 86], ghost: namesOff, out: true, vertical: true, rule: true, avoid: true };
       }
-      const r = t.r1 + city.lot * 0.55;
+      const r = t.r1 + pitch * 0.55;
       return { key: `d:${t.district}`, at: new Vector3(r * Math.cos(mid), BLOCK_H + 1, r * Math.sin(mid)), lifts: [4, 24, 44, 64], ghost: namesOff, out: true };
     });
     // each leader's data on a leader line over its roof (over its plaque, or the landmark's spire), once it has risen; a district's or the close-up's own words take their place
@@ -774,24 +781,25 @@ export default function City3D({ data: incoming, network, versions = null, targe
             <span className="shrink-0 border border-[#A2AFB2] px-1 py-px font-mono text-[8px] font-bold tracking-[0.1em] text-[#5F6B7A] dark:border-[#5F6B7A] dark:text-[#A2AFB2]">PRIVATE</span>
           )}
         </p>
-        {tipNode.newAt !== null && <TipRow label="Joined the P-Chain" value={`${ageShort(tipNode.newAt)} ago`} />}
-        <TipRow label="Validators" value={tipNode.validators.toLocaleString("en-US")} />
+        {/* AVAGUARD: the tooltips in the page's French */}
+        {tipNode.newAt !== null && <TipRow label="Arrivée sur la P-Chain" value={agoFr(tipNode.newAt)} />}
+        <TipRow label="Validateurs" value={tipNode.validators.toLocaleString("fr-FR")} />
         {/* the version rows come with the Versions lens: in the districts view the plate keeps to the chain */}
         {painted && m && target && (
           <>
-            <TipRow label={`On ${target}+`} value={pct === null ? (PRIVATE_IDS.has(tipNode.id) ? "private" : "n/a") : `${m.on} · ${pct}%`} />
-            {m.near + m.stale > 0 && <TipRow label="Behind" value={String(m.near + m.stale)} />}
+            <TipRow label={`En ${target}+`} value={pct === null ? (PRIVATE_IDS.has(tipNode.id) ? "privée" : "n.d.") : `${m.on} · ${pct} %`} />
+            {m.near + m.stale > 0 && <TipRow label="En retard" value={String(m.near + m.stale)} />}
           </>
         )}
         {/* a chain with no ICM in the window shows no counts */}
         {!tipNode.guest && tipNode.out + tipNode.in > 0 && (
           <>
-            <TipRow label="Messages out" value={fmtCompact(tipNode.out)} />
-            <TipRow label="Messages in" value={fmtCompact(tipNode.in)} />
+            <TipRow label="Messages envoyés" value={fmtCompact(tipNode.out)} />
+            <TipRow label="Messages reçus" value={fmtCompact(tipNode.in)} />
           </>
         )}
-        {partner && <TipRow label="Most with" value={byId.get(partner[0])?.name ?? partner[0]} />}
-        <p className="mt-1 font-mono text-[10px] text-zinc-400">{pickedId === tipNode.id ? "Click to let it go" : "Click to open it"}</p>
+        {partner && <TipRow label="Surtout avec" value={byId.get(partner[0])?.name ?? partner[0]} />}
+        <p className="mt-1 font-mono text-[10px] text-zinc-400">{pickedId === tipNode.id ? "Cliquer pour la relâcher" : "Cliquer pour l'ouvrir"}</p>
       </TipPlate>
     );
   } else if (tipPchain) {
@@ -807,11 +815,11 @@ export default function City3D({ data: incoming, network, versions = null, targe
           <Logo uri={PCHAIN_LOGO} name="P-Chain" />
           P-Chain
         </p>
-        {tipHeight !== null && <TipRow label="Block" value={tipHeight.toLocaleString("en-US")} />}
-        {tipAt !== null && <TipRow label="Last block" value={`${ageShort(tipAt)} ago`} />}
-        {s && <TipRow label="Txs · 24h" value={s.txCount24h.toLocaleString("en-US")} />}
-        {primary && <TipRow label="Validators" value={primary.validators.toLocaleString("en-US")} />}
-        <p className="mt-1 font-mono text-[10px] text-zinc-400">{selected === PCHAIN_PICK ? "Click to let it go" : "Click to open it"}</p>
+        {tipHeight !== null && <TipRow label="Bloc" value={tipHeight.toLocaleString("fr-FR")} />}
+        {tipAt !== null && <TipRow label="Dernier bloc" value={agoFr(tipAt)} />}
+        {s && <TipRow label="Tx · 24 h" value={s.txCount24h.toLocaleString("fr-FR")} />}
+        {primary && <TipRow label="Validateurs" value={primary.validators.toLocaleString("fr-FR")} />}
+        <p className="mt-1 font-mono text-[10px] text-zinc-400">{selected === PCHAIN_PICK ? "Cliquer pour la relâcher" : "Cliquer pour l'ouvrir"}</p>
       </TipPlate>
     );
   } else if (tipSite) {
@@ -821,9 +829,9 @@ export default function City3D({ data: incoming, network, versions = null, targe
           <span className="h-2.5 w-1.5 shrink-0 bg-[#A2AFB2]" />
           {tipSite.site.name}
         </p>
-        <p className="mb-1 font-mono text-[10px] text-zinc-500">Created on the P-Chain, no validators yet</p>
-        <TipRow label="Created" value={`${ageShort(tipSite.site.createdAt)} ago`} />
-        <p className="mt-1 font-mono text-[10px] text-zinc-400">Click to open it on the P-Chain</p>
+        <p className="mb-1 font-mono text-[10px] text-zinc-500">Créée sur la P-Chain, pas encore de validateur</p>
+        <TipRow label="Créée" value={agoFr(tipSite.site.createdAt)} />
+        <p className="mt-1 font-mono text-[10px] text-zinc-400">Cliquer pour l&apos;ouvrir sur la P-Chain</p>
       </TipPlate>
     );
   } else if (tipRoute) {
@@ -856,7 +864,7 @@ export default function City3D({ data: incoming, network, versions = null, targe
         if (!flyingRef.current) setHover(null);
       }}
       role="region"
-      aria-label="Avalanche L1s as a city in 3D: drag to turn it, scroll to zoom, right-drag to pan"
+      aria-label="Les L1 d'Avalanche en ville 3D : glisser pour tourner, molette pour zoomer, clic droit pour déplacer"
     >
       <RouterRef into={router} />
       {tier && (
@@ -1007,7 +1015,7 @@ export default function City3D({ data: incoming, network, versions = null, targe
                 <button
                   type="button"
                   tabIndex={namesOff ? -1 : 0}
-                  aria-label={`${t.label}: ${t.ids.length} chains. Open the district`}
+                  aria-label={`${t.label} : ${t.ids.length} chaînes. Ouvrir le quartier`}
                   onPointerEnter={() => setHoverDistrict(t.district)}
                   onPointerLeave={() => setHoverDistrict(null)}
                   onFocus={() => setHoverDistrict(t.district)}
@@ -1039,7 +1047,7 @@ export default function City3D({ data: incoming, network, versions = null, targe
               <button
                 type="button"
                 tabIndex={namesOff ? -1 : 0}
-                aria-label={`${t.label}: ${t.ids.length} chains. Open the district`}
+                aria-label={`${t.label} : ${t.ids.length} chaînes. Ouvrir le quartier`}
                 onPointerEnter={() => setHoverDistrict(t.district)}
                 onPointerLeave={() => setHoverDistrict(null)}
                 onFocus={() => setHoverDistrict(t.district)}
