@@ -1,4 +1,4 @@
-import type { Mode, RunEvent, World } from './types';
+import type { Commit, Mode, Onchain, RunEvent, World } from './types';
 
 export async function fetchWorld(): Promise<World> {
   const res = await fetch('/api/world');
@@ -7,6 +7,14 @@ export async function fetchWorld(): Promise<World> {
 }
 
 export type RunRequest = { prompt: string; agent: string; instructions: string; model: string; mode?: Mode; /** false : le paiement part sans vérification. */ guard?: boolean };
+
+/** Inscrit la décision on-chain au moment du paiement : c'est cet appel qui fait partir la voiture dans la ville 3D. */
+export async function authorizeNow(commit: Commit): Promise<Onchain> {
+  const res = await fetch('/api/authorize', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(commit) });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) return { ok: false, verdict: '', error: data?.error ?? `Le serveur a répondu ${res.status}` };
+  return data as Onchain;
+}
 
 /** Un humain tranche une décision en attente du garde. */
 export async function decide(instruction_id: string, decision: 'allow' | 'decline' | 'block'): Promise<{ verdict: string }> {

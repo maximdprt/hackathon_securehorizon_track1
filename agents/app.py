@@ -92,6 +92,13 @@ def public_asset(asset_id: str | None) -> dict | None:
     return a and {"id": a.id, "name": a.name, "domain": a.domain, "kind": a.kind, "why": a.why, "apy": a.apy}
 
 
+def _commit(verdict: dict, site: dict | None, item: str) -> dict:
+    """Le nécessaire pour inscrire la décision on-chain (SentinelChain.authorize), renvoyé à l'interface dans l'event
+    `submit`. L'interface le repostera à /api/authorize quand le rejeu atteint le paiement : la voiture de la ville 3D
+    part alors à cet instant, pas en tout début de rejeu. JSON-safe (le verdict porte parfois des objets)."""
+    return json.loads(json.dumps({"verdict": verdict, "site": site, "item": item}, default=str))
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, status: int, body: bytes, ctype: str, extra: dict | None = None) -> None:
         self.send_response(status)
@@ -166,8 +173,16 @@ class Handler(BaseHTTPRequestHandler):
             fields = parse_qs(self.rfile.read(length).decode("utf-8", "replace"), keep_blank_values=True)
             return self._shop("POST", shop.group(1), shop.group(2) or "/", {k: v[0] for k, v in fields.items()})
         # Content-Type JSON exigé : une page web tierce ne peut pas l'envoyer sans préflight CORS, que l'on n'accorde pas
-        if self.path not in ("/api/run", "/api/decide") or not self.headers.get("Content-Type", "").startswith("application/json"):
+        if self.path not in ("/api/run", "/api/decide", "/api/authorize") or not self.headers.get("Content-Type", "").startswith("application/json"):
             return self._json(404, {"error": "not found"})
+        if self.path == "/api/authorize":  # l'interface déclenche l'écriture on-chain au moment du paiement du rejeu (voiture)
+            try:
+                body = json.loads(self.rfile.read(length))
+                assert _chain is not None and isinstance(body.get("verdict"), dict)
+            except Exception:
+                return self._json(400, {"error": "bad request"})
+            onchain = _chain.authorize(body["verdict"], body.get("site"), item=str(body.get("item", "")))
+            return self._json(200, onchain)
         if self.path == "/api/decide":  # un humain tranche une décision en attente (outil approve_pending du garde)
             try:
                 body = json.loads(self.rfile.read(length))
@@ -207,25 +222,30 @@ class Handler(BaseHTTPRequestHandler):
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
             backend = guard.backend if guard else None
             if mode == "finance":  # l'agent Hermès généraliste : sans garde l'ordre est préparé, jamais envoyé (outcome "ready") ; avec, il lui est soumis
-                run = run_hermes(prompt, llm, guard=guard, chain=_chain if guard else None, instructions=instructions, emit=emit)
+                # chain=None : on ne grave pas pendant le run ; l'interface reposte à /api/authorize au paiement (voiture au bon moment)
+                run = run_hermes(prompt, llm, guard=guard, chain=None, instructions=instructions, emit=emit)
                 run.update(agent=agent, model=model, mode=mode, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
                 OUT.mkdir(exist_ok=True)
                 with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
                     f.write(json.dumps(run, ensure_ascii=False, default=str) + "\n")
                 request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères lus par l'agent>"}
+                if run["verdict"] and _chain:  # l'ordre entre dans SentinelL1 : l'écriture on-chain est déclenchée par l'interface
+                    a = assets.ASSETS.get(run.get("asset") or "")
+                    site = {"name": a.name, "domain": a.domain} if a else None
+                    emit({"type": "submit", "network": "SentinelL1", "commit": _commit(run["verdict"], site, a.name if a else "")})
                 emit({"type": "end", "outcome": run["outcome"], "order": run["order"], "chosen": run.get("asset") or "", "why": run["why"],
                       "considered": [], "submitted": None, "confirmation": None, "expected": None, "final_text": run["final_text"],
                       "turns": run["turns"], "site": None, "request": request, "asset": public_asset(run.get("asset")),
-                      **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], backend),
-                          "onchain": run.get("onchain")} if run["verdict"] else {})})
+                      **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], backend), "onchain": None} if run["verdict"] else {})})
                 return
             # l'agent ne connaît pas le garde : run_browser l'appelle au clic sur "Payer" et ne paie que s'il valide
             run = run_browser(prompt, llm, guard=guard, instructions=instructions, emit=emit, pace=PACE)
-            if run["verdict"] and _chain:  # la transaction entre dans SentinelL1 : le garde a jugé, on inscrit la décision
-                emit({"type": "submit", "network": "SentinelL1"})
-                run["onchain"] = _chain.authorize(run["verdict"], public_site(run["site"]) if run["site"] else None,
-                                                   item=", ".join(world.PRODUCTS[p]["name"] for p in run.get("items", {})) or run.get("chosen", ""))
-                emit({"type": "onchain", **run["onchain"]})
+            if run["verdict"] and _chain:  # la transaction entre dans SentinelL1 ; on n'inscrit PAS tout de suite :
+                # l'interface reposte à /api/authorize quand le rejeu atteint le paiement, pour que la voiture parte à cet instant
+                item = ", ".join(world.PRODUCTS[p]["name"] for p in run.get("items", {})) or run.get("chosen", "")
+                emit({"type": "submit", "network": "SentinelL1",
+                      "commit": _commit(run["verdict"], public_site(run["site"]) if run["site"] else None, item)})
+                run["onchain"] = None  # inscrit par l'appel /api/authorize de l'interface, révélé après la voiture
             run.update(agent=agent, model=model, backend=backend, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
             OUT.mkdir(exist_ok=True)
             with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:

@@ -26,8 +26,8 @@ os.environ.setdefault("GUARD_LLM", "off")
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from agents import world  # noqa: E402
-from agents.app import MODELS, public_site  # noqa: E402
+from agents import assets, world  # noqa: E402
+from agents.app import MODELS, public_site, _commit  # noqa: E402
 from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
 from agents.hermes_agent import run_hermes  # noqa: E402
 from agents.guard_client import GuardClient  # noqa: E402
@@ -88,25 +88,40 @@ def _run(body: dict):
     events: list[dict] = []
     llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
     if (body.get("mode") if body.get("mode") in ("shop", "finance") else "shop") == "finance":
-        run = run_hermes(prompt, llm, guard=guard, chain=chain, instructions=instructions, emit=events.append, max_turns=MAX_TURNS)
+        # chain=None : on ne grave pas pendant le run ; l'interface reposte à /api/authorize au paiement (voiture au bon moment)
+        run = run_hermes(prompt, llm, guard=guard, chain=None, instructions=instructions, emit=events.append, max_turns=MAX_TURNS)
         req = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères lus par l'agent>"}
+        if run["verdict"] and chain:  # l'ordre entre dans SentinelL1 : écriture déclenchée par l'interface
+            a = assets.ASSETS.get(run.get("asset") or "")
+            site = {"name": a.name, "domain": a.domain} if a else None
+            events.append({"type": "submit", "network": "SentinelL1", "commit": _commit(run["verdict"], site, a.name if a else "")})
         events.append({"type": "end", "outcome": run["outcome"], "order": run["order"], "chosen": run.get("asset") or "", "why": run["why"],
                        "considered": [], "submitted": None, "confirmation": None, "expected": None, "final_text": run["final_text"],
                        "turns": run["turns"], "site": None, "request": req,
-                       **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], guard.backend), "onchain": run.get("onchain")} if run["verdict"] else {})})
+                       **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], guard.backend), "onchain": None} if run["verdict"] else {})})
         return _resp(200, "\n".join(json.dumps(e, ensure_ascii=False, default=str) for e in events) + "\n", "application/x-ndjson; charset=utf-8")
     run = run_browser(prompt, llm, guard=guard, instructions=instructions, emit=events.append, pace=0.0, max_turns=MAX_TURNS)
-    if run["verdict"] and chain:  # la transaction entre dans SentinelL1 : décision inscrite on-chain
-        events.append({"type": "submit", "network": "SentinelL1"})
-        run["onchain"] = chain.authorize(run["verdict"], public_site(run["site"]) if run["site"] else None,
-                                          item=", ".join(world.PRODUCTS[p]["name"] for p in run.get("items", {})) or run.get("chosen", ""))
-        events.append({"type": "onchain", **run["onchain"]})
+    if run["verdict"] and chain:  # la transaction entre dans SentinelL1 ; on n'inscrit pas tout de suite :
+        # l'interface reposte à /api/authorize quand le rejeu atteint le paiement, pour que la voiture parte à cet instant
+        item = ", ".join(world.PRODUCTS[p]["name"] for p in run.get("items", {})) or run.get("chosen", "")
+        events.append({"type": "submit", "network": "SentinelL1",
+                       "commit": _commit(run["verdict"], public_site(run["site"]) if run["site"] else None, item)})
+        run["onchain"] = None  # inscrit par l'appel /api/authorize de l'interface, révélé après la voiture
     req = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères de HTML lus par l'agent>"}
     keys = ("outcome", "order", "chosen", "why", "considered", "submitted", "confirmation", "expected", "final_text", "turns")
     events.append({"type": "end", **{k: run[k] for k in keys}, "site": public_site(run["site"]) if run["site"] else None, "request": req,
                    **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], guard.backend), "onchain": run.get("onchain")} if run["verdict"] else {})})
     ndjson = "\n".join(json.dumps(e, ensure_ascii=False, default=str) for e in events) + "\n"
     return _resp(200, ndjson, "application/x-ndjson; charset=utf-8")
+
+
+def _authorize(body: dict):
+    """L'interface déclenche l'écriture on-chain au moment du paiement du rejeu : la voiture part dans la ville à cet instant."""
+    guard, chain = _guard_chain()
+    if chain is None or not isinstance(body.get("verdict"), dict):
+        return _resp(400, json.dumps({"error": "bad request"}))
+    onchain = chain.authorize(body["verdict"], body.get("site"), item=str(body.get("item", "")))
+    return _resp(200, json.dumps(onchain, ensure_ascii=False, default=str))
 
 
 def _asset(name: str):
@@ -136,11 +151,11 @@ def handler(event, context):
             return _resp(200, base64.b64encode(f.read_bytes()).decode(), world.IMAGE_TYPES[f.suffix.lower()], b64=True)
         if path == "/api/world":
             return _world()
-        if path == "/api/run" and method == "POST":
+        if path in ("/api/run", "/api/authorize") and method == "POST":
             raw = event.get("body") or "{}"
             if event.get("isBase64Encoded"):
                 raw = base64.b64decode(raw).decode()
-            return _run(json.loads(raw))
+            return _run(json.loads(raw)) if path == "/api/run" else _authorize(json.loads(raw))
         return _resp(404, json.dumps({"error": "not found"}))
     except Exception as e:  # jamais de 502 muet
         import traceback

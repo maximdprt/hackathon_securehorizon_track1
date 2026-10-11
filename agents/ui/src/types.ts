@@ -36,6 +36,9 @@ export type OnchainTx = { kind: 'visa' | 'flag' | 'decision'; hash: string; url:
 export type Onchain =
   | { ok: true; verdict: string; payment_id: string; nonce: number; txs: OnchainTx[]; city: string; latency_ms: number }
   | { ok: false; verdict: string; error: string };
+/** Le nécessaire pour inscrire la décision on-chain, porté par l'event `submit`. L'interface le reposte à /api/authorize
+ *  au moment du paiement du rejeu : la voiture de la ville 3D part alors à cet instant (et non en début de rejeu). */
+export type Commit = { verdict: unknown; site: unknown; item: string };
 
 /** Boutiques : l'agent navigue et achète. Finance : l'agent Hermès cherche des placements, lit leur fiche et prépare un ordre. */
 export type Mode = 'shop' | 'finance';
@@ -77,7 +80,7 @@ export type RunEvent =
   | { type: 'invalid'; tool?: string; message?: string }
   | { type: 'guard'; status: string }
   | ({ type: 'verdict' } & Partial<Verdict>)
-  | { type: 'submit'; network: string }
+  | { type: 'submit'; network: string; commit?: Commit }
   | ({ type: 'onchain' } & Onchain)
   | EndEvent
   | { type: 'error'; message: string };

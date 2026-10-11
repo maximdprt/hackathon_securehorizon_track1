@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { initials, loadAgents, saveAgents } from './agents';
-import { decide, fetchWorld, streamRun } from './api';
+import { authorizeNow, decide, fetchWorld, streamRun } from './api';
 import { AgentEditor } from './components/AgentEditor';
 import { AgentReply } from './components/AgentReply';
 import { BrowserView } from './components/BrowserView';
@@ -9,7 +9,7 @@ import { Bag, Chart, Shield } from './components/Icons';
 import { Panel } from './components/Panel';
 import { applyEvent, type AgentMessage, type Message } from './run';
 import { durationOf, sleep, spoken } from './timing';
-import type { Agent, Mode, World } from './types';
+import type { Agent, Mode, Onchain, World } from './types';
 
 const IDEAS: Record<Mode, string[]> = {
   shop: ['Achète-moi une Apple Watch Series 10 46 mm.', 'Achète une Apple Watch SE 40 mm.', 'Achète une Apple Watch Ultra 2.', 'Je veux une Apple Watch Series 10 42 mm, livrée vite.'],
@@ -164,10 +164,19 @@ export default function App() {
       let ended = false;
       let said = ''; // la dernière explication écrite dans le fil
       let before = ''; // le dernier geste joué dans le navigateur : deux saisies de suite s'enchaînent avec Tab
+      let onchainJob: Promise<Onchain> | null = null; // l'écriture on-chain lancée au paiement : la voiture part à cet instant
       try {
         for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model, mode, guard: guardOn }, abort.signal)) {
           ended ||= ev.type === 'end' || ev.type === 'error';
-          patch((m) => applyEvent(m, ev, shopName));
+          if (ev.type === 'submit' && ev.commit) {
+            // la transaction entre dans la chaîne : on l'inscrit MAINTENANT (la voiture entre dans la ville), la preuve se révèle après
+            onchainJob = authorizeNow(ev.commit).catch((e): Onchain => ({ ok: false, verdict: '', error: e instanceof Error ? e.message : String(e) }));
+            patch((m) => applyEvent(m, ev, shopName));
+          } else if (ev.type === 'end' && onchainJob) {
+            // la preuve on-chain rejoint l'événement final : la carte du garde la montre après la voiture
+            const onchain = await onchainJob;
+            patch((m) => applyEvent(m, { ...ev, onchain }, shopName));
+          } else patch((m) => applyEvent(m, ev, shopName));
           const narrated = spoken(ev) !== '' && spoken(ev) !== said;
           if (narrated) said = spoken(ev);
           const tabbed = ev.type === 'fill' && before === 'fill';
