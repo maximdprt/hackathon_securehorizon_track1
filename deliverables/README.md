@@ -3,6 +3,7 @@
 Documents destinés au jury et au pitch. Chiffres réels, reproductibles depuis le repo.
 
 - **defense-sheet.md** — la fiche défense 1 page (menace, parade, NIST CSF / OWASP / ATLAS, métriques, limites).
+- **defense-sheet.pdf** : la fiche défense 1 page brandée Sentinel (design DESIGN.md) à remettre au jury. Régénérer avec `python deliverables/build_defense_sheet_pdf.py`.
 - **compliance.md** — DORA / MiCA / AML / AI Act : comment la trace on-chain + le human-in-the-loop répondent à chaque cadre.
 - **compliance.pdf** : la version brandée Sentinel (design DESIGN.md) à remettre au jury. Régénérer avec `python deliverables/build_compliance_pdf.py` (HTML + Chrome headless).
 - **response-playbook.md** — ce que fait le système à chaque verdict (allow / block / human) et qui agit.
