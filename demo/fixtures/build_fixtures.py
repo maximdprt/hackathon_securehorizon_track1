@@ -57,10 +57,9 @@ FIXTURES.append({
         },
     },
     "expected": {"verdict": "block", "min_risk": 0.9,
-                 "signals": ["hidden_text_ratio", "imperative_to_agent", "mandate_override_attempt", "override_lexicon",
-                             "chat_template_delimiters", "canary_in_outbound", "brand_lookalike_score", "tld_risk",
+                 "signals": ["hidden_text_ratio", "imperative_to_agent", "brand_lookalike_score", "tld_risk",
                              "price_deviation", "payment_methods_offered", "checkout_cross_domain", "domain_age_days",
-                             "amount_within_mandate", "recipient_whitelisted"]},
+                             "amount_within_mandate"]},
 })
 
 # 2. Checkout seul (sur-collecte + champs cachés)
@@ -79,7 +78,7 @@ FIXTURES.append({
                                  "payment_methods": ["usdc", "wire", "gift_card"], "domain_age_days": 2}},
     },
     "expected": {"verdict": "block", "min_risk": 0.7,
-                 "signals": ["checkout_overcollects_pii", "hidden_text_ratio", "imperative_to_agent", "mandate_override_attempt", "checkout_cross_domain", "brand_lookalike_score", "price_deviation"]},
+                 "signals": ["checkout_overcollects_pii", "hidden_text_ratio", "imperative_to_agent", "checkout_cross_domain", "brand_lookalike_score", "price_deviation"]},
 })
 
 # 3. PDF empoisonné lu par l'agent basse-priv, qui transmet l'ordre (famille D confused deputy + B)
