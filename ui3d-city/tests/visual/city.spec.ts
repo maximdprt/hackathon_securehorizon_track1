@@ -1,9 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
-/* Three captures of the demo, saved under docs/captures: the city at home, the toll during the fraud's analysis, and
-   the scrapyard as the press comes down. Each also checks what the page must show. */
+/* Three captures of the demo, saved under docs/captures: the city at home, the gantry during the fraud's analysis (the
+   car a hologram, the card's radiography and checks), and the yard as the baler crushes the red car. Each also checks
+   what the page must show (the Sentinel protocol, Sentinel Protocole Pub.html). */
 
-type Ag = { sim: { get: () => { phase: string; step: number; registry: string[]; kpi: { blocked: number } } }; motion: { press: number; leg: string } };
+type Ag = { sim: { get: () => { phase: string; step: number; registry: string[]; kpi: { blocked: number } } }; motion: { yard: number; xray: number; paintTo: string; leg: string } };
 const ag = (page: Page) => page.evaluate(() => (window as unknown as { __ag: Ag }).__ag.sim.get());
 
 async function open(page: Page) {
@@ -24,23 +25,31 @@ test("home: the city, its Security ward, the figures, the key and the licence's 
   await page.screenshot({ path: "docs/captures/home.jpg", quality: 85, type: "jpeg" });
 });
 
-test("toll: the fraud's contract with its risky line framed", async ({ page }) => {
+test("toll: the car a hologram under the gantry, the card's radiography and its checks lighting one by one", async ({ page }) => {
   await open(page);
   await page.keyboard.press("1");
   await page.waitForFunction(() => {
-    const s = (window as unknown as { __ag: Ag }).__ag.sim.get();
-    return s.phase === "analysis" && s.step >= 3;
+    const a = (window as unknown as { __ag: Ag }).__ag;
+    const s = a.sim.get();
+    return s.phase === "analysis" && s.step >= 3 && a.motion.xray === 1;
   }, null, { timeout: 30_000 });
-  await expect(page.getByText("RISQUE", { exact: true })).toBeVisible();
   await expect(page.getByText("Sentinel · Analyse", { exact: false }).first()).toBeVisible();
-  await page.waitForTimeout(600);
+  await expect(page.getByRole("img", { name: "Radiographie du paiement" }).or(page.getByLabel("Radiographie du paiement")).first()).toBeVisible();
+  // still white: the colour comes with the decision only
+  expect(await page.evaluate(() => (window as unknown as { __ag: Ag }).__ag.motion.paintTo)).toBe("white");
+  await page.waitForTimeout(400);
   await page.screenshot({ path: "docs/captures/toll.jpg", quality: 85, type: "jpeg" });
+  // the decision paints it red, the card says BLOCK
+  await page.waitForFunction(() => (window as unknown as { __ag: Ag }).__ag.motion.paintTo === "block", null, { timeout: 20_000 });
+  await expect(page.getByText("BLOCK", { exact: true }).first()).toBeVisible();
 });
 
-test("scrapyard: the press comes down, the address joins the registry", async ({ page }) => {
+test("scrapyard: the red car crushed in the baler, the address joins the registry", async ({ page }) => {
   await open(page);
   await page.keyboard.press("1");
-  await page.waitForFunction(() => (window as unknown as { __ag: Ag }).__ag.motion.press > 0.6, null, { timeout: 60_000, polling: 50 });
+  // the yard's clock (components/guard-yard/three/timeline.ts): the lids, the side ram and the end ram from 13.9 to 16.7
+  await page.waitForFunction(() => (window as unknown as { __ag: Ag }).__ag.motion.yard > 15.4, null, { timeout: 60_000, polling: 50 });
+  expect(await page.evaluate(() => (window as unknown as { __ag: Ag }).__ag.motion.paintTo)).toBe("block");
   await page.screenshot({ path: "docs/captures/scrapyard.jpg", quality: 85, type: "jpeg" });
   await page.waitForFunction(() => (window as unknown as { __ag: Ag }).__ag.sim.get().registry.length === 1, null, { timeout: 30_000 });
   const s = await ag(page);

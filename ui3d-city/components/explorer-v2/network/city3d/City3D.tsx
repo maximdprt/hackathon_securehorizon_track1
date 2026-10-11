@@ -43,6 +43,7 @@ import { webglProbe, webglSeen } from "@/components/explorer-v2/network/webgl-pr
 import { PRIVATE_IDS } from "@/components/explorer-v2/network/private";
 // AVAGUARD: our parcel and our one simulated car, in the same scene
 import { AvaGuardRun } from "./AvaGuardRun";
+import { Decor } from "./Decor";
 import { AVAGUARD3 } from "./palette";
 import { SENTINEL_ONLY, guardKey } from "@/components/explorer-v2/network/avaguard";
 import { useSim } from "@/sim/store";
@@ -568,7 +569,9 @@ export default function City3D({ data: incoming, network, versions = null, targe
     // room under the rim's front for its words, as the map leaves
     points.push(new Vector3(0, -PLATE_T - 34, PLATE));
     for (const b of model.buildings) points.push(new Vector3(b.x, b.base + b.crest + 14, b.z));
-    return { key: "home", points, polar: HOME_POLAR, cap: 0, fill: 0.95 };
+    // AVAGUARD: the Sentinel-only city is looked at a little from the right, so our straight road runs diagonally away
+    // from the control tower and nothing stands in front of it (city3d/guardGeo.ts)
+    return { key: "home", points, polar: HOME_POLAR, cap: 0, fill: 0.95, ...(SENTINEL_ONLY ? { az: 1.1 } : {}) };
   }, [model]);
   const shot = useMemo<Shot>(() => {
     if (guardShot) return guardShot; // AVAGUARD
@@ -867,6 +870,8 @@ export default function City3D({ data: incoming, network, versions = null, targe
         // the city's own context has the last word: a kept yes from a GPU that has since gone reads as software here
         onCreated={({ gl }) => {
           if (webglSeen(gl.getContext()).low) setTier("low");
+          // AVAGUARD: our car's X-ray clips its body at the gantry's beam, and the C-Chain's gate clips it as it goes through (city3d/GuardCar.tsx)
+          gl.localClippingEnabled = true;
         }}
         onPointerMissed={(e) => {
           const d = down.current;
@@ -901,6 +906,8 @@ export default function City3D({ data: incoming, network, versions = null, targe
         <Pillar theme={theme} />
         <Ground city={city} terrain={terrain} outskirts={outskirts} trees={trees} paint={paintInput} theme={theme} sector={{ arc: sectorArc, on: !!sectorWard }} onGround={stepBack} />
         <Ledger theme={theme} />
+        {/* AVAGUARD: Sentinel's protected perimeter: the rim's fence, its wall of light and the sentinel monoliths */}
+        <Decor theme={theme} />
         {/* the city's parts mount a frame apart, each in its own task (warmup.tsx), each set's pick with its meshes */}
         <Stage at={1}>
         {model.buildings.length > 0 && (

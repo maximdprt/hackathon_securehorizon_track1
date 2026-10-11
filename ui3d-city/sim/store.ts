@@ -5,12 +5,15 @@ import type { AuditTx, Tone, TxEvent } from "./types";
    values (positions, sweeps, gauges) live in `motion`, which GSAP tweens and the scene reads in useFrame. */
 
 export type Phase = "idle" | "approach" | "analysis" | "allow" | "block" | "human" | "home";
-export type Leg = "approach" | "toCChain" | "uTurn" | "toScrapyard" | "toParking" | "fromParking" | "none";
+export type Leg = "approach" | "scanPass" | "toCChain" | "toScrapyard" | "toParking" | "parkToCChain" | "parkToScrapyard" | "none";
+/** the car's paint: white until Sentinel decides, then the decision's colour, all over the body */
+export type Paint = "white" | "allow" | "block" | "human";
 export type Panel = null | "detail" | "journal" | "registry" | "audit";
 /** the screens that open over the city, a building's door each (sim/nav.ts) */
 export type View = null | "transactions" | "registry" | "parking" | "audit";
 export type ViewFilter = "all" | "ALLOW" | "BLOCK" | "HUMAN" | "PENDING" | "proof";
 
+export type Review = { tx_id: string; approve: boolean; by: string; at: string; protocol: "visa" | "déchetterie" };
 export type JournalEntry = { tx_id: string; outcome: "ALLOW" | "BLOCK" | "PENDING"; via: "Sentinel" | "humain" | "registre"; amount: number; token: string; to: string; at: string; block?: number };
 
 export type SimState = {
@@ -21,6 +24,8 @@ export type SimState = {
   queue: string[];
   paused: boolean;
   human: { tx_id: string; deadline: number } | null;
+  /** the human's answer for the car in the car park: who, when, and the protocol it set off */
+  review: Review | null;
   registry: string[];
   blocks: { n: number; tone: Tone; tx_id: string }[];
   journal: JournalEntry[];
@@ -32,6 +37,8 @@ export type SimState = {
   liveStatus: string;
   /** our street lit in green while a visa drives it to the C-Chain */
   routeLit: boolean;
+  /** the camera follows the protocol (a click on the car, or F); else the city stays the reader's, as builders-hub's */
+  follow: boolean;
   /** every transaction played in the city, whole, newest first (the audit screens read it through data/source.ts) */
   ledger: AuditTx[];
   /** the screen open over the city, the transaction it shows, the filter it opened on */
@@ -56,6 +63,7 @@ const initial = (): SimState => ({
   queue: [],
   paused: false,
   human: null,
+  review: null,
   registry: [],
   blocks: [],
   journal: [],
@@ -66,6 +74,7 @@ const initial = (): SimState => ({
   mode: initialMode(),
   liveStatus: "",
   routeLit: false,
+  follow: false,
   ledger: [],
   view: null,
   viewTx: null,
@@ -133,7 +142,13 @@ export const motion = {
   shield: 0,
   /** parking slot taken (0..5) */
   slot: 2,
+  /** the Guard Yard's own clock for a refusal (components/guard-yard/three/timeline.ts): 0 at rest, 10.4 at PICK to 22.2 */
+  yard: 0,
+  /** the body's paint: from `paintFrom` to `paintTo` as `paint` goes 0..1 (a short fade, sim/Director.ts repaint) */
+  paintFrom: "white" as Paint,
+  paintTo: "white" as Paint,
+  paint: 1,
 };
 export function resetMotion() {
-  Object.assign(motion, { leg: "none", u: 0, visible: false, tone: "verify", xray: 0, frost: 0, cube: false, press: 0, dump: 0, barrier: 0, blink: false, scan: 0, authority: 0, snow: 0, ping: 0, gauge: 0, crystals: 0, registryFlash: 0, glow: 0, shield: 0 });
+  Object.assign(motion, { leg: "none", u: 0, visible: false, tone: "verify", xray: 0, frost: 0, cube: false, press: 0, dump: 0, barrier: 0, blink: false, scan: 0, authority: 0, snow: 0, ping: 0, gauge: 0, crystals: 0, registryFlash: 0, glow: 0, shield: 0, yard: 0, paintFrom: "white", paintTo: "white", paint: 1 });
 }

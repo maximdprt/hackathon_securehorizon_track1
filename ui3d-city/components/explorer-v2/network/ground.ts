@@ -1,5 +1,7 @@
 import type { City } from "@/components/explorer-v2/network/city";
 import { arcPath, diceOf, TILT } from "@/components/explorer-v2/network/city-geometry";
+// AVAGUARD: the Sentinel-only city has no river (its outer band carries our perimeter instead, city3d/Decor.tsx)
+import { SENTINEL_ONLY } from "@/components/explorer-v2/network/avaguard";
 
 /* The city's ground as a model maker lays it: every block cut into its
    plots, the plots no L1 stands on laid to lawn with a tree or two, trees
@@ -125,7 +127,8 @@ export function groundOf(city: City, g: { cx: number; cy: number; ringIn: number
   let river: River | null = null;
   let centre: (t: number) => number = () => -1;
   let width: (t: number) => number = () => 0;
-  if (city.wards.length && room > 40) {
+  // AVAGUARD: no river in the Sentinel-only city: no bed, no banks, no bridges, no mouths at the rim
+  if (!SENTINEL_ONLY && city.wards.length && room > 40) {
     // the city's edge at an angle: the last block of the ward it falls in
     const edgeAt = (a: number) => {
       const w = city.wards.find((o) => past(a, o.a0) <= past(o.a1, o.a0));

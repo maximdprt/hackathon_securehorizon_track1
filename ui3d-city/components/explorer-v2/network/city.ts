@@ -14,7 +14,7 @@
    streetRoute). Pure geometry: the map draws what this returns. */
 
 import { DISTRICTS, FRONT, districtLabel, type District } from "./districts";
-import { SECURITY_ROOM } from "./avaguard"; // AVAGUARD
+import { AVAGUARD_ID, SECURITY_ROOM, SENTINEL_ONLY } from "./avaguard"; // AVAGUARD
 
 export interface CityChain {
   id: string;
@@ -336,6 +336,15 @@ export function planCity(chains: CityChain[], g: CityGeometry): City {
     edge = Math.max(edge, r1);
     wards.push({ district: k, label: districtLabel(k), ids: members.map((c) => c.id), a0: arcs[i].a0, a1: arcs[i].a1, r0: core, r1 });
   });
+  // AVAGUARD: in the Sentinel-only city our control tower stands at the back of its block, facing the C-Chain down one
+  // straight road, so the scanner, the human post and the yard fit between them (city3d/guardGeo.ts)
+  const ours = lots.get(AVAGUARD_ID);
+  const ourBlock = ours && blocks.find((b) => ours.r > b.r0 && ours.r < b.r1);
+  if (SENTINEL_ONLY && ours && ourBlock) {
+    const r = ourBlock.r1 - lot * 0.12;
+    const [x, y] = screen(r, ours.a);
+    lots.set(AVAGUARD_ID, { ...ours, x, y, r });
+  }
   for (const l of lots.values()) l.reach = Math.min(1, l.r / edge);
   const pairs = Math.round((edge - core - ROAD * lot) / ((2 + ROAD) * lot)) + 1;
   const rings = Array.from({ length: Math.max(1, pairs) }, (_, p) => core + (ROAD * lot) / 2 + p * (2 + ROAD) * lot);

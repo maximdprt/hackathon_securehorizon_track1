@@ -11,7 +11,7 @@ import { STATE, fmtAmount, shortAddr, type Tone } from "@/sim/types";
 import { StateIcon } from "./charts";
 
 const EYEBROW = "font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500";
-const STEP_FR = ["Scan du portique", "Contrat lu", "Fil d'autorité", "Échantillonnage", "Registre consulté", "Score", "Verdict"];
+const STEP_FR = ["Radiographie", "Autorité", "Bénéficiaire", "Mandat", "Intention IA", "Contrat", "Décision"];
 
 function PanelShell({ name, title, width, children }: { name: Exclude<Panel, null>; title: ReactNode; width: number; children: ReactNode }) {
   const open = useSim((s) => s.panel === name);

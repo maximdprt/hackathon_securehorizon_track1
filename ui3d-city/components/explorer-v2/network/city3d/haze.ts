@@ -12,9 +12,11 @@ import type { Theme } from "./palette";
    rim (Ledger.tsx). */
 
 /** the air's color, cool as the brand's grade: a pale steel by day, a blue-black by night */
-export const HAZE_COLOR: Record<Theme, string> = { light: "#E9EDF2", dark: "#121A28" };
+// AVAGUARD: Sentinel's neutral grade: a pale grey by day, a near black by night, no blue in either
+export const HAZE_COLOR: Record<Theme, string> = { light: "#ECECEE", dark: "#0D1118" };
 /** the opening's mist: the cloud sea as it shows behind the rising column at camera's first look (Rig.tsx), measured by day and by night */
-export const MIST_COLOR: Record<Theme, string> = { light: "#CFD3DB", dark: "#1A1C23" };
+// AVAGUARD: the sea's tone under the neutral grade (Backdrop.tsx LOOK)
+export const MIST_COLOR: Record<Theme, string> = { light: "#D8D8DC", dark: "#0D1118" };
 
 /** the column's foot: past the sea, so it is never seen */
 export const FOOT = SEA_Y - 600;

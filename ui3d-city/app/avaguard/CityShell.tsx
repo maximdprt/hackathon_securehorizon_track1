@@ -13,14 +13,14 @@ import type { District } from "@/components/explorer-v2/network/districts";
 import type { Height } from "@/components/explorer-v2/network/city-app";
 import type { PchainNetwork } from "@/lib/pchain-explorer";
 import { AVAGUARD_ID } from "@/components/explorer-v2/network/avaguard";
-import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused } from "@/sim/Director";
+import { answerHuman, enqueue, followCar, playScene, resetAll, setPaused, stopFollow } from "@/sim/Director";
 import { parseMessage, startLiveFeed } from "@/sim/liveFeed";
 import { motion, sim, useSim, type View } from "@/sim/store";
 import { closeView, listenUrl, openView } from "@/sim/nav";
 import { STATE } from "@/sim/types";
 import type { SceneKey } from "@/sim/scenario";
 import { AnalysisCard } from "./ui/AnalysisCard";
-import { HumanAlert, Toasts } from "./ui/Panels";
+import { Toasts } from "./ui/Panels";
 import { Directory, Figures, LatestFeed, SentinelKey, useKpis } from "./ui/Frame";
 import { ViewHost } from "./views/ViewHost";
 import { TransactionsView } from "./views/TransactionsView";
@@ -239,6 +239,7 @@ export default function CityShell() {
         case "escape":
           sim.set({ panel: null });
           setListOpen(false);
+          stopFollow();
           break;
       }
     };
@@ -397,7 +398,6 @@ export default function CityShell() {
 
         <AnalysisCard />
         {sheetNode && <ChainSheet node={sheetNode} partner={sheetPartner} simulated={data.icmSimulated} onClose={() => setSelected(null)} />}
-        <HumanAlert />
         <Toasts />
         <ViewHost screens={{ transactions: <TransactionsView />, registry: <RegistryView />, parking: <ParkingView />, audit: <AuditView /> }} />
 
