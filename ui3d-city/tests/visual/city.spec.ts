@@ -18,7 +18,9 @@ async function open(page: Page) {
 test("home: the city, its Security ward, the figures, the key and the licence's mention", async ({ page }) => {
   await open(page);
   await expect(page.getByText("Ville 3D d'après Avalanche Builder Hub (open source, BSD-3)", { exact: false })).toBeVisible();
-  await expect(page.getByText("Sécurité", { exact: false }).first()).toBeVisible();
+  // the two ends of the protocol, named on the city: our L1's ward and the C-Chain's plaza
+  await expect(page.getByRole("button", { name: /Sentinel L1/ }).first()).toBeVisible();
+  await expect(page.getByText(/C-Chain · où l'argent arrive/).first()).toBeVisible();
   // the rest of the network stands round the protocol: the key counts it
   await expect(page.getByText(/autres L1 d'Avalanche Fuji/).first()).toBeVisible();
   await expect(page.getByPlaceholder("Rechercher un paiement, une adresse, un agent…")).toBeVisible();

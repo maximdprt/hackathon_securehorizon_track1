@@ -40,12 +40,13 @@ import { Post } from "./Post";
 import { hurry, Rise, Stage, useSteady, Warmup, WARM } from "./warmup";
 import { useFx, useHud, useLabels, useMonoLogos, type LabelStyle } from "@/components/explorer-v2/network/city3d/options";
 import { webglProbe, webglSeen } from "@/components/explorer-v2/network/webgl-probe";
+import { onCityStood } from "@/components/explorer-v2/network/city-signal"; // AVAGUARD
 import { PRIVATE_IDS } from "@/components/explorer-v2/network/private";
 // AVAGUARD: our parcel and our one simulated car, in the same scene
 import { AvaGuardRun } from "./AvaGuardRun";
 import { Decor } from "./Decor";
 import { AVAGUARD3 } from "./palette";
-import { AVAGUARD_ID, HOME_AZ, SENTINEL_ONLY, guardKey } from "@/components/explorer-v2/network/avaguard";
+import { AVAGUARD_ID, HOME_AZ, RING_FACING, SENTINEL_ONLY, guardKey } from "@/components/explorer-v2/network/avaguard";
 import { useSim } from "@/sim/store";
 
 /* The city in 3D: the same plan, towers, streets and traffic as the map
@@ -494,13 +495,16 @@ export default function City3D({ data: incoming, network, versions = null, targe
   // a picked district's towers, a picked set's, and a picked route's two ends wear their district's glass at full color; the rest keep the calm grade
   // by day an answer's or a search's towers wear their district glass whole and a shade deeper (the boost's excess over 1), so they read on the white model
   const day = theme !== "dark";
-  // AVAGUARD: our control tower always wears its ward's guard-teal glass whole, so it reads as the protocol's own in the skyline
+  /* AVAGUARD: our control tower wears its ward's guard-teal glass whole, so it reads as the protocol's own in the skyline;
+     from once the city stands, its windows lit (a full hue on unlit glass would show the plain glass's sand) */
+  const [stood, setStood] = useState(false);
+  useEffect(() => onCityStood(() => setStood(true)), []);
   const boost = useMemo(
     () =>
       Float32Array.from(model.buildings, (b) =>
-        day && !pair && litSet?.has(b.id) ? 1 + LIT_DEEPEN : (focus !== null && b.n.district === focus) || b.id === pickedId || pair?.has(b.id) || b.id === AVAGUARD_ID ? 1 : 0,
+        day && !pair && litSet?.has(b.id) ? 1 + LIT_DEEPEN : (focus !== null && b.n.district === focus) || b.id === pickedId || pair?.has(b.id) || (stood && b.id === AVAGUARD_ID) ? 1 : 0,
       ),
-    [model, focus, pickedId, pair, day, litSet],
+    [model, focus, pickedId, pair, day, litSet, stood],
   );
   // and the towers outside it, and outside whatever a hover, a pick or a route lights, recede into the haze
   const recede = useMemo(
@@ -724,6 +728,11 @@ export default function City3D({ data: incoming, network, versions = null, targe
         const at = hub ? new Vector3(b.x, b.base + b.n.h + HUB_REACH, b.z) : plaqueAt(b);
         out.push({ key: `t:${b.id}`, at, lifts: [8, 16, 24, 32, 40, 48, 56, 64], fade: true, b: i, rule: true, flag: true, avoid: true, clear: plaqueOf(b), from: schedule.rise[i] + RISE_S });
       }
+    // AVAGUARD: in the Sentinel city the payment's destination is named on the plaza in front of its tower, toward the camera
+    if (SENTINEL_ONLY && !rules) {
+      const r = city.core * 0.72;
+      out.push({ key: "x:hub", at: new Vector3(r * Math.cos(RING_FACING), 1, r * Math.sin(RING_FACING)), lifts: [4, 24, 44], ghost: namesOff, out: true });
+    }
     // the week's new L1s carry no floating tag: their building sites (fence, scaffolding, crane) and the New chip say it
     for (const id of roofIds) {
       const b = model.buildings[model.byId.get(id)!];
@@ -1042,12 +1051,14 @@ export default function City3D({ data: incoming, network, versions = null, targe
                 />
               </div>
             );
+          // AVAGUARD: in the Sentinel city our ward is named for its one L1, the protocol's, in its green
+          const ours = SENTINEL_ONLY && t.district === "security";
           return (
             <div key={t.district} ref={tagRef(`d:${t.district}`)} className="absolute left-0 top-0" style={{ visibility: "hidden" }}>
               <button
                 type="button"
                 tabIndex={namesOff ? -1 : 0}
-                aria-label={`${t.label} : ${t.ids.length} chaînes. Ouvrir le quartier`}
+                aria-label={ours ? "Sentinel L1 : ouvrir le quartier du protocole" : `${t.label} : ${t.ids.length} chaînes. Ouvrir le quartier`}
                 onPointerEnter={() => setHoverDistrict(t.district)}
                 onPointerLeave={() => setHoverDistrict(null)}
                 onFocus={() => setHoverDistrict(t.district)}
@@ -1056,17 +1067,26 @@ export default function City3D({ data: incoming, network, versions = null, targe
                 className={cn(
                   "cursor-pointer select-none whitespace-nowrap px-1.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] outline-none transition-[opacity,color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]",
                   HALO,
-                  on ? "text-[#0061E2] dark:text-[#5f9dff]" : "text-zinc-800 dark:text-zinc-100",
+                  on ? "text-[#0061E2] dark:text-[#5f9dff]" : ours ? "text-[#2FB57B] dark:text-[#3FD08F]" : "text-zinc-800 dark:text-zinc-100",
                   namesOff ? "pointer-events-none opacity-0" : "pointer-events-auto opacity-100",
                 )}
               >
-                {t.label}
-                <span className={cn("font-normal tracking-[0.04em]", on ? "" : "text-zinc-400 dark:text-zinc-500")}> {t.ids.length}</span>
+                {ours ? "Sentinel L1" : t.label}
+                {!ours && <span className={cn("font-normal tracking-[0.04em]", on ? "" : "text-zinc-400 dark:text-zinc-500")}> {t.ids.length}</span>}
                 <span aria-hidden className={cn("mt-0.5 block h-[1.5px] w-5 bg-[#0061E2] transition-opacity duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] dark:bg-[#5f9dff]", on ? "opacity-100" : "opacity-0")} />
               </button>
             </div>
           );
         })}
+        {/* AVAGUARD: the C-Chain named on its plaza, where the visa's car arrives */}
+        {SENTINEL_ONLY && !rules && (
+          <div ref={tagRef("x:hub")} className="absolute left-0 top-0" style={{ visibility: "hidden" }}>
+            <span className={cn("block select-none whitespace-nowrap px-1.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#D7263D] transition-opacity duration-300 dark:text-[#FF5D57]", HALO, namesOff ? "opacity-0" : "opacity-100")}>
+              C-Chain
+              <span className="font-normal normal-case tracking-[0.02em] text-zinc-400 dark:text-zinc-500"> · où l&apos;argent arrive</span>
+            </span>
+          </div>
+        )}
         {/* a district's or the close-up's own words take the data tags' place: they leave the page, as the roof names do */}
         {!namesOff &&
           leaders.map((i) => {
