@@ -6,10 +6,25 @@
 
 | Démo live | URL |
 |---|---|
+| 🌐 Landing + dashboard (login, crée un agent, récupère sa clé) | **https://petroi.fr** · **https://petroi.fr/app** |
+| 🤖 Agents de démo (shopping + IA-à-IA) | **https://agents.petroi.fr** |
 | 🏙️ Ville 3D (transactions = voitures) | **https://city.petroi.fr** |
 | 🔎 Explorer de blocs (SentinelScan) | **https://explorer.petroi.fr** |
 | 🔌 API / RPC du garde | **https://rpc.petroi.fr** (`GET /health`) |
-| 🤖 Agents de démo (shopping + IA-à-IA) | https://yo6k6eid4h.execute-api.us-west-2.amazonaws.com/ |
+
+### 📦 Repos produit open-source (MIT)
+
+| Repo | Quoi |
+|---|---|
+| **[sentinel-guard](https://github.com/walidb212/sentinel-guard)** | Le **garde** : serveur MCP à brancher sur n'importe quel agent (Claude, Cursor, Hermès) en une ligne `uvx`. Screene chaque paiement, répond `allow` / `needs_approval` / `block`. |
+| **[secure-agent-starter](https://github.com/walidb212/secure-agent-starter)** | L'**agent de référence "Jarvis"** clé-en-main : clone, `uv run`, et regarde un agent se faire bloquer sur une arnaque (garde câblé dans le wallet). |
+
+```bash
+# Essayer en 30 s : l'agent se fait piéger, le garde bloque avant la signature
+git clone https://github.com/walidb212/secure-agent-starter && cd secure-agent-starter
+uv run secure-agent run shopping --variant scam --guard off --offline   # sans garde : paie 500 USDC à l'arnaque
+uv run secure-agent run shopping --variant scam --offline               # avec garde : bloqué
+```
 
 ---
 
