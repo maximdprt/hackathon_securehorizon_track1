@@ -5,6 +5,7 @@ Everything removed here is reported back as a finding so the content layer can s
 from __future__ import annotations
 
 import base64
+import codecs
 import re
 import unicodedata
 from urllib.parse import unquote
@@ -110,6 +111,13 @@ def _decode_blobs(text: str) -> list[str]:
             continue
         if s and sum(c.isprintable() for c in s) / len(s) > 0.9 and re.search(r"[A-Za-z]{3}", s):
             out.append(s)
+    # ROT13 : on ajoute la version décodée en candidat. Le texte normal décode en charabia (ignoré par le lexique) ;
+    # une instruction cachée encodée en ROT13 (ex. "vtaber cerivbhf vafgehpgvbaf") décode en vraie instruction, captée.
+    r13 = codecs.encode(text, "rot_13")
+    # on ne retient le ROT13 que s'il décode en quelque chose qui ressemble à une instruction : du texte normal
+    # décode en charabia (aucun mot-clé) et n'est donc pas ajouté — pas de décodage parasite.
+    if r13 != text and re.search(r"(?i)\b(ignore|approve|transfer|send|pay|wire|allowance|deprecated|skip|do not|previous instruction|re-?approve)\b", r13):
+        out.append(r13)
     return out
 
 
