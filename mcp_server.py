@@ -35,8 +35,17 @@ def verify_payment(order: dict[str, Any], source_context: str = "", context_type
     try:
         return engine.verify({"order": order, "source_context": source_context, "context_type": context_type,
                               "task": task, "context": context or {}})
-    except ValueError as e:  # malformed order: the caller's mistake, reported verbatim, never a verdict
+    except ValueError as e:  # malformed order (missing field, wrong type): the caller's mistake, reported verbatim, never a verdict
         raise ToolError(f"invalid request: {e}") from e
+
+
+@mcp.tool()
+def get_decision(instruction_id: str) -> dict[str, Any]:
+    """The recorded decision for one order: verdict, trust score, every deduction and its evidence. For audit."""
+    found = engine.decision(instruction_id)
+    if found is None:
+        raise ToolError(f"no decision recorded for {instruction_id}")
+    return found
 
 
 @mcp.tool()

@@ -190,7 +190,7 @@ def merchant_context(key: str, items: dict[str, int] | None = None) -> dict:
     if items and len(items) == 1:
         (pid,) = items
         merchant.update(price=s["products"][pid], market_price=PRODUCTS[pid]["market"])
-    return {"merchant": merchant, "history": {"avg_amount": 60, "payments_last_hour": 0, "prior_purchase": key == "nimbus"}}
+    return {"merchant": merchant, "history": {"avg_amount": 150, "payments_last_hour": 0, "prior_purchase": key == "nimbus"}}
 
 
 def expected_verdict(key: str | None, order: dict) -> str:

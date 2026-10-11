@@ -3,10 +3,11 @@ import { initials } from '../agents';
 import { amount, planOf, short, type AgentMessage, type Step } from '../run';
 import type { EndEvent } from '../types';
 import { Alert, Card, Check, Doc, Globe, Pen, Pointer, Scale } from './Icons';
+import { GuardCard } from './GuardCard';
 import { Typed } from './Typed';
 
 const ICON: Record<Step['kind'], ReactNode> = {
-  search: <Globe />, research: <Doc />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, invalid: <Alert />, thought: <Doc />,
+  search: <Globe />, research: <Doc />, guard: <Check />, open: <Doc />, page: <Doc />, click: <Pointer />, fill: <Pen />, choose: <Scale />, pay: <Card />, invalid: <Alert />, thought: <Doc />,
 };
 
 function Plan({ msg }: { msg: AgentMessage }) {
@@ -94,9 +95,30 @@ function StepLine({ step, selected, live, onSelect }: StepProps) {
   );
 }
 
+type OutcomeProps = { end: EndEvent; human?: AgentMessage['human']; onDecide: (decision: 'allow' | 'block') => void };
+
+/** Ce que le bac à sable sait du destinataire et que ni l'agent ni le garde ne savent : pour juger si le verdict est juste. */
+function Truth({ end }: { end: EndEvent }) {
+  const subject = end.site ? { kind: end.site.kind, why: end.site.why, noun: 'Boutique', fem: true } : end.asset ? { kind: end.asset.kind, why: end.asset.why, noun: 'Placement', fem: false } : null;
+  if (!subject) return null;
+  const legit = subject.kind === 'legit';
+  return (
+    <section className="plan">
+      <h3 className="plan__title">Bac à sable</h3>
+      <div className="plan__row">
+        <span className={`pill pill--${legit ? 'ok' : 'warn'}`}>
+          {subject.noun} {legit ? 'légitime' : subject.fem ? 'frauduleuse' : 'frauduleux'}
+        </span>
+        <p className="plan__text">{subject.why}</p>
+      </div>
+    </section>
+  );
+}
+
 /** La fin du run en texte, puis ce que le bac à sable sait et que l'agent ignore. */
-function Outcome({ end }: { end: EndEvent }) {
+function Outcome({ end, human, onDecide }: OutcomeProps) {
   const { site, confirmation } = end;
+  const guard = end.verdict ? <GuardCard verdict={end.verdict} human={human} onDecide={onDecide} /> : null;
   if (end.outcome === 'paid' && confirmation) {
     const legit = site?.kind === 'legit';
     return (
@@ -116,8 +138,9 @@ function Outcome({ end }: { end: EndEvent }) {
             Cette boutique a reçu le nom, l'e-mail et l'adresse de {confirmation.buyer.name}, ainsi que le numéro complet de sa carte, sa date
             d'expiration et son cryptogramme.
           </p>
-          <p className="plan__text">Aucun garde n'était branché : le paiement est parti. Le garde se placera juste avant le clic sur « Payer ».</p>
+          {!end.verdict && <p className="plan__text">Aucun garde n'était branché : le paiement est parti sans vérification.</p>}
         </section>
+        {guard}
       </>
     );
   }
@@ -137,7 +160,7 @@ function Outcome({ end }: { end: EndEvent }) {
               <p className="plan__text">{asset.why}</p>
             </div>
           )}
-          <p className="plan__text">Aucun garde n'était branché : l'ordre est préparé mais n'a pas été envoyé. Le garde le recevra juste avant l'envoi.</p>
+          <p className="plan__text">Aucun garde n'était branché : l'ordre est préparé mais n'a pas été envoyé.</p>
         </section>
       </>
     );
@@ -145,8 +168,8 @@ function Outcome({ end }: { end: EndEvent }) {
   const text = {
     ready: 'Ordre prêt.',
     done: 'Investissement effectué.',
-    blocked: 'Le garde a bloqué le paiement.',
-    needs_approval: 'Le garde demande une validation humaine avant de payer.',
+    blocked: "Le paiement n'est pas parti : le garde l'a refusé.",
+    needs_approval: "Le paiement n'est pas parti : il attend la décision d'un humain.",
     no_payment: "Je n'ai rien acheté.",
     max_turns: `Je n'ai pas réussi à finir l'achat en ${end.turns} étapes.`,
     paid: 'Commande passée.',
@@ -155,6 +178,8 @@ function Outcome({ end }: { end: EndEvent }) {
     <>
       <p className="chat__text chat__text--strong">{text}</p>
       {end.final_text && <p className="chat__text">{end.final_text}</p>}
+      {end.verdict && <Truth end={end} />}
+      {guard}
     </>
   );
 }
@@ -183,9 +208,11 @@ type Props = {
   shownFrame: number | null;
   onSelect: (frame: number) => void;
   onRetry: (prompt: string) => void;
+  /** Un humain tranche le paiement que le garde a mis en attente. */
+  onDecide: (decision: 'allow' | 'block') => void;
 };
 
-export function AgentReply({ msg, shownFrame, onSelect, onRetry }: Props) {
+export function AgentReply({ msg, shownFrame, onSelect, onRetry, onDecide }: Props) {
   const request = msg.end?.request ? JSON.stringify(msg.end.request, null, 2) : '';
   return (
     <div className="chat__msg--agent">
@@ -217,7 +244,7 @@ export function AgentReply({ msg, shownFrame, onSelect, onRetry }: Props) {
           )}
         </ol>
 
-        {msg.status === 'done' && msg.end && <Outcome end={msg.end} />}
+        {msg.status === 'done' && msg.end && <Outcome end={msg.end} human={msg.human} onDecide={onDecide} />}
         {msg.status === 'stopped' && <p className="chat__text chat__text--strong">Run interrompu.</p>}
         {msg.status === 'error' && (
           <>
@@ -237,7 +264,7 @@ export function AgentReply({ msg, shownFrame, onSelect, onRetry }: Props) {
         )}
         {request && (
           <details className="disclosure">
-            <summary className="disclosure__summary">Requête que le garde aurait reçue (verify_payment)</summary>
+            <summary className="disclosure__summary">{msg.end?.verdict ? 'Requête envoyée au garde (verify_payment)' : 'Requête que le garde aurait reçue (verify_payment)'}</summary>
             <div className="disclosure__body">
               <div>
                 <CopyButton text={request} />

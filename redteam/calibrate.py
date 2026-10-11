@@ -76,7 +76,7 @@ def load_cases() -> dict[str, dict]:
     cases: dict[str, dict] = {}
     for p in files:
         name = p.stem if p.parent.name == "cases" else "demo_" + p.stem
-        c = normalize_case(json.loads(p.read_text()), name, default_family="demo")
+        c = normalize_case(json.loads(p.read_text(encoding="utf-8")), name, default_family="demo")
         if c:
             cases[name] = c
     return cases
@@ -93,12 +93,12 @@ def load_extra(path: str | Path) -> dict[str, dict]:
     for f in files:
         records: list[dict] = []
         if f.suffix == ".jsonl":
-            for line in f.read_text().splitlines():
+            for line in f.read_text(encoding="utf-8").splitlines():
                 line = line.strip()
                 if line:
                     records.append(json.loads(line))
         else:
-            d = json.loads(f.read_text())
+            d = json.loads(f.read_text(encoding="utf-8"))
             records = d if isinstance(d, list) else [d]
         for i, rec in enumerate(records):
             base = rec.get("name") if isinstance(rec, dict) else None
@@ -254,7 +254,7 @@ def confusion(results: list[CaseResult], verdict_of: Callable[[CaseResult], str]
 def research_weights(path: Path = RESEARCH) -> dict[str, dict]:
     if not path.exists():
         return {}
-    d = json.loads(path.read_text())
+    d = json.loads(path.read_text(encoding="utf-8"))
     out: dict[str, dict] = {}
     for block, feats in (d.get("blocks") or {}).items():
         for f in feats or []:
