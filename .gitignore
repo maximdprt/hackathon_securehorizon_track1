@@ -44,3 +44,6 @@ demo/out/data/
 
 # sandbox agents : sorties de run (regenerees)
 agents/out/
+
+# the landing widget and app builds (landing/sentinel-auth.js and landing/sentinel-app.js are the copies we ship)
+landing/wallet-widget/dist-app/
