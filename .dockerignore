@@ -1,0 +1,10 @@
+.git
+.venv
+node_modules
+agents/out
+demo/out
+**/__pycache__
+*.log
+.env
+.env.*
+redteam/last_run.json

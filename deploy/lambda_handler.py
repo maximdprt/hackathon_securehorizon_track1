@@ -1,0 +1,126 @@
+"""Point d'entrée Lambda : héberge l'agent (navigateur agentique) + le garde + la chaîne, derrière une URL publique.
+
+Sert la même expérience que `agents/app.py` en local :
+  GET  /                      -> l'interface React (agents/ui/dist)
+  GET  /assets/<fichier>      -> les fichiers de l'interface
+  GET  /api/world             -> boutiques, modèles, profil acheteur
+  POST /api/run               -> un run complet de l'agent, rendu en ndjson (un geste par ligne). Le garde juge au
+                                 clic "Payer", la décision s'inscrit sur SentinelL1 (voiture dans la ville), et le
+                                 verdict voyage dans l'événement final. L'interface rejoue le flux à vitesse humaine.
+
+API Gateway coupe à 30 s : le modèle par défaut est Haiku (rapide) et le nombre de tours est borné. Données
+synthétiques uniquement. Le garde tourne en in-process (GUARD_LLM=off), la chaîne via SENTINEL_API (rpc.petroi.fr).
+"""
+from __future__ import annotations
+
+import base64
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+os.environ.setdefault("AGENTS_OUT_DIR", "/tmp/agents_out")
+os.environ.setdefault("GUARD_LLM", "off")
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from agents import world  # noqa: E402
+from agents.app import MODELS, public_site  # noqa: E402
+from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
+from agents.guard_client import GuardClient  # noqa: E402
+from agents.llm import BedrockLLM  # noqa: E402
+from agents.sentinel_chain import SentinelChain  # noqa: E402
+from agents.sentinel_gateway import verdict_summary  # noqa: E402
+
+import agents as _agents  # noqa: E402
+DIST = Path(_agents.__file__).resolve().parent / "ui" / "dist"
+ASSET_TYPES = {".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml",
+               ".map": "application/json", ".woff2": "font/woff2", ".png": "image/png"}
+# Lambda : Haiku par défaut (rapide, pour tenir sous les 30 s d'API Gateway), le garde en moteur, Claude coupé.
+DEFAULT_MODEL = os.environ.get("AGENT_MODEL_ID", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
+MAX_TURNS = int(os.environ.get("LAMBDA_MAX_TURNS", "18"))
+# en Lambda, seul /tmp est inscriptible : le moteur du garde y écrit son état jetable
+import demo.golden_path as _gp  # noqa: E402
+_gp.OUT = Path("/tmp/guard_out")
+_llms: dict[str, BedrockLLM] = {}
+_guard = None  # construits à la première requête (l'init Lambda reste légère, les erreurs remontent en 500 lisible)
+_chain = None
+
+
+def _guard_chain():
+    global _guard, _chain
+    if _guard is None:
+        _guard = GuardClient(os.environ.get("GUARD_BACKEND", "engine"))
+        _chain = None if os.environ.get("SENTINEL_API") == "off" else SentinelChain()
+    return _guard, _chain
+
+
+def _resp(code, body, ctype="application/json", b64=False):
+    return {"statusCode": code, "isBase64Encoded": b64,
+            "headers": {"Content-Type": ctype, "Cache-Control": "no-store", "Access-Control-Allow-Origin": "*"},
+            "body": body}
+
+
+def _world():
+    buyer = masked(PROFILE)
+    guard, chain = _guard_chain()
+    return _resp(200, json.dumps({"sites": [public_site(k) for k in world.ALL_SITES], "models": MODELS,
+                                  "default_model": DEFAULT_MODEL if DEFAULT_MODEL in MODELS else next(iter(MODELS)),
+                                  "profile": {"name": buyer["name"], "city": buyer["city"], "card": buyer["card_number"]},
+                                  "guard": guard.backend, "chain": chain.base if chain else None}, ensure_ascii=False))
+
+
+def _run(body: dict):
+    prompt = str(body.get("prompt", "")).strip()
+    model = body.get("model") if body.get("model") in MODELS else DEFAULT_MODEL
+    instructions, agent = str(body.get("instructions", "")).strip(), str(body.get("agent", "")).strip()
+    if not prompt or len(prompt) > 2000 or len(instructions) > 4000:
+        return _resp(400, json.dumps({"error": "bad request"}))
+    guard, chain = _guard_chain()
+    events: list[dict] = []
+    llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
+    run = run_browser(prompt, llm, guard=guard, instructions=instructions, emit=events.append, pace=0.0, max_turns=MAX_TURNS)
+    if run["verdict"] and chain:  # la transaction entre dans SentinelL1 : décision inscrite on-chain
+        events.append({"type": "submit", "network": "SentinelL1"})
+        run["onchain"] = chain.authorize(run["verdict"], public_site(run["site"]) if run["site"] else None,
+                                          item=", ".join(world.PRODUCTS[p]["name"] for p in run.get("items", {})) or run.get("chosen", ""))
+        events.append({"type": "onchain", **run["onchain"]})
+    req = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères de HTML lus par l'agent>"}
+    keys = ("outcome", "order", "chosen", "why", "considered", "submitted", "confirmation", "expected", "final_text", "turns")
+    events.append({"type": "end", **{k: run[k] for k in keys}, "site": public_site(run["site"]) if run["site"] else None, "request": req,
+                   **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], guard.backend), "onchain": run.get("onchain")} if run["verdict"] else {})})
+    ndjson = "\n".join(json.dumps(e, ensure_ascii=False, default=str) for e in events) + "\n"
+    return _resp(200, ndjson, "application/x-ndjson; charset=utf-8")
+
+
+def _asset(name: str):
+    f = DIST / "assets" / Path(name).name
+    if not f.is_file() or f.suffix not in ASSET_TYPES:
+        return _resp(404, json.dumps({"error": "not found"}))
+    data = f.read_bytes()
+    text = f.suffix in (".js", ".css", ".svg", ".map")
+    return _resp(200, data.decode() if text else base64.b64encode(data).decode(), ASSET_TYPES[f.suffix], b64=not text)
+
+
+def handler(event, context):
+    method = (event.get("requestContext", {}).get("http", {}) or {}).get("method", "GET")
+    path = event.get("rawPath") or event.get("path") or "/"
+    try:
+        if path == "/" or path == "":
+            index = DIST / "index.html"
+            return _resp(200, index.read_text(encoding="utf-8"), "text/html; charset=utf-8") if index.is_file() \
+                else _resp(503, "<h1>Interface non construite</h1>", "text/html; charset=utf-8")
+        if path.startswith("/assets/"):
+            return _asset(path[len("/assets/"):])
+        if path == "/api/world":
+            return _world()
+        if path == "/api/run" and method == "POST":
+            raw = event.get("body") or "{}"
+            if event.get("isBase64Encoded"):
+                raw = base64.b64decode(raw).decode()
+            return _run(json.loads(raw))
+        return _resp(404, json.dumps({"error": "not found"}))
+    except Exception as e:  # jamais de 502 muet
+        import traceback
+        return _resp(500, json.dumps({"error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()[-1500:]}))
