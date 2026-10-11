@@ -52,8 +52,9 @@ export function AuditView() {
   }, [txs, banned]);
 
   // the thresholds the decisions were taken on: the MCP agent's (30 / 70 risk) on the chain, the demo's otherwise
-  const lo = txs[0]?.thresholds.allow_below ?? 40;
-  const hi = txs[0]?.thresholds.block_from ?? 70;
+  // shown as trust (100 − risk): refused at or under `lo`, a visa above `hi`
+  const lo = 100 - (txs[0]?.thresholds.block_from ?? 70);
+  const hi = 100 - (txs[0]?.thresholds.allow_below ?? 40);
   const detection = m.attacks.length ? Math.round((m.stopped.length / m.attacks.length) * 100) : 100;
   const maxDay = Math.max(1, ...m.days.map(([, v]) => v.allow + v.block + v.human));
   const maxCheck = Math.max(1, ...Object.values(m.byCheck));
@@ -79,7 +80,7 @@ export function AuditView() {
         <Kpi label="Délai de décision" value={m.avgAll ? secs(m.avgAll) : "n.p."} sub={m.avgAll ? `1re fois ${secs(m.avgFirst)} · immunité ${secs(m.avgImmune)}` : "non publié on-chain"} />
         <Kpi label="Incidents DORA" value={m.incidents.length} sub="ouverts à chaque refus" tone={STATE.block.hex} />
         <Kpi label="Montant protégé" value={fmtAmount(m.prot.value)} sub={`${m.prot.token} refusés`} />
-        <Kpi label="Preuves on-chain" value={m.final.filter((t) => t.source === "live").length || m.final.length} sub={LIVE_CONFIGURED ? "décisions lues sur Sentinel L1" : "décisions ancrées (simulé)"} />
+        <Kpi label="Preuves on-chain" value={m.final.filter((t) => t.source === "live").length || m.final.length} sub={LIVE_CONFIGURED ? "décisions lues sur Sentinel L1, chacune payée en SEC" : "décisions ancrées (simulé)"} />
       </div>
 
       <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-4">
@@ -131,14 +132,14 @@ export function AuditView() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-[11.5px] text-zinc-500">Le contrôle au score le plus haut dans chaque refus de première main (hors immunité).</p>
+          <p className="mt-3 text-[11.5px] text-zinc-500">Le contrôle à la confiance la plus basse dans chaque refus de première main (hors immunité).</p>
         </section>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <section className={cn(CARD, "p-5")}>
           <h2 className={cn(LABEL, "mb-3")}>Seuils (recommandation KPMG : décider par seuils)</h2>
-          <div className="relative mt-6 h-3 rounded-full" style={{ background: `linear-gradient(to right, ${STATE.allow.hex} 0 ${lo}%, ${STATE.human.hex} ${lo}% ${hi}%, ${STATE.block.hex} ${hi}% 100%)` }}>
+          <div className="relative mt-6 h-3 rounded-full" style={{ background: `linear-gradient(to right, ${STATE.block.hex} 0 ${lo}%, ${STATE.human.hex} ${lo}% ${hi}%, ${STATE.allow.hex} ${hi}% 100%)` }}>
             {[lo, hi].map((v) => (
               <span key={v} className="absolute -top-6 -translate-x-1/2 font-mono text-[11px] text-zinc-500" style={{ left: `${v}%` }}>
                 {v}
@@ -146,13 +147,13 @@ export function AuditView() {
             ))}
           </div>
           <div className="mt-3 grid grid-cols-3 text-[12px]">
-            <span className="text-[#2FB57B] dark:text-[#3FD08F]">0 à {lo - 1} : visa signé</span>
+            <span className="text-[#E5483F] dark:text-[#FF5D57]">0 à {lo} : refus, registre</span>
             <span className="text-center text-[#D99A1E] dark:text-[#F2B33D]">
-              {lo} à {hi - 1} : un humain tranche
+              {lo + 1} à {hi} : un humain tranche
             </span>
-            <span className="text-right text-[#E5483F] dark:text-[#FF5D57]">{hi} à 100 : refus, registre</span>
+            <span className="text-right text-[#2FB57B] dark:text-[#3FD08F]">{hi + 1} à 100 : visa signé</span>
           </div>
-          <p className="mt-3 text-[11.5px] text-zinc-500">Le score de risque est la synthèse des 5 contrôles (autorité, bénéficiaire, mandat, intention IA, contrat). Une adresse au registre est refusée sans calcul.{LIVE_CONFIGURED ? " Seuils de l'agent MCP, resserrés quand le montant approche du plafond." : ""}</p>
+          <p className="mt-3 text-[11.5px] text-zinc-500">Le score de confiance (100 = sûr, 0 = arnaque) est la synthèse des 5 contrôles (autorité, bénéficiaire, mandat, intention IA, contrat). Une adresse au registre est refusée sans calcul.{LIVE_CONFIGURED ? " Seuils de l'agent MCP, resserrés quand le montant approche du plafond." : ""}</p>
         </section>
 
         <section className={cn(CARD, "p-5")}>

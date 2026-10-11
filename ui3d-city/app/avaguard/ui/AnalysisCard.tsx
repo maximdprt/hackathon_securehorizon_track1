@@ -9,11 +9,11 @@ import { answerHuman, followCar, stopFollow } from "@/sim/Director";
 import { motion, useSim } from "@/sim/store";
 import { STEPS } from "@/sim/timings";
 import { CHECK_LABEL, CHECK_ORDER, STATE, fmtAmount, fmtSecs, shortAddr, toneOf, type CheckKey, type Decision, type TxEvent } from "@/sim/types";
-import { Gauge, Radar, StateIcon, iconOf, zoneHex } from "./charts";
+import { Gauge, Radar, SEC_LINE, StateIcon, iconOf, trustOf, trustZones, zoneHex } from "./charts";
 
 /* The analysis card, at the right from the scan to the end of the protocol: the car's radiography building as it goes
    through the beam, the five checks lighting one by one (authority, beneficiary, mandate, AI intent, contract), the
-   score climbing to its value; then the decision in its colour (VISA, BLOCK, HUMAIN) with its reasons, its time, the
+   trust draining to its value (100 safe, 0 a scam); then the decision in its colour (VISA, BLOCK, HUMAIN) with its reasons, its time, the
    thresholds, the on-chain proof and, for a refusal, its DORA incident. A doubtful case asks a human here: Valider,
    Refuser. */
 
@@ -130,7 +130,7 @@ function HumanAsk() {
         </span>
       </div>
       <div className="mt-1.5 font-mono text-[11px] text-zinc-600 dark:text-zinc-300">
-        {tx.tx_id} · {fmtAmount(tx.amount.value)} {tx.amount.token} · {tx.to.domain ?? shortAddr(tx.to.address)} · score {tx.score}
+        {tx.tx_id} · {fmtAmount(tx.amount.value)} {tx.amount.token} · {tx.to.domain ?? shortAddr(tx.to.address)} · confiance {trustOf(tx.score)}/100
       </div>
       <p className="mt-1 text-[12.5px] leading-snug text-zinc-700 dark:text-zinc-200">{tx.reasons[0]}</p>
       <div className="mt-2.5 flex gap-2">
@@ -146,7 +146,7 @@ function HumanAsk() {
   );
 }
 
-/** Petite note de bas de carte : comment le score (risque) se calcule, pour qui veut comprendre. */
+/** Petite note de bas de carte : comment le score de confiance se calcule, pour qui veut comprendre. */
 function ScoreExplain({ tx }: { tx: TxEvent }) {
   const sig = tx.signals ?? [];
   const hard = sig.find((x) => x.hard);
@@ -160,20 +160,21 @@ function ScoreExplain({ tx }: { tx: TxEvent }) {
       </summary>
       <div className="mt-1.5 space-y-1 text-[10.5px] leading-snug text-zinc-500 dark:text-zinc-400">
         <p>
-          Le score est un <b>risque combiné</b>, pas une somme : <span className="font-mono">risque = 1 − ∏(1 − poids)</span>. Chaque signal
-          retire une part de confiance ; les forts dominent, et le total ne dépasse jamais 100.
+          Le score est une <b>confiance</b> sur 100 : <b>100 = sûr, 0 = arnaque</b>. Ce n&apos;est pas une somme :{" "}
+          <span className="font-mono">confiance = 100 × ∏(1 − poids)</span>. Chaque signal retire sa part de la confiance restante ; les forts
+          dominent, et elle ne descend jamais sous 0.
         </p>
         {hard ? (
           <p>
-            Ici un <b>signal bloquant</b> (<span className="font-mono">{hard.id}</span>) force le risque à <b>100/100</b>, quels que soient les autres.
+            Ici un <b>signal bloquant</b> (<span className="font-mono">{hard.id}</span>) force la confiance à <b>0/100</b>, quels que soient les autres.
           </p>
         ) : weights.length ? (
           <p className="font-mono">
-            1 − ({weights.map((w) => `(1−${fr(w)})`).join(" × ")}) = {Math.round((1 - product) * 100)}/100
+            100 × {weights.map((w) => `(1−${fr(w)})`).join(" × ")} = {Math.round(product * 100)}/100
           </p>
         ) : null}
         <p>
-          Zones : visa &lt; {tx.thresholds.allow_below} · humain {tx.thresholds.allow_below}–{tx.thresholds.block_from - 1} · refus ≥ {tx.thresholds.block_from}. Confiance = 100 − risque.
+          Zones : {trustZones(tx.thresholds)}. Plus le montant approche du plafond, plus les seuils se resserrent.
         </p>
       </div>
     </details>
@@ -241,7 +242,7 @@ export function AnalysisCard() {
             <Radar tx={tx} lit={(k) => done || lit(k)} />
           </div>
           <div className="px-4 font-mono text-[10px] text-zinc-500 dark:text-zinc-400">
-            seuils : visa &lt; {tx.thresholds.allow_below} · humain {tx.thresholds.allow_below} à {tx.thresholds.block_from - 1} · refus ≥ {tx.thresholds.block_from}
+            seuils de confiance : {trustZones(tx.thresholds)}
           </div>
           <ul className="mt-2 space-y-0.5 px-3">
             {CHECK_ORDER.map((k) => {
@@ -254,7 +255,7 @@ export function AnalysisCard() {
                     <div className="flex justify-between gap-2 text-[13px]">
                       <span className="font-medium text-zinc-900 dark:text-zinc-100">{CHECK_LABEL[k]}</span>
                       <span className="font-mono text-[12px]" style={{ color: on ? zoneHex(c.score, tx.thresholds) : undefined }}>
-                        {on ? `${c.score}/100` : "…"}
+                        {on ? `${trustOf(c.score)}/100` : "…"}
                       </span>
                     </div>
                     {on && <div className="text-[12px] leading-snug text-zinc-500 dark:text-zinc-400">{c.reason}</div>}
@@ -286,6 +287,9 @@ export function AnalysisCard() {
           <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-zinc-100 px-4 py-3 dark:border-zinc-900">
             <span className="w-full font-mono text-[10.5px] text-zinc-500 dark:text-zinc-400">
               {tx.onchain && decided ? `Preuve on-chain : bloc #${fmtAmount(tx.onchain.block)} · ${shortAddr(tx.onchain.tx_hash)}` : "Preuve on-chain : en attente"}
+            </span>
+            <span className="w-full text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
+              <span className="font-mono text-[10px] font-bold text-[#6FA8FF]">SEC</span> {SEC_LINE}
             </span>
             <button
               type="button"

@@ -8,7 +8,7 @@ import { answerHuman } from "@/sim/Director";
 import { sim, useSim, type Panel } from "@/sim/store";
 import { STEPS } from "@/sim/timings";
 import { STATE, fmtAmount, shortAddr, type Tone } from "@/sim/types";
-import { StateIcon } from "./charts";
+import { StateIcon, trustOf } from "./charts";
 
 const EYEBROW = "font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400 dark:text-zinc-500";
 const STEP_FR = ["Radiographie", "Autorité", "Bénéficiaire", "Mandat", "Intention IA", "Contrat", "Décision"];
@@ -239,7 +239,7 @@ export function HumanAlert() {
         {tx.from.agent_id} → {tx.to.domain ?? shortAddr(tx.to.address)}
       </div>
       <div className="font-mono text-[11px] text-zinc-500">
-        {fmtAmount(tx.amount.value)} {tx.amount.token} · score {tx.score} · {tx.tx_id}
+        {fmtAmount(tx.amount.value)} {tx.amount.token} · confiance {trustOf(tx.score)}/100 · {tx.tx_id}
       </div>
       <p className="mt-1.5 text-[12.5px] text-zinc-600 dark:text-zinc-400">{tx.reasons[0]}</p>
       <div className="mt-3 flex gap-2">

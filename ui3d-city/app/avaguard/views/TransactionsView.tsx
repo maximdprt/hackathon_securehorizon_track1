@@ -9,7 +9,7 @@ import { signalLabel } from "@/data/signals";
 import { setViewFilter, setViewTx } from "@/sim/nav";
 import { sim, useSim, type ViewFilter } from "@/sim/store";
 import { CHECK_LABEL, CHECK_ORDER, STATE, fmtAmount, shortAddr, type AuditTx } from "@/sim/types";
-import { Gauge, Radar, StateIcon, iconOf, zoneHex } from "../ui/charts";
+import { Gauge, Radar, SEC_LINE, StateIcon, iconOf, trustCuts, trustOf, trustZones, zoneHex } from "../ui/charts";
 import { SourceBadge } from "./ViewHost";
 
 /* The C-Chain's door: every agent payment Sentinel checked before it settled, as an explorer lists transactions, and
@@ -50,18 +50,19 @@ export function StatusPill({ status }: { status: AuditTx["status"] }) {
   );
 }
 
-/** the score on its 0 to 100 line, the thresholds marked */
+/** the trust on its 0 (scam) to 100 (safe) line, the thresholds marked */
 export function ScoreBar({ tx }: { tx: AuditTx }) {
   const t = tx.thresholds;
+  const c = trustCuts(t);
   return (
     <span className="flex items-center gap-2">
       <span className="relative h-1.5 w-20 rounded-full bg-zinc-200 dark:bg-zinc-800">
-        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${tx.score}%`, background: zoneHex(tx.score, t) }} />
-        <span className="absolute -top-0.5 h-2.5 w-px bg-zinc-400/70" style={{ left: `${t.allow_below}%` }} />
-        <span className="absolute -top-0.5 h-2.5 w-px bg-zinc-400/70" style={{ left: `${t.block_from}%` }} />
+        <span className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${trustOf(tx.score)}%`, background: zoneHex(tx.score, t) }} />
+        <span className="absolute -top-0.5 h-2.5 w-px bg-zinc-400/70" style={{ left: `${c.block_at}%` }} />
+        <span className="absolute -top-0.5 h-2.5 w-px bg-zinc-400/70" style={{ left: `${c.visa_above}%` }} />
       </span>
       <span className="w-6 text-right font-mono text-[12px] tabular-nums" style={{ color: zoneHex(tx.score, t) }}>
-        {tx.score}
+        {trustOf(tx.score)}
       </span>
     </span>
   );
@@ -248,7 +249,7 @@ export function TransactionsView() {
             <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="bg-transparent text-zinc-900 outline-none dark:text-zinc-100">
               <option value="date">Plus récentes</option>
               <option value="amount">Montant</option>
-              <option value="score">Score de risque</option>
+              <option value="score">Confiance (la plus basse d&apos;abord)</option>
             </select>
           </label>
         </div>
@@ -414,7 +415,7 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
               </div>
             </Section>
 
-            <Section title="Scoring d'audit" aside={<span className="font-mono text-[10px] text-zinc-400">seuils KPMG : visa &lt; {t.allow_below} · humain {t.allow_below} à {t.block_from - 1} · refus ≥ {t.block_from}</span>}>
+            <Section title="Scoring d'audit" aside={<span className="font-mono text-[10px] text-zinc-400">seuils KPMG (confiance) : {trustZones(t)}</span>}>
               {tx.partial ? (
                 <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-[12px] text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300">
                   <div className="mb-1 flex items-center gap-2">
@@ -465,11 +466,11 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
                           {CHECK_LABEL[k]}
                         </span>
                         <span className="font-mono text-[11px] tabular-nums" style={{ color: zoneHex(c.score, t) }}>
-                          {c.score}/100
+                          {trustOf(c.score)}/100
                         </span>
                       </div>
                       <div className="mt-1 h-1 rounded-full bg-zinc-100 dark:bg-zinc-800">
-                        <div className="h-full rounded-full" style={{ width: `${c.score}%`, background: zoneHex(c.score, t) }} />
+                        <div className="h-full rounded-full" style={{ width: `${trustOf(c.score)}%`, background: zoneHex(c.score, t) }} />
                       </div>
                       <p className="mt-1 text-[11.5px] text-zinc-500 dark:text-zinc-400">{c.reason}</p>
                     </li>
@@ -544,6 +545,9 @@ export function TxDetail({ tx, onClose = () => setViewTx(null) }: { tx: AuditTx;
               ) : (
                 <p className="text-[12px] text-zinc-500">La preuve est écrite sur Sentinel L1 dès la décision.</p>
               )}
+              <p className="mt-2.5 text-[11.5px] text-zinc-500 dark:text-zinc-400">
+                <span className="font-mono text-[10px] font-bold text-[#6FA8FF]">SEC</span> {SEC_LINE}
+              </p>
             </Section>
 
             <Section title="Conformité">
