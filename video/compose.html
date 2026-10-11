@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>AvaGuard+ · film agentique</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500;600&display=block" rel="stylesheet">
+<style>
+  /* The film's look (AvaGuard_Film_80s_1080p.mp4, the city's night palette): no particle, colour tells the decision */
+  :root {
+    --bg: #0D1118; --panel: rgba(18, 22, 32, 0.86); --line: #2A3440; --ink: #E8EBF0; --mute: #8E959F; --dim: #5E6B7A;
+    --allow: #3FD08F; --block: #FF5D57; --red: #D7263D; --human: #F2B33D; --scan: #6FA8FF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--ink); font-family: Geist, system-ui, sans-serif; }
+  .mono { font-family: "Geist Mono", ui-monospace, monospace; }
+  #stage { position: absolute; inset: 0; overflow: hidden; background: var(--bg); }
+  .scene { position: absolute; inset: 0; opacity: 0; visibility: hidden; }
+  .abs { position: absolute; }
+  .center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); text-align: center; }
+
+  /* screens: a captured page shown as a window */
+  .screen { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 50% 50%; border-radius: 18px; overflow: hidden;
+            box-shadow: 0 0 0 1px #2A3440, 0 40px 120px rgba(0,0,0,.55), 0 0 0 10px rgba(255,255,255,.02); background: #000; }
+  .screen video, .screen .clipwrap { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+  .rec { position: absolute; left: 36px; top: 30px; display: flex; gap: 10px; align-items: center; padding: 9px 16px; border-radius: 999px; background: rgba(13,17,24,.78);
+         border: 1px solid var(--line); font: 500 17px "Geist Mono"; color: var(--ink); letter-spacing: .04em; }
+  .rec i { width: 11px; height: 11px; border-radius: 50%; background: var(--block); box-shadow: 0 0 12px var(--block); }
+  .speed { position: absolute; right: 40px; top: 30px; padding: 8px 14px; border-radius: 10px; background: rgba(13,17,24,.78); border: 1px solid var(--line);
+           font: 600 18px "Geist Mono"; color: var(--scan); }
+
+  /* captions, as the film writes them: bottom left, the second half in the decision's colour */
+  #scrim { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; background: linear-gradient(to top, rgba(13,17,24,.92), rgba(13,17,24,0)); pointer-events: none; }
+  #kicker { position: absolute; left: 96px; bottom: 150px; font: 500 18px "Geist Mono"; letter-spacing: .22em; color: var(--mute); text-transform: uppercase; }
+  #caption { position: absolute; left: 96px; bottom: 84px; max-width: 1500px; font: 650 44px Geist; letter-spacing: -.01em; line-height: 1.2; }
+  #caption b { font-weight: 700; }
+  #badge { position: absolute; right: 36px; bottom: 30px; padding: 8px 14px; border-radius: 10px; background: rgba(13,17,24,.7); border: 1px solid var(--line);
+           font: 400 16px "Geist Mono"; color: var(--mute); }
+
+  /* panels */
+  .panel { position: absolute; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; backdrop-filter: blur(8px); }
+  .label { font: 500 16px "Geist Mono"; letter-spacing: .18em; text-transform: uppercase; color: var(--mute); }
+  .code { font: 400 24px/1.55 "Geist Mono"; color: var(--ink); white-space: pre; }
+  .k { color: var(--scan); } .s { color: #C9D1DB; } .n { color: var(--human); } .r { color: var(--block); } .g { color: var(--allow); }
+
+  /* act 2: the pipeline */
+  .stage-box { position: absolute; width: 330px; height: 128px; border-radius: 16px; border: 1px solid var(--line); background: rgba(18,22,32,.9);
+               display: flex; flex-direction: column; justify-content: center; padding: 0 28px; }
+  .stage-box .t { font: 700 30px Geist; } .stage-box .d { font: 400 19px Geist; color: var(--mute); margin-top: 8px; }
+  .arrow { position: absolute; height: 2px; background: var(--line); }
+  .arrow i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--scan); }
+  .chip { position: absolute; padding: 10px 18px; border-radius: 999px; border: 1px solid var(--line); font: 500 20px Geist; color: var(--mute); background: rgba(18,22,32,.9); }
+  .row { display: flex; justify-content: space-between; align-items: baseline; padding: 10px 0; border-bottom: 1px solid #1C222B; font: 500 25px Geist; }
+  .row small { display: block; font: 400 17px "Geist Mono"; color: var(--dim); margin-top: 4px; }
+  .row .c { font: 600 28px "Geist Mono"; }
+  .bar { position: relative; height: 16px; border-radius: 99px; background: #1C222B; overflow: visible; }
+  .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; }
+  .bar .tick { position: absolute; top: -8px; bottom: -8px; width: 2px; background: #C9D1DB; }
+  .stamp { position: absolute; padding: 14px 30px; border: 4px solid var(--block); color: var(--block); border-radius: 14px; font: 800 52px Geist; letter-spacing: .06em; }
+
+  /* act 3: blocks */
+  .block { position: absolute; width: 190px; height: 190px; border-radius: 20px; border: 1px solid var(--line); background: #121620; display: flex; flex-direction: column;
+           align-items: center; justify-content: center; gap: 10px; }
+  .block .h { font: 600 30px "Geist Mono"; } .block .d { font: 400 16px "Geist Mono"; color: var(--dim); }
+  .link { position: absolute; height: 2px; width: 60px; background: var(--line); }
+
+  /* act 6 */
+  .kpi { position: absolute; width: 400px; text-align: left; }
+  .kpi .v { font: 700 76px Geist; letter-spacing: -.02em; } .kpi .l { font: 400 22px Geist; color: var(--mute); margin-top: 6px; line-height: 1.35; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 0. the problem -->
+  <section class="scene" id="s0">
+    <div class="abs" id="halo" style="left:50%;top:52%;width:900px;height:900px;margin:-450px 0 0 -450px;border-radius:50%;
+      background:radial-gradient(circle, rgba(255,236,200,.55) 0%, rgba(255,214,150,.18) 18%, rgba(255,214,150,0) 55%)"></div>
+    <div class="center" style="top:46%">
+      <div id="s0a" style="font:700 64px Geist;letter-spacing:-.02em">Un agent IA peut payer seul.</div>
+      <div id="s0b" style="font:700 64px Geist;letter-spacing:-.02em;color:var(--block);margin-top:18px">Qui vérifie qu'il en a le droit ?</div>
+    </div>
+  </section>
+
+  <!-- 1-4. the agent, as a recorded screen -->
+  <section class="scene" id="sAgent">
+    <div class="screen" id="agentScreen"><div class="clipwrap" id="agentWrap"><video id="vAgent" muted preload="auto"></video>
+      <div class="abs" id="payRing" style="left:288px;top:802px;width:700px;height:78px;border-radius:14px;border:4px solid var(--human);box-shadow:0 0 40px rgba(242,179,61,.6);opacity:0"></div></div>
+    </div>
+    <div class="rec" id="agentRec"><i></i>Sandbox des agents · run réel</div>
+    <div class="speed" id="agentSpeed">×2,5</div>
+  </section>
+
+  <!-- 5. the request to the MCP -->
+  <section class="scene" id="s5">
+    <div class="abs label" id="s5k" style="left:180px;top:150px">MCP · outil <span style="color:var(--scan)">verify_payment</span></div>
+    <div class="panel" id="s5p" style="left:180px;top:200px;width:1100px;height:560px;padding:40px 46px">
+      <div class="code" id="s5code"></div>
+    </div>
+    <div class="panel" id="s5side" style="left:1340px;top:200px;width:400px;height:560px;padding:36px">
+      <div class="label">Ce que le garde sait</div>
+      <div style="font:500 26px/1.5 Geist;margin-top:22px">Le <b>mandat</b> de l'agent,<br>lu côté serveur :</div>
+      <div class="mono" style="font-size:22px;color:var(--human);margin-top:14px">300 € max par achat</div>
+      <div style="font:500 26px/1.5 Geist;margin-top:30px">La <b>page</b> que l'agent<br>a lue, relue par le garde.</div>
+      <div style="font:500 26px/1.5 Geist;margin-top:30px">Le <b>registre</b> des<br>menaces on-chain.</div>
+    </div>
+  </section>
+
+  <!-- 6. pipeline and score -->
+  <section class="scene" id="s6">
+    <div class="abs label" style="left:120px;top:62px">Le serveur MCP · moteur de décision</div>
+    <div class="stage-box" id="st0" style="left:120px;top:110px"><div class="t">Nettoyage</div><div class="d">texte caché, Unicode invisible, base64</div></div>
+    <div class="stage-box" id="st1" style="left:560px;top:110px"><div class="t">7 couches</div><div class="d">d'indices, chacun avec un poids</div></div>
+    <div class="stage-box" id="st2" style="left:1000px;top:110px"><div class="t">Score</div><div class="d">on part de 100, chaque indice retire sa part</div></div>
+    <div class="stage-box" id="st3" style="left:1440px;top:110px"><div class="t">Décision</div><div class="d">visa · humain · refus</div></div>
+    <div class="arrow" style="left:450px;top:174px;width:110px"><i id="ar0"></i></div>
+    <div class="arrow" style="left:890px;top:174px;width:110px"><i id="ar1"></i></div>
+    <div class="arrow" style="left:1330px;top:174px;width:110px"><i id="ar2"></i></div>
+    <div id="chips"></div>
+    <div class="panel" id="scoreP" style="left:120px;top:345px;width:1000px;height:530px;padding:24px 40px">
+      <div style="display:flex;align-items:baseline;gap:18px"><span id="scoreN" style="font:800 96px Geist;letter-spacing:-.03em">100</span>
+        <span style="font:500 30px Geist;color:var(--mute)">/ 100 de confiance</span></div>
+      <div class="bar" style="margin:18px 0 10px"><span class="fill" id="scoreFill"></span><span class="tick" style="left:40%"></span><span class="tick" style="left:80%"></span></div>
+      <div class="mono" style="font-size:17px;color:var(--dim);display:flex;justify-content:space-between"><span>refus ≤ 40</span><span>humain entre les deux</span><span>visa ≥ 80</span></div>
+      <div id="rows" style="margin-top:12px"></div>
+    </div>
+    <div class="panel" id="whyP" style="left:1180px;top:345px;width:620px;height:530px;padding:30px 36px">
+      <div class="label">Pourquoi</div>
+      <div style="font:500 28px/1.5 Geist;margin-top:22px">Meridian Watch Co. existe depuis <span class="r">9 jours</span>, et l'agent ne l'a jamais payée.</div>
+      <div style="font:500 28px/1.5 Geist;margin-top:22px">389 € dépasse le mandat de 300 € : <span style="color:var(--human)">une règle</span>, pas un soupçon.</div>
+      <div style="font:400 22px/1.5 Geist;margin-top:22px;color:var(--mute)">Montant ≥ 50 % du plafond : seuils stricts 40 / 80.</div>
+    </div>
+    <div class="stamp" id="stamp" style="left:700px;top:380px">REFUSÉ</div>
+  </section>
+
+  <!-- 7. the real card -->
+  <section class="scene" id="sCard">
+    <div class="abs" id="cardScreen" style="left:50%;top:465px;width:480px;height:495px;margin:-247px 0 0 -240px;border-radius:16px;overflow:hidden;background:#fff;transform-origin:50% 50%;
+      box-shadow:0 0 0 1px #2A3440, 0 40px 120px rgba(0,0,0,.55)"><video id="vCard" muted preload="auto" style="position:absolute;left:-1440px;top:-430px;width:1920px;height:1080px"></video></div>
+    <div class="rec" id="cardRec"><i></i>La vraie carte du chat</div>
+  </section>
+
+  <!-- 8. into the chain -->
+  <section class="scene" id="s8">
+    <div class="abs label" style="left:120px;top:110px">SentinelL1 · L1 Avalanche · chainId 99999</div>
+    <div id="chainRow"></div>
+    <div class="panel" id="s8p" style="left:120px;top:500px;width:1680px;height:300px;padding:36px 44px">
+      <div class="code" id="s8code"></div>
+    </div>
+  </section>
+
+  <!-- 9. the explorer -->
+  <section class="scene" id="sExp">
+    <div class="screen" id="expScreen"><div class="clipwrap" id="expWrap"><video id="vExp" muted preload="auto"></video></div></div>
+    <div class="rec" id="expRec"><i></i>explorer.petroi.fr · lecture seule</div>
+    <div class="panel" id="decoded" style="left:150px;top:540px;width:1620px;height:230px;padding:30px 40px">
+      <div class="label">Décodé depuis le champ Data · bloc #181 · transaction réelle</div>
+      <div class="code" style="margin-top:18px;font-size:23px;white-space:pre-wrap"><span class="k">recordDecision</span>(paymentId, <span class="r">"block"</span>,
+  <span class="s">"trust=0/100; recipient_flagged_onchain: recipient already flagged in incident registry (severity 3)"</span>)</div>
+    </div>
+  </section>
+
+  <!-- 10-14. the city -->
+  <section class="scene" id="sCity">
+    <div class="screen" id="cityScreen"><div class="clipwrap" id="cityWrap"><video id="vCity" muted preload="auto"></video></div></div>
+    <div class="rec" id="cityRec"><i></i>city.petroi.fr · ville 3D en production</div>
+    <div class="speed" id="citySpeed">×1,5</div>
+  </section>
+
+  <!-- 15. the figures -->
+  <section class="scene" id="s15">
+    <div class="abs label" style="left:160px;top:200px">Mesuré dans le repo · sans Claude, déterministe</div>
+    <div class="kpi" id="k0" style="left:160px;top:290px"><div class="v g" id="k0v">23/23</div><div class="l">attaques détectées</div></div>
+    <div class="kpi" id="k1" style="left:580px;top:290px"><div class="v" id="k1v">814</div><div class="l">variantes d'évasion,<br>aucune validée</div></div>
+    <div class="kpi" id="k2" style="left:1000px;top:290px"><div class="v g" id="k2v">0 %</div><div class="l">de faux positifs<br>sur 52 contrôles</div></div>
+    <div class="kpi" id="k3" style="left:1420px;top:290px"><div class="v" style="color:var(--scan)" id="k3v">~2 ms</div><div class="l">par décision<br>(≈ 6 s avec Claude)</div></div>
+    <div class="abs" id="k4" style="left:160px;top:620px;font:600 40px Geist;line-height:1.35">Et un <span style="color:var(--human)">humain</span> dès que le garde doute.<br>Chaque décision : une <span class="g">preuve on-chain</span>.</div>
+  </section>
+
+  <!-- 16. the end card -->
+  <section class="scene" id="s16">
+    <div class="center" style="top:47%">
+      <div style="font:800 120px Geist;color:var(--allow);letter-spacing:-.03em">AvaGuard+</div>
+      <div style="font:500 40px Geist;margin-top:14px;white-space:nowrap">Le péage de confiance des agents IA, sur Avalanche.</div>
+      <div class="mono" style="font-size:22px;color:var(--mute);margin-top:30px;letter-spacing:.06em">MCP · visa on-chain · registre des hackers · preuve DORA / MiCA</div>
+      <div style="font:500 24px Geist;color:var(--ink);margin-top:44px">Corentin · Bruno · Maxime · Walid</div>
+      <div class="mono" style="font-size:18px;color:var(--dim);margin-top:12px">ESSECKATHON Secure Horizons · Track 01 Fintech Security</div>
+    </div>
+  </section>
+
+  <div id="scrim"></div>
+  <div id="kicker"></div>
+  <div id="caption"></div>
+  <div id="badge">Simulation · données fictives</div>
+  <div class="abs" id="black" style="inset:0;background:#000;opacity:0"></div>
+</div>
+
+<script>
+const CAP = new URLSearchParams(location.search).get("cap") || "./cap/";
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, k) => a + (b - a) * k;
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2); // in-out cubic
+const out = (k) => 1 - Math.pow(1 - k, 3);
+/** in over [a,b], out over [c,d] */
+const fade = (t, a, b, c = 1e9, d = 1e9) => Math.min(ease(prog(t, a, b)), 1 - ease(prog(t, c, d)));
+const show = (el, o, y = 0) => { el.style.opacity = o; el.style.transform = `translateY(${(1 - o) * y}px)`; };
+
+/* ---------- the timeline (seconds) ---------- */
+const T = {
+  s0: [0, 7.5], agent: [7.5, 36.5], s5: [36.5, 43], s6: [43, 55], card: [55, 61], s8: [61, 72], exp: [72, 82], city: [82, 124], s15: [124, 131], s16: [131, 138.5],
+};
+const END = 138.5;
+
+/* the agent clip: [film start, film end, source start, source end] (source in seconds of agent.mp4) */
+const AGENT = [[7.5, 14.5, 1.2, 8.2], [14.5, 24, 8.2, 21.0], [24, 31, 21.0, 38.8], [31, 31.5, 38.8, 39.25], [31.5, 36.5, 39.25, 39.25]];
+/* the city clip: four scenes, then the second agent */
+const CITY = [[82, 86, 0.4, 3.5], [86, 100, 3.5, 25.2], [100, 107, 25.3, 36.5], [107, 116, 38.4, 55.0], [116, 124, 57.7, 65.7]];
+const EXP = [[72, 74.5, 0.6, 3.1], [74.5, 82, 4.6, 12.1]];
+const srcOf = (map, t) => { for (const [a, b, s, e] of map) if (t >= a && t < b) return { at: lerp(s, e, (t - a) / (b - a)), speed: (e - s) / (b - a) }; return null; };
+
+/* captions: [start, end, kicker, html] */
+const CAPTIONS = [
+  [8.2, 14.3, "Acte 1 · l'agent", "Un vrai agent d'achat. <b style='color:var(--mute)'>Il ne sait pas qu'on le surveille.</b>"],
+  [14.6, 18.6, "Acte 1 · l'agent", "Il cherche, il compare…"],
+  [18.8, 23.8, "Acte 1 · l'agent", "…et choisit le moins cher : <b style='color:var(--block)'>Meridian, 389 €.</b>"],
+  [24.2, 30.8, "Acte 1 · l'agent", "Il remplit le formulaire de carte, tout seul."],
+  [31.3, 36.3, "Acte 1 · l'agent", "Il clique « Payer ». <b style='color:var(--human)'>Le paiement ne part pas encore.</b>"],
+  [37.0, 42.8, "Acte 2 · le garde", "La transaction part d'abord à notre garde : <b style='color:var(--scan)'>un serveur MCP.</b>"],
+  [43.4, 48.6, "Acte 2 · le garde", "Il ne fait pas confiance à l'agent : il relit tout, lui-même."],
+  [48.8, 54.8, "Acte 2 · le garde", "Confiance 35 / 100, sous le seuil de 40 : <b style='color:var(--block)'>refusé.</b>"],
+  [55.4, 60.8, "Acte 2 · le garde", "Décidé en 165 ms. <b style='color:var(--mute)'>L'agent ne voit que : « le paiement n'est pas passé ».</b>"],
+  [61.4, 71.8, "Acte 3 · la blockchain", "La décision est écrite sur notre L1 Avalanche. <b style='color:var(--allow)'>Personne ne peut l'effacer.</b>"],
+  [72.4, 81.8, "Acte 3 · la blockchain", "Chaque décision : sa transaction, son bloc, sa raison. <b style='color:var(--allow)'>La preuve pour l'audit.</b>"],
+  [82.4, 86.0, "Acte 4 · la ville", "Dans la ville, chaque paiement est une voiture."],
+  [86.2, 89.4, "Acte 4 · la ville", "Blanche : <b style='color:var(--mute)'>rien n'est encore décidé.</b>"],
+  [89.6, 93.6, "Acte 4 · la ville", "Le scan : <b style='color:var(--scan)'>cinq contrôles.</b>"],
+  [93.8, 99.8, "Acte 4 · la ville", "Rouge : la casse. <b style='color:var(--block)'>L'adresse entre au registre des hackers.</b>"],
+  [100.2, 106.8, "Acte 4 · la ville", "Verte : visa émis. <b style='color:var(--allow)'>Elle entre dans la C-Chain.</b>"],
+  [107.2, 115.8, "Acte 4 · la ville", "Orange : <b style='color:var(--human)'>un humain décide.</b>"],
+  [116.2, 123.8, "Acte 5 · l'immunité", "Même escroc, autre agent : <b style='color:var(--block)'>refus direct par le registre.</b>"],
+];
+
+/* ---------- static pieces ---------- */
+const REQ = [
+  ['<span class="k">verify_payment</span>({', 0],
+  ['  order: {', 0],
+  ['    issuer:    <span class="s">"0xA11ce…0002"</span>,   <span style="color:var(--dim)">// l\'agent d\'achat</span>', 1],
+  ['    action:    <span class="s">"pay"</span>,', 1],
+  ['    amount:    <span class="n">389</span>,  currency: <span class="s">"EUR"</span>,', 1],
+  ['    recipient: <span class="s">"0x3E21…0C7B"</span>    <span style="color:var(--dim)">// le wallet de la boutique</span>', 1],
+  ['  },', 0],
+  ['  source_context: <span class="s">"&lt;html&gt; … la page lue par l\'agent … &lt;/html&gt;"</span>,', 2],
+  ['  context: { merchant: { domain: <span class="s">"meridian-watch.example"</span>,', 3],
+  ['                         domain_age_days: <span class="r">9</span> } }', 3],
+  ['})', 0],
+];
+const CHIPS = [["Contenu", 0], ["Mandat", 1], ["Autorité", 0], ["Contrepartie", 2], ["Transaction", 0], ["Outils", 0], ["Comportement", 0]];
+const ROWS = [
+  ["Départ", "", "100", "var(--ink)"],
+  ["Premier paiement à un marchand récent", "new_merchant_first_payment", "−50", "var(--block)"],
+  ["Domaine du marchand très récent", "domain registered 9.0 days ago", "−15", "var(--block)"],
+  ["Montant au-dessus du plafond du mandat", "amount 389.0 exceeds mandate cap 300", "règle", "var(--human)"],
+];
+const CHAIN = `<span style="color:var(--dim)">POST</span> rpc.petroi.fr/authorize   <span style="color:var(--dim)">→  AuthorityRegistry 0x7A7e…bcb6</span>
+  <span class="k">flagThreat</span>(<span class="s">0x3E21…0C7B</span>, severity <span class="r">3</span>)          <span style="color:var(--dim)">// l'adresse au registre des hackers</span>
+  <span class="k">recordDecision</span>(paymentId, <span class="r">"block"</span>, <span class="s">"trust=35/100; new_merchant_first_payment …"</span>)`;
+
+function build() {
+  $("vAgent").src = CAP + "agent.mp4"; $("vCard").src = CAP + "agent.mp4"; $("vCity").src = CAP + "city.mp4"; $("vExp").src = CAP + "explorer.mp4";
+  $("s5code").innerHTML = REQ.map(([l]) => `<div class="ln">${l}</div>`).join("");
+  $("chips").innerHTML = CHIPS.map(([n], i) => `<div class="chip" id="chip${i}" style="left:${120 + i * 252}px;top:268px">${n}</div>`).join("");
+  $("rows").innerHTML = ROWS.map(([a, b, c, col], i) => `<div class="row" id="row${i}"><div>${a}${b ? `<small>${b}</small>` : ""}</div><div class="c" style="color:${col}">${c}</div></div>`).join("");
+  $("chainRow").innerHTML = [178, 179, 180, 181].map((n, i) => `<div class="block" id="blk${i}" style="left:${170 + i * 300}px;top:200px"><div class="h">#${n}</div><div class="d">${i === 3 ? "nouveau bloc" : "décision"}</div></div>` +
+    (i ? `<div class="link" style="left:${170 + i * 300 - 110}px;top:295px;width:110px"></div>` : "")).join("");
+  $("s8code").innerHTML = CHAIN;
+}
+
+/* a screen: scale s, centred at the stage's middle, focused on (fx, fy) of the 1920x1080 page at zoom z */
+function frame(screen, wrap, { s = 0.78, z = 1, fx = 960, fy = 540, rx = 0, o = 1, cy = -70 }) {
+  screen.style.opacity = o;
+  screen.style.transform = `translate(-50%, calc(-50% + ${cy}px)) perspective(2400px) rotateX(${rx}deg) scale(${s})`;
+  // zoom into the page around (fx, fy), keeping that point at the window's centre
+  const tx = 960 - fx * z, ty = 540 - fy * z;
+  wrap.style.transform = `translate(${clamp(tx, 1920 - 1920 * z, 0)}px, ${clamp(ty, 1080 - 1080 * z, 0)}px) scale(${z})`;
+}
+
+const seekTo = (v, at) => new Promise((resolve) => {
+  if (!isFinite(at)) return resolve();
+  at = Math.min(at, (v.duration || 1e9) - 0.02);
+  if (Math.abs(v.currentTime - at) < 1 / 120 && v.readyState >= 2) return resolve();
+  const done = () => { v.removeEventListener("seeked", done); resolve(); };
+  v.addEventListener("seeked", done);
+  v.currentTime = at;
+  setTimeout(done, 3000);
+});
+
+const on = (id, t, [a, b], fin = 0.5, fout = 0.5) => {
+  const el = $(id); const o = fade(t, a, a + fin, b - fout, b);
+  const vis = t >= a && t < b;
+  el.style.visibility = vis ? "visible" : "hidden"; el.style.opacity = vis ? o : 0;
+  return vis;
+};
+
+async function renderAt(t) {
+  const waits = [];
+  /* 0 */
+  if (on("s0", t, T.s0, 0.01, 0.7)) {
+    const h = ease(prog(t, 0, 2.6));
+    $("halo").style.transform = `scale(${lerp(0.25, 1, h)})`; $("halo").style.opacity = lerp(0, 1, h) * (1 - prog(t, 5.5, 7.4));
+    show($("s0a"), fade(t, 0.6, 1.6), 16); show($("s0b"), fade(t, 3.0, 4.0), 16);
+  }
+  /* agent */
+  if (on("sAgent", t, T.agent, 0.8, 0.6)) {
+    const src = srcOf(AGENT, t);
+    if (src) waits.push(seekTo($("vAgent"), src.at));
+    const intro = ease(prog(t, 7.5, 9.0));
+    let z = 1, fx = 960, fy = 540;
+    // the click on « Payer »: zoom onto the button (the agent's browser, left), the frame frozen
+    const zin = ease(prog(t, 31.0, 32.2));
+    z = lerp(1, 2.3, zin); fx = lerp(960, 631, zin); fy = lerp(540, 842, zin);
+    frame($("agentScreen"), $("agentWrap"), { s: lerp(0.64, 0.78, intro), rx: lerp(14, 0, intro), z, fx, fy });
+    $("payRing").style.opacity = t > 32.2 ? 0.55 + 0.45 * Math.sin((t - 32.2) * 6) : 0;
+    $("agentSpeed").style.opacity = t >= 24 && t < 31 ? fade(t, 24, 24.4, 30.6, 31) : 0;
+    $("agentRec").style.opacity = fade(t, 8.6, 9.4, 30.6, 31.2);
+  }
+  /* 5: the request */
+  if (on("s5", t, T.s5, 0.6, 0.5)) {
+    const p = $("s5p"); p.style.transform = `translateY(${(1 - out(prog(t, 36.5, 37.4))) * 30}px)`;
+    const lines = [...$("s5code").children];
+    lines.forEach((ln, i) => (ln.style.opacity = prog(t, 37.0 + i * 0.32, 37.25 + i * 0.32)));
+    show($("s5side"), fade(t, 39.8, 40.6), 20);
+    show($("s5k"), fade(t, 36.6, 37.2), 10);
+  }
+  /* 6: pipeline and score */
+  if (on("s6", t, T.s6, 0.5, 0.5)) {
+    ["st0", "st1", "st2", "st3"].forEach((id, i) => {
+      const k = fade(t, 43.2 + i * 0.7, 43.6 + i * 0.7);
+      const el = $(id); el.style.opacity = k; el.style.transform = `translateY(${(1 - k) * 18}px)`;
+      const lit = t > 43.6 + i * 0.7 && t < 47.2;
+      el.style.borderColor = i === 3 && t > 52.2 ? "var(--block)" : lit ? "var(--scan)" : "var(--line)";
+      el.style.boxShadow = lit ? "0 0 0 1px var(--scan), 0 0 40px rgba(111,168,255,.18)" : "none";
+    });
+    ["ar0", "ar1", "ar2"].forEach((id, i) => ($(id).style.width = `${prog(t, 43.6 + i * 0.7, 44.1 + i * 0.7) * 100}%`));
+    CHIPS.forEach(([, hit], i) => {
+      const el = $("chip" + i); const k = fade(t, 45.2 + i * 0.15, 45.5 + i * 0.15);
+      el.style.opacity = k;
+      const flag = t > 46.6 && hit;
+      el.style.borderColor = flag ? (hit === 2 ? "var(--block)" : "var(--human)") : "var(--line)";
+      el.style.color = flag ? (hit === 2 ? "var(--block)" : "var(--human)") : t > 45.6 + i * 0.15 ? "var(--ink)" : "var(--mute)";
+    });
+    show($("scoreP"), fade(t, 47.0, 47.6), 24); show($("whyP"), fade(t, 47.4, 48.0), 24);
+    const n = t < 48.6 ? 100 : t < 49.6 ? Math.round(lerp(100, 50, ease(prog(t, 48.6, 49.4)))) : Math.round(lerp(50, 35, ease(prog(t, 49.8, 50.6))));
+    $("scoreN").textContent = n; $("scoreN").style.color = n <= 40 ? "var(--block)" : n < 80 ? "var(--human)" : "var(--ink)";
+    $("scoreFill").style.width = `${n}%`; $("scoreFill").style.background = n <= 40 ? "var(--block)" : n < 80 ? "var(--human)" : "var(--allow)";
+    ROWS.forEach((_, i) => show($("row" + i), fade(t, 48.0 + i * 0.9, 48.4 + i * 0.9), 10));
+    const st = out(prog(t, 52.2, 52.6));
+    $("stamp").style.opacity = st; $("stamp").style.transform = `rotate(-8deg) scale(${lerp(1.6, 1, st)})`;
+  }
+  /* 7: the real card */
+  if (on("sCard", t, T.card, 0.5, 0.5)) {
+    waits.push(seekTo($("vCard"), 47.3));
+    const k = ease(prog(t, 55.0, 56.2));
+    $("cardScreen").style.transform = `scale(${lerp(1.2, 1.62, k)}) translateY(${(1 - k) * 40}px)`;
+    $("cardRec").style.opacity = fade(t, 55.6, 56.2);
+  }
+  /* 8: into the chain */
+  if (on("s8", t, T.s8, 0.5, 0.5)) {
+    [0, 1, 2, 3].forEach((i) => {
+      const el = $("blk" + i);
+      if (i < 3) { el.style.opacity = fade(t, 61.2 + i * 0.2, 61.6 + i * 0.2); el.style.transform = "none"; return; }
+      const k = out(prog(t, 63.0, 64.0));
+      el.style.opacity = k; el.style.transform = `translateY(${(1 - k) * -120}px) scale(${lerp(0.7, 1, k)})`;
+      const glow = t > 64 ? 0.5 + 0.5 * Math.sin((t - 64) * 3) : 0;
+      el.style.borderColor = t > 64 ? "var(--allow)" : "var(--line)"; el.style.boxShadow = `0 0 ${30 + 30 * glow}px rgba(63,208,143,${0.15 + 0.2 * glow})`;
+    });
+    show($("s8p"), fade(t, 64.6, 65.3), 20);
+  }
+  /* 9: explorer */
+  if (on("sExp", t, T.exp, 0.5, 0.5)) {
+    const src = srcOf(EXP, t); if (src) waits.push(seekTo($("vExp"), src.at));
+    const zk = ease(prog(t, 75.5, 77));
+    frame($("expScreen"), $("expWrap"), { s: 0.78, z: lerp(1, 1.45, zk), fx: lerp(960, 820, zk), fy: lerp(540, 560, zk) });
+    $("expRec").style.opacity = fade(t, 72.6, 73.2);
+    show($("decoded"), fade(t, 77.4, 78.1), 24);
+  }
+  /* 10-14: the city */
+  if (on("sCity", t, T.city, 0.6, 0.6)) {
+    const src = srcOf(CITY, t); if (src) waits.push(seekTo($("vCity"), src.at));
+    frame($("cityScreen"), $("cityWrap"), { s: lerp(0.74, 0.8, ease(prog(t, 82, 84))), z: 1, cy: -60 });
+    $("citySpeed").style.opacity = src && src.speed > 1.2 ? 1 : 0;
+    if (src) $("citySpeed").textContent = "×" + src.speed.toFixed(1).replace(".", ",");
+    $("cityRec").style.opacity = fade(t, 82.6, 83.2);
+  }
+  /* 15 */
+  if (on("s15", t, T.s15, 0.5, 0.6)) {
+    ["k0", "k1", "k2", "k3"].forEach((id, i) => show($(id), fade(t, 124.3 + i * 0.35, 124.8 + i * 0.35), 24));
+    $("k1v").textContent = Math.round(lerp(0, 814, out(prog(t, 124.6, 126.2))));
+    show($("k4"), fade(t, 126.4, 127.1), 20);
+  }
+  /* 16 */
+  on("s16", t, T.s16, 0.8, 1.2);
+
+  /* captions */
+  const c = CAPTIONS.find(([a, b]) => t >= a && t < b);
+  if (c) {
+    const k = fade(t, c[0], c[0] + 0.35, c[1] - 0.3, c[1]);
+    if ($("caption").dataset.k !== String(c[0])) { $("caption").innerHTML = c[3]; $("kicker").textContent = c[2]; $("caption").dataset.k = String(c[0]); }
+    show($("caption"), k, 14); $("kicker").style.opacity = k;
+  } else { $("caption").style.opacity = 0; $("kicker").style.opacity = 0; }
+  const filmed = t >= 7.5 && t < 124;
+  $("scrim").style.opacity = filmed ? 1 : 0;
+  $("badge").style.opacity = t >= 7.5 && t < 131 ? 1 : 0;
+  $("black").style.opacity = Math.max(1 - prog(t, 0, 0.4), prog(t, END - 1.0, END));
+  await Promise.all(waits);
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+}
+
+window.FILM = { END, renderAt, ready: (async () => {
+  build();
+  await document.fonts.ready;
+  await Promise.all(["vAgent", "vCard", "vCity", "vExp"].map((id) => new Promise((r) => { const v = $(id); if (v.readyState >= 2) r(); else v.addEventListener("loadeddata", r, { once: true }); })));
+  return true;
+})() };
+</script>
+</body>
+</html>
