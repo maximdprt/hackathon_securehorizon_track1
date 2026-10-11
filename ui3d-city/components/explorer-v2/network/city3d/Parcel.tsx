@@ -87,10 +87,11 @@ export function ProofStack({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const shown = blocks.slice(-PROOFS);
   return (
     <group position={geo.proof}>
-      {/* the plinth, stepped, its top edged with the proof's green */}
+      {/* the plinth, stepped, its top edged with a fine rim of the proof's green */}
       <Block w={size * 2} h={size * 0.25} d={size * 2} mat={mats.base} />
       <Block w={size * 1.5} h={size * 0.25} d={size * 1.5} y0={size * 0.25} mat={mats.step} />
       <Block w={size * 1.52} h={size * 0.035} d={size * 1.52} y0={size * 0.5} mat={mats.line} />
+      <Block w={size * 1.4} h={size * 0.04} d={size * 1.4} y0={size * 0.5} mat={mats.step} />
       {/* the glass column the blocks stack in, and its edges */}
       <mesh position={[0, base + tall / 2, 0]} material={mats.glass} renderOrder={2}>
         <boxGeometry args={[cube * 1.24, tall, cube * 1.24]} />

@@ -33,6 +33,30 @@ void main() {
 float r = length( ( vUv - 0.5 ) * 2.0 ); gl_FragColor = vec4( 0.0, 0.0, 0.0, ( 1.0 - smoothstep( 0.3, 1.0, r ) ) * uShade ); }`,
 };
 
+/* AVAGUARD: its lights on the road at night, its headlamps' two pools ahead, a fan that fades with the distance and toward
+   its sides, and the tail lamps' red glow behind; added to the dark (by day they are not drawn). Clipped with the body, so
+   a hologram has none and a car gone through the gate leaves none */
+const LAMPS_VERT = /* glsl */ `#include <clipping_planes_pars_vertex>
+varying vec2 vUv;
+void main() { vUv = uv; vec4 mvPosition = modelViewMatrix * vec4( position, 1.0 ); gl_Position = projectionMatrix * mvPosition;
+#include <clipping_planes_vertex>
+}`;
+const BEAM_FRAG = /* glsl */ `#include <clipping_planes_pars_fragment>
+uniform vec3 uColor; uniform float uA; varying vec2 vUv;
+void main() {
+#include <clipping_planes_fragment>
+float x = vUv.x; float y = abs( vUv.y - 0.5 ) * 2.0;
+float fan = 1.0 - smoothstep( 0.2 + 0.75 * x, 0.35 + 0.85 * x, y );
+float a = pow( 1.0 - x, 1.7 ) * smoothstep( 0.0, 0.06, x ) * fan * uA;
+gl_FragColor = vec4( uColor * a, a ); }`;
+const TAIL_FRAG = /* glsl */ `#include <clipping_planes_pars_fragment>
+uniform vec3 uColor; uniform float uA; varying vec2 vUv;
+void main() {
+#include <clipping_planes_fragment>
+float d = length( ( vUv - vec2( 1.0, 0.5 ) ) * vec2( 1.6, 1.0 ) );
+float a = pow( max( 0.0, 1.0 - d ), 2.2 ) * uA;
+gl_FragColor = vec4( uColor * a, a ); }`;
+
 /* the scan's hologram: the reference's fresnel (avaguard-fx.html), blue, no scanlines, no noise */
 const HOLO_VERT = /* glsl */ `#include <clipping_planes_pars_vertex>
 varying vec3 vN;
@@ -75,6 +99,8 @@ export function GuardCar({ geo, theme, share }: { geo: GuardGeo; theme: Theme; s
       shadow: new ShaderMaterial({ uniforms: { uShade: { value: dark ? 0.42 : 0.26 } }, ...SHADOW, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1, clipping: true }),
       holo: new ShaderMaterial({ uniforms: { uColor: { value: new Color("#6FA8FF") } }, vertexShader: HOLO_VERT, fragmentShader: HOLO_FRAG, transparent: true, depthWrite: false, blending: AdditiveBlending, clipping: true }),
       wire: new LineBasicMaterial({ color: "#9cc2ff", transparent: true, opacity: 0.6 }),
+      beam: new ShaderMaterial({ uniforms: { uColor: { value: new Color("#FFF1D6") }, uA: { value: 0.42 } }, vertexShader: LAMPS_VERT, fragmentShader: BEAM_FRAG, transparent: true, depthWrite: false, blending: AdditiveBlending, premultipliedAlpha: true, clipping: true }),
+      tail: new ShaderMaterial({ uniforms: { uColor: { value: new Color("#FF2A1F") }, uA: { value: 0.35 } }, vertexShader: LAMPS_VERT, fragmentShader: TAIL_FRAG, transparent: true, depthWrite: false, blending: AdditiveBlending, premultipliedAlpha: true, clipping: true }),
     };
   }, [dark]);
   const paint = mats.car.Paint as MeshLambertMaterial;
@@ -83,6 +109,8 @@ export function GuardCar({ geo, theme, share }: { geo: GuardGeo; theme: Theme; s
   useMemo(() => {
     for (const m of Object.values(mats.car)) m.clippingPlanes = [clip.solid];
     mats.shadow.clippingPlanes = [clip.solid];
+    mats.beam.clippingPlanes = [clip.solid];
+    mats.tail.clippingPlanes = [clip.solid];
     mats.holo.clippingPlanes = [clip.holo];
     mats.wire.clippingPlanes = [clip.holo];
     if (share) share.current = mats.car;
@@ -144,6 +172,17 @@ export function GuardCar({ geo, theme, share }: { geo: GuardGeo; theme: Theme; s
           <mesh material={mats.shadow} position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[CAR_LENGTH * 1.1 * w, 1.3 * w, 1]}>
             <planeGeometry args={[1, 1]} />
           </mesh>
+          {/* its lamps on the road at night: the headlamps' pools ahead, the tail lamps' glow behind */}
+          {dark && (
+            <>
+              <mesh material={mats.beam} position={[(CAR_LENGTH / 2 + 2.1) * w, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[4.2 * w, 2.6 * w, 1]} renderOrder={4}>
+                <planeGeometry args={[1, 1]} />
+              </mesh>
+              <mesh material={mats.tail} position={[-(CAR_LENGTH / 2 + 0.55) * w, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.1 * w, 1.3 * w, 1]} renderOrder={4}>
+                <planeGeometry args={[1, 1]} />
+              </mesh>
+            </>
+          )}
         </group>
       </Door>
     </group>

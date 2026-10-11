@@ -160,6 +160,43 @@ def _art(pid: str, cls: str) -> str:
         holes = "".join(f'<circle cx="60" cy="{y}" r="2.6" fill="#e6f0ec"/>' for y in (66, 76, 86, 96))
         shape = (f'<circle cx="60" cy="60" r="58" fill="#e6f0ec"/><rect x="46" y="6" width="28" height="108" rx="13" fill="#3f7d6b"/>'
                  f'<circle cx="60" cy="26" r="4.5" fill="#c3cad5"/>{holes}')
+    elif pid == "airmax-270":  # sneaker de profil : semelle, bulle d'air, tige, virgule rouge, lacets
+        shape = ('<circle cx="60" cy="60" r="58" fill="#eef2f7"/>'
+                 '<path d="M16 84 Q20 92 34 92 H94 Q102 92 101 83 L99 77 H20 Z" fill="#1c2430"/>'
+                 '<circle cx="34" cy="83" r="5" fill="#3a4556"/><circle cx="50" cy="83" r="5" fill="#3a4556"/>'
+                 '<path d="M18 78 Q20 54 44 49 L74 45 Q92 47 97 66 L99 78 Z" fill="#ffffff" stroke="#d2dae6" stroke-width="1.6"/>'
+                 '<path d="M30 72 Q58 60 96 64 Q68 72 36 76 Z" fill="#e23744"/>'
+                 '<g stroke="#c6cfdc" stroke-width="2" stroke-linecap="round"><path d="M50 55 l11 3"/><path d="M50 61 l11 3"/><path d="M50 67 l11 3"/></g>'
+                 '<path d="M74 45 Q86 46 92 58" fill="none" stroke="#c6cfdc" stroke-width="2"/>')
+    elif pid == "iphone-16":  # dos titane : module photo deux objectifs, flash, pastille centrale
+        shape = ('<circle cx="60" cy="60" r="58" fill="#eef2f7"/>'
+                 '<rect x="38" y="15" width="44" height="90" rx="12" fill="#8a94a6"/>'
+                 '<rect x="40.5" y="17.5" width="39" height="85" rx="9.5" fill="#aeb8c9"/>'
+                 '<rect x="43" y="20" width="25" height="25" rx="7" fill="#79839a"/>'
+                 '<circle cx="51" cy="28" r="4.6" fill="#10141b" stroke="#dfe5ef" stroke-width="1.7"/>'
+                 '<circle cx="60" cy="37" r="4.6" fill="#10141b" stroke="#dfe5ef" stroke-width="1.7"/>'
+                 '<circle cx="51" cy="37" r="2.1" fill="#f4d27a"/>'
+                 '<circle cx="60" cy="72" r="6.5" fill="#eef2f7" opacity="0.85"/>')
+    elif pid == "ticket-aurora":  # billet incliné : perforation, code-barres, étoile
+        shape = ('<circle cx="60" cy="60" r="58" fill="#efeaf7"/>'
+                 '<g transform="rotate(-8 60 60)">'
+                 '<rect x="22" y="40" width="76" height="40" rx="6" fill="#ffffff" stroke="#d7cdeb" stroke-width="1.6"/>'
+                 '<line x1="74" y1="42" x2="74" y2="78" stroke="#c9bce4" stroke-width="1.6" stroke-dasharray="3 3"/>'
+                 '<circle cx="74" cy="40" r="3" fill="#efeaf7"/><circle cx="74" cy="80" r="3" fill="#efeaf7"/>'
+                 '<path d="M86 54 l2.4 5 5.4 .8 -3.9 3.8 .9 5.4 -4.8-2.5 -4.8 2.5 .9-5.4 -3.9-3.8 5.4-.8 z" fill="#7a3fd1"/>'
+                 '<g fill="#2a2140"><rect x="30" y="50" width="2.4" height="20"/><rect x="35" y="50" width="1.6" height="20"/>'
+                 '<rect x="39" y="50" width="3" height="20"/><rect x="45" y="50" width="1.6" height="20"/><rect x="49" y="50" width="2.4" height="20"/></g>'
+                 '</g>')
+    elif pid == "giftcard-100":  # carte cadeau : ruban, nœud, étincelle
+        shape = ('<circle cx="60" cy="60" r="58" fill="#e8f3ec"/>'
+                 '<rect x="26" y="36" width="68" height="46" rx="8" fill="#2f6b3f"/>'
+                 '<rect x="26" y="36" width="68" height="46" rx="8" fill="#ffffff" opacity="0.06"/>'
+                 '<rect x="55" y="36" width="8" height="46" fill="#f4d27a"/>'
+                 '<rect x="26" y="55" width="68" height="8" fill="#f4d27a"/>'
+                 '<path d="M59 59 q-13 -9 -16 -2 q2 7 16 2 z" fill="#f4d27a"/>'
+                 '<path d="M61 59 q13 -9 16 -2 q-2 7 -16 2 z" fill="#f4d27a"/>'
+                 '<circle cx="60" cy="59" r="4.2" fill="#e3a81a"/>'
+                 '<path d="M39 44 l1.6 3.2 3.2 1.6 -3.2 1.6 -1.6 3.2 -1.6-3.2 -3.2-1.6 3.2-1.6 z" fill="#ffffff"/>')
     else:  # un câble de recharge : la bobine, le palet magnétique, la prise
         shape = ('<circle cx="60" cy="60" r="58" fill="#eef0f4"/><g fill="none" stroke="#b9bfca" stroke-width="5"><circle cx="60" cy="66" r="27"/>'
                  '<circle cx="60" cy="66" r="16"/></g><circle cx="60" cy="30" r="14" fill="#fff" stroke="#b9bfca" stroke-width="4"/>'
