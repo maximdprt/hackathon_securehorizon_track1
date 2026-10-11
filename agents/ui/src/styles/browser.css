@@ -3,45 +3,56 @@
   --accent: #8C1D33; --accent-soft: #F8EBEE; --accent-ring: rgba(140, 29, 51, .16); /* bordeaux */
   display: flex;
   height: 100%;
-  background: #F7F8FA;
-  color: #16202B;
-  font-family: 'Figtree', system-ui, sans-serif;
+  background: var(--stage) radial-gradient(circle at 1px 1px, rgba(27, 23, 18, .09) 1px, transparent 0) 0 0 / 22px 22px;
+  color: var(--text);
+  font-family: var(--sans);
 }
 .agentic :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.agentic__state { margin: 12vh auto; max-width: 60ch; padding: 0 24px; font-size: 15px; line-height: 1.55; }
-.agentic__state-title { margin: 0 0 8px; font-size: 18px; font-weight: 700; }
-.agentic__side { flex: none; width: 440px; min-height: 0; display: flex; flex-direction: column; background: #fff; border-left: 1px solid #E3E7ED; }
+.agentic__state { margin: 12vh auto; max-width: 60ch; padding: 0 24px; font-size: 15px; line-height: 1.55; color: var(--text); }
+.agentic__state-title { margin: 0 0 10px; font: 700 22px/1.2 var(--sans); }
+.agentic__side { flex: none; width: 460px; min-height: 0; display: flex; flex-direction: column; background: var(--paper); border-left: 1px solid var(--rule-2); }
 
 /* la fenêtre de navigation. --t-out et --t-in (la page qui s'efface, la suivante qui arrive) sont posés par BrowserView depuis timing.ts. */
-.browser { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 16px; }
+.browser { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 20px; }
+/* la fenêtre tient sur la scène par une ombre douce, portée par ses deux bords arrondis */
+.browser__tabs, .browser__caption, .browser__start { box-shadow: 0 18px 40px -28px rgba(27, 23, 18, .35); }
 
 /* l'onglet : la pastille prend la couleur de la boutique ouverte (--site), neutre pour la recherche et l'accueil */
-.browser__tabs { flex: none; display: flex; align-items: flex-end; height: 42px; padding: 0 10px; background: #EBEEF2; border: 1px solid #E3E7ED;
+.browser__tabs { flex: none; display: flex; align-items: flex-end; height: 42px; padding: 0 10px; background: var(--paper-2); border: 1px solid var(--rule-2);
   border-bottom: 0; border-radius: 14px 14px 0 0; }
+/* trois pastilles de fenêtre, dessinées d'un seul fond */
+.browser__tabs::before { content: ''; flex: none; align-self: center; width: 42px; height: 10px; margin: 0 14px 0 6px;
+  background: radial-gradient(circle 5px at 5px 5px, var(--rule-2) 96%, transparent) 0 0 / 16px 10px repeat-x; }
 .browser__tab { display: flex; align-items: center; gap: 9px; min-width: 0; max-width: 380px; height: 34px; padding: 0 18px 0 12px;
-  border-radius: 10px 10px 0 0; background: #fff; font-size: 13px; font-weight: 600; }
-.browser__favicon { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; background: #DDE2E9; color: #5E6B7A;
+  border-radius: 10px 10px 0 0; background: var(--card); color: var(--text); font-size: 13px; font-weight: 600; }
+.browser__favicon { flex: none; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; background: var(--paper-2); color: var(--text-2);
   font-size: 11px; font-weight: 700; line-height: 1; animation: browser-pop var(--t-med) var(--ease); }
 .browser__favicon--site { background: var(--site, #5E6B7A); color: #fff; }
 .browser__favicon > svg { width: 12px; height: 12px; }
-.browser__spinner { flex: none; width: 14px; height: 14px; margin: 2px; border-radius: 50%; border: 2px solid #DDE2E9; border-top-color: var(--accent);
+.browser__spinner { flex: none; width: 14px; height: 14px; margin: 2px; border-radius: 50%; border: 2px solid var(--rule); border-top-color: var(--accent);
   animation: browser-spin 0.7s linear infinite; }
 .browser__tab-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; animation: browser-rise var(--t-med) var(--ease); }
 
 /* la barre d'adresse */
-.browser__bar { position: relative; flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fff; border: 1px solid #E3E7ED;
+.browser__bar { position: relative; flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border: 1px solid var(--rule-2);
   border-top: 0; }
 .browser__address { flex: 1; min-width: 0; height: 40px; display: flex; align-items: center; gap: 8px; padding: 0 14px; border-radius: 10px;
-  background: #F0F2F5; color: #5E6B7A; transition: background-color var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease); }
-.browser__address--typing { background: #fff; box-shadow: 0 0 0 2px var(--accent); }
-.browser__url { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #16202B;
-  font: 400 13px 'JetBrains Mono', Consolas, monospace; }
-.browser__url--empty { color: #5E6B7A; font-family: inherit; }
+  background: var(--paper-2); color: var(--text-2); transition: box-shadow var(--t-fast) var(--ease); }
+.browser__address--typing { box-shadow: 0 0 0 2px var(--accent); }
+.browser__url { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text);
+  font: 400 13px var(--mono-font); }
+.browser__url--empty { color: var(--text-2); font: 400 13px var(--sans); }
 .browser__address--typing .browser__url::after { content: ''; display: inline-block; width: 2px; height: 14px; margin-left: 2px; vertical-align: -2px;
   background: var(--accent); }
-.browser__state { padding: 0 6px; font-size: 13px; font-weight: 600; color: #5E6B7A; white-space: nowrap; }
+.browser__state { display: inline-flex; align-items: center; gap: 8px; padding: 0 6px; font: 500 10.5px var(--mono-font); letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-2); white-space: nowrap; }
+.browser__state::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .55; }
 .browser__state--live { color: var(--accent); }
-.browser__bar .button { display: inline-flex; align-items: center; text-decoration: none; }
+.browser__state--live::before { opacity: 1; animation: browser-live 1.4s ease-in-out infinite; }
+@keyframes browser-live { 0%, 100% { box-shadow: 0 0 0 0 rgba(140, 29, 51, .55); } 60% { box-shadow: 0 0 0 7px rgba(140, 29, 51, 0); } }
+.browser__bar .button { display: inline-flex; align-items: center; text-decoration: none; background: transparent; border-color: var(--rule-2);
+  color: var(--text); }
+.browser__bar .button:hover { background: var(--paper-2); border-color: var(--text); }
 /* la barre de chargement : elle avance pendant que l'ancienne page s'efface, se remplit quand la nouvelle arrive, puis s'éteint */
 .browser__progress { position: absolute; left: -1px; right: -1px; bottom: -1px; z-index: 1; height: 3px; background: var(--site, var(--accent));
   transform-origin: 0 50%; opacity: 0; animation: browser-progress calc(var(--t-out, 160ms) + var(--t-in, 420ms) + 160ms) linear; }
@@ -53,7 +64,7 @@
 }
 
 /* la page : elle s'efface en montant un peu, la suivante arrive par le bas. Au repos elle n'a aucun décalage : le curseur vise juste. */
-.browser__viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; border: 1px solid #E3E7ED; border-top: 0; border-bottom: 0; background: #fff; }
+.browser__viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; border: 1px solid var(--rule-2); border-top: 0; border-bottom: 0; background: #fff; }
 .browser__page { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; opacity: 1; transform: none;
   transition: opacity var(--t-in, 420ms) var(--ease), transform var(--t-in, 420ms) var(--ease); }
 .browser__page--hidden { opacity: 0; transition: none; }
@@ -114,31 +125,33 @@
 
 /* la légende : sa hauteur est fixe, pour que la page ne bouge pas quand le texte change. La couleur est celle du geste. */
 .browser__caption { --gesture: var(--k-search); flex: none; display: flex; align-items: center; gap: 14px; height: 88px; padding: 0 18px; overflow: hidden;
-  border-top: 3px solid var(--gesture); border-radius: 0 0 14px 14px; background: #16202B; color: #fff; transition: border-color var(--t-med) var(--ease); }
+  border: 1px solid var(--rule-2); border-top: 3px solid var(--gesture); border-radius: 0 0 14px 14px; background: var(--card); color: var(--text);
+  transition: border-top-color var(--t-med) var(--ease); }
 .browser__caption--click { --gesture: var(--k-click); }
 .browser__caption--type { --gesture: var(--k-type); }
 .browser__caption--pay { --gesture: var(--k-pay); }
 .browser__chip { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 11px; background: var(--gesture); color: #fff;
   animation: browser-pop var(--t-med) var(--ease); }
 .browser__legend { min-width: 0; animation: browser-rise var(--t-med) var(--ease); }
-.browser__action { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 600; }
+.browser__action { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 16px/1.3 var(--sans); }
 .browser__why { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; margin: 2px 0 0; overflow: hidden; font-size: 13px;
-  line-height: 1.45; color: #C9D1DD; }
+  line-height: 1.45; color: var(--text-2); }
 
-/* l'écran d'accueil */
+/* l'écran d'accueil : une page blanche, avec un halo très léger à la couleur de l'agent */
 .browser__start { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 40px 44px; text-align: center; background: #fff; border: 1px solid #E3E7ED; border-top: 0;
-  border-radius: 0 0 14px 14px; }
-.browser__start-mark { position: relative; flex: none; display: grid; place-items: center; width: 56px; height: 56px; margin-bottom: 22px; border-radius: 18px;
-  background: var(--k-click-soft); color: var(--accent); animation: browser-pop var(--t-slow) var(--ease) backwards; }
-.browser__start-mark::after { content: ''; position: absolute; inset: 0; border-radius: 18px; border: 2px solid var(--accent); opacity: 0;
+  padding: 40px 44px; text-align: center; color: var(--text); border: 1px solid var(--rule-2); border-top: 0; border-radius: 0 0 14px 14px;
+  background: radial-gradient(60% 48% at 50% 42%, rgba(140, 29, 51, .09), transparent 72%) var(--card); }
+.browser__start-mark { position: relative; flex: none; display: grid; place-items: center; width: 60px; height: 60px; margin-bottom: 28px; border-radius: 18px;
+  border: 1px solid rgba(140, 29, 51, .35); background: var(--k-click-soft); color: var(--accent); animation: browser-pop var(--t-slow) var(--ease) backwards; }
+.browser__start-mark::after { content: ''; position: absolute; inset: -1px; border-radius: 18px; border: 2px solid var(--accent); opacity: 0;
   animation: browser-start-ring 0.9s var(--ease) 0.45s; }
 .browser__start-pointer { width: 26px; height: 26px; margin: 3px 0 0 3px; }
 .browser__start-mark--finance > svg { width: 28px; height: 28px; }
-.browser__start-title { margin: 0 0 10px; font-size: 22px; font-weight: 700; animation: browser-rise var(--t-slow) var(--ease) 0.08s backwards; }
-.browser__start-text { max-width: 52ch; margin: 0; font-size: 15px; line-height: 1.55; color: #44505E; animation: browser-rise var(--t-slow) var(--ease) 0.16s backwards; }
-.browser__start-wait { display: inline-flex; align-items: center; margin: 22px 0 0; padding: 6px 14px; border-radius: 999px; background: var(--k-click-soft);
-  font-size: 13px; font-weight: 600; animation: browser-rise var(--t-med) var(--ease); }
+.browser__start-title { max-width: 18ch; margin: 0 0 18px; font: 700 clamp(26px, 2.8vw, 38px)/1.12 var(--sans); letter-spacing: -.02em;
+  animation: browser-rise var(--t-slow) var(--ease) 0.08s backwards; }
+.browser__start-text { max-width: 50ch; margin: 0; font-size: 15px; line-height: 1.6; color: var(--text-2); animation: browser-rise var(--t-slow) var(--ease) 0.16s backwards; }
+.browser__start-wait { display: inline-flex; align-items: center; margin: 26px 0 0; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--rule-2);
+  background: var(--paper-2); font: 500 11px var(--mono-font); letter-spacing: .04em; animation: browser-rise var(--t-med) var(--ease); }
 .browser__start-wait .browser__dots { color: var(--accent); animation-delay: 0s; }
 @keyframes browser-start-ring { from { transform: scale(1); opacity: 0.7; } to { transform: scale(1.45); opacity: 0; } }
 
@@ -155,5 +168,5 @@
 @media (max-width: 1000px) {
   .agentic { flex-direction: column; height: auto; min-height: 100%; }
   .browser { flex: none; height: 70vh; padding: 12px; }
-  .agentic__side { width: 100%; min-height: 80vh; border-left: 0; border-top: 1px solid #E3E7ED; }
+  .agentic__side { width: 100%; min-height: 80vh; border-left: 0; border-top: 1px solid var(--rule-2); }
 }

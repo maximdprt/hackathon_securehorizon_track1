@@ -1,8 +1,8 @@
 /* La palette commune : toute couleur d'état, de geste ou de mouvement vient d'ici, en aplats, sans dégradé. */
 :root {
-  --ok: #1F9D55; --ok-soft: #E3F5EA;           /* validé, payé */
-  --danger: #D64545; --danger-soft: #FBE9E9;   /* bloqué, erreur */
-  --warn: #C77700; --warn-soft: #FFF1D6;       /* validation humaine, attention */
+  --ok: #1F9D55; --ok-soft: #E3F5EA; --ok-ink: #167A47;           /* validé, payé */
+  --danger: #D64545; --danger-soft: #FBE9E9; --danger-ink: #A32626; /* bloqué, erreur */
+  --warn: #C77700; --warn-soft: #FFF1D6; --warn-ink: #9A6200;       /* validation humaine, attention */
   --k-search: #2F6FDB; --k-search-soft: #E6EEFB; /* geste : recherche et navigation */
   --k-click: #8C1D33; --k-click-soft: #F8EBEE;   /* geste : clic */
   --k-type: #7A4FD6; --k-type-soft: #EEE8FB;     /* geste : saisie */
@@ -10,9 +10,17 @@
   --ease: cubic-bezier(.22, .8, .26, 1);       /* sortie douce : ce qui apparaît ou arrive */
   --ease-move: cubic-bezier(.45, .05, .25, 1); /* aller-retour : ce qui se déplace */
   --t-fast: 140ms; --t-med: 260ms; --t-slow: 420ms;
+
+  /* Le décor : tout est clair. Le blanc porte le contenu, un papier très pâle porte la scène et les fonds de champ,
+     l'encre ne sert qu'au texte et à quelques repères (avatar, bouton principal). */
+  --ink: #16130F; --on-ink: #FFFFFF;
+  --paper: #FFFFFF; --paper-2: #F4F2ED; --card: #FFFFFF; --stage: #F4F2ED; --rule: #E6E1D7; --rule-2: #CFC8BA;
+  --text: #1B1712; --text-2: #5C5347; --text-3: #8C8273;
+  --sans: 'Figtree', system-ui, sans-serif;
+  --mono-font: 'JetBrains Mono', Consolas, monospace;
 }
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
-body { margin: 0; background: #E9EAEE; font-family: system-ui, sans-serif; }
+body { margin: 0; background: var(--stage); font-family: system-ui, sans-serif; }
 button { font-family: inherit; cursor: pointer; }
 button:disabled { cursor: default; }

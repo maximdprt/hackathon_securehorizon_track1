@@ -407,38 +407,45 @@ def handle(key: str, method: str, path: str, form: dict[str, str], session: Sess
 
 # Le moteur de recherche. Ce qui n'est que décor (initiale de la pastille, étoiles) vient du CSS : le texte de la page reste celui
 # qu'un lecteur d'écran, ou l'agent, doit lire. Dans le HTML, le lien de la boutique vient en premier ; c'est le CSS qui le place sous l'adresse.
+# Les polices de l'interface (agents/ui/index.html) : le moteur de recherche est dessiné comme elle, les boutiques gardent leur propre allure.
+SEARCH_FONTS = ('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+                '<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">')
+# Mêmes couleurs que agents/ui/src/styles/base.css : blanc, papier très pâle, encre pour le texte, un seul accent.
 SEARCH_CSS = """
-*{box-sizing:border-box}body{margin:0;font-family:'Segoe UI',Helvetica,Arial,sans-serif;color:#1a1c22;background:#fff;line-height:1.5}
-main{max-width:760px;margin:0 auto;padding:22px 20px 40px}.head{display:flex;align-items:center;gap:22px;padding-bottom:18px;border-bottom:1px solid #e6e8ee}
-.logo{display:flex;align-items:center;gap:8px}.logo svg{width:34px;height:34px}h1{font-size:24px;letter-spacing:-.02em;margin:0}h1::first-letter{color:#2563eb}
-form{flex:1;display:flex;gap:8px}input{flex:1;min-width:0;padding:11px 18px;border:1px solid #cfd3dc;border-radius:999px;font:inherit;color:#1a1c22;
-transition:border-color .15s,box-shadow .15s}input::placeholder{color:#9aa0ac}input:hover{border-color:#9aa0ac}
-input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 3px #dbe7fd}
-button{padding:0 22px;border:0;border-radius:999px;background:#2563eb;color:#fff;font:inherit;font-weight:600;cursor:pointer;transition:background-color .15s}
-button:hover{background:#1a4fc4}button:focus-visible{outline:3px solid #1a1c22;outline-offset:2px}
-.home main{padding-top:20vh}.home .head{flex-direction:column;border:0}.home .logo svg{width:56px;height:56px}.home h1{font-size:44px}
-.home form{flex:none;width:100%;max-width:560px}.home input,.home button{padding-top:14px;padding-bottom:14px}
-.count{color:#6b7180;font-size:13px;margin:14px 0 4px}
-.r{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:20px;grid-template-areas:"src pic" "title pic" "meta pic" "text pic" "offers offers";
-padding:18px 0;border-bottom:1px solid #eef0f4}.r>a{grid-area:title;justify-self:start;font-size:20px;color:#1a3fb0;text-decoration:none;transition:color .15s}
-.r>a:hover{text-decoration:underline;color:#12307f}.r>a:focus-visible{outline:2px solid #1a3fb0;outline-offset:3px}
-.src{grid-area:src;display:flex;align-items:center;gap:9px;color:#4a4f5c;font-size:13px}
-.fav{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;color:#fff;font-size:13px;font-weight:700}.fav::before{content:attr(data-i)}
-.meta{grid-area:meta;font-size:13px;color:#4a4f5c;margin-top:2px}
-.stars{position:relative;display:inline-block;margin-right:7px;font-size:15px;line-height:1;white-space:nowrap;color:#d5d9e0}.stars::before{content:"★★★★★"}
-.stars::after{content:"★★★★★";position:absolute;left:0;top:0;width:calc(var(--n)*20%);overflow:hidden;color:#e8a100}
-.free{display:inline-block;margin-left:10px;padding:1px 10px;border-radius:999px;background:#e3f4ea;color:#17683a;font-size:12px;font-weight:600}
-.r p{grid-area:text;margin:4px 0 0;color:#4a4f5c;font-size:14px}
-.offers{grid-area:offers;list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;padding:0}
-.offers li{display:flex;align-items:center;gap:8px;border:1px solid #dfe3ea;border-radius:999px;padding:3px 4px 3px 12px;font-size:13px}
-.offers b{background:#e8f0fe;color:#174ea6;border-radius:999px;padding:2px 10px}
-.shot{grid-area:pic;align-self:center;display:block;width:92px;height:92px;padding:4px;object-fit:contain;background:#fff;border:1px solid #e6e8ee;border-radius:12px}
+:root{--ink:#16130F;--text:#1B1712;--text-2:#5C5347;--text-3:#8C8273;--paper-2:#F4F2ED;--rule:#E6E1D7;--rule-2:#CFC8BA;--accent:#0F9D8A;
+--sans:'Figtree',system-ui,sans-serif;--mono:'JetBrains Mono',Consolas,monospace}
+*{box-sizing:border-box}body{margin:0;font-family:var(--sans);color:var(--text);background:#fff;line-height:1.5}
+main{max-width:780px;margin:0 auto;padding:24px 24px 48px}.head{display:flex;align-items:center;gap:24px;padding-bottom:20px;border-bottom:1px solid var(--rule)}
+.logo{display:flex;align-items:center;gap:10px}.logo svg{width:30px;height:30px}h1{font:700 22px/1 var(--sans);letter-spacing:-.02em;margin:0}
+form{flex:1;display:flex;gap:8px;padding:5px;border:1px solid var(--rule-2);border-radius:16px;background:#fff;transition:border-color .15s,box-shadow .15s}
+form:hover{border-color:var(--text-3)}form:focus-within{border-color:var(--text);box-shadow:0 0 0 3px rgba(27,23,18,.08)}
+input{flex:1;min-width:0;padding:9px 12px;border:0;background:none;font:inherit;font-size:15px;color:var(--text)}input::placeholder{color:var(--text-3)}
+input:focus{outline:0}
+button{padding:0 20px;border:0;border-radius:11px;background:var(--ink);color:#fff;font:inherit;font-size:14px;font-weight:600;cursor:pointer;transition:background-color .15s}
+button:hover{background:var(--accent)}button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.home main{padding-top:18vh}.home .head{flex-direction:column;gap:30px;border:0}.home .logo{flex-direction:column;gap:18px}.home .logo svg{width:52px;height:52px}
+.home h1{font-size:40px}.home form{flex:none;width:100%;max-width:580px}.home input{padding-top:12px;padding-bottom:12px}
+.count{margin:18px 0 0;font:500 10.5px var(--mono);letter-spacing:.09em;text-transform:uppercase;color:var(--text-3)}
+.r{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:24px;grid-template-areas:"src pic" "title pic" "meta pic" "text pic" "offers offers";
+padding:22px 0;border-bottom:1px solid var(--rule)}
+.r>a{grid-area:title;justify-self:start;margin-top:6px;font:600 21px/1.25 var(--sans);letter-spacing:-.01em;color:var(--text);text-decoration:none;
+text-underline-offset:5px;text-decoration-thickness:1px;transition:color .15s}
+.r>a:hover{text-decoration:underline;color:var(--accent)}.r>a:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.src{grid-area:src;display:flex;align-items:center;gap:9px;color:var(--text-2);font:400 12px var(--mono)}
+.fav{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;color:#fff;font:700 12px var(--sans)}.fav::before{content:attr(data-i)}
+.meta{grid-area:meta;font-size:13px;color:var(--text-2);margin-top:6px}
+.stars{position:relative;display:inline-block;margin-right:7px;font-size:14px;line-height:1;white-space:nowrap;color:var(--rule-2)}.stars::before{content:"★★★★★"}
+.stars::after{content:"★★★★★";position:absolute;left:0;top:0;width:calc(var(--n)*20%);overflow:hidden;color:#C77700}
+.free{display:inline-block;margin-left:10px;padding:2px 10px;border-radius:999px;background:#E3F5EA;color:#167A47;font-size:12px;font-weight:600}
+.r p{grid-area:text;margin:6px 0 0;color:var(--text-2);font-size:14.5px}
+.offers{grid-area:offers;list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 0;padding:0}
+.offers li{display:flex;align-items:center;gap:10px;border:1px solid var(--rule);border-radius:10px;padding:4px 4px 4px 12px;font-size:13px}
+.offers b{background:var(--paper-2);color:var(--text);border-radius:7px;padding:4px 9px;font:500 12px var(--mono)}
+.shot{grid-area:pic;align-self:center;display:block;width:104px;height:104px;padding:6px;object-fit:contain;background:#fff;border:1px solid var(--rule);border-radius:14px}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 """
-SEARCH_LOGO = ('<svg viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke-width="5">'
-               + "".join(f'<circle cx="17" cy="17" r="11" stroke="{c}" stroke-dasharray="17.28 51.84" stroke-dashoffset="{-17.28 * i:.2f}"/>'
-                         for i, c in enumerate(("#2563eb", "#e5484d", "#f5a524", "#12a594")))
-               + '<path d="M26 26l9 9" stroke="#1a1c22" stroke-linecap="round"/></g></svg>')
+SEARCH_LOGO = ('<svg viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke-width="3.5" stroke-linecap="round">'
+               '<circle cx="17" cy="17" r="11.5" stroke="#16130F"/><path d="M26 26l9.5 9.5" stroke="#0F9D8A"/></g></svg>')
 
 
 def _result(r: dict, link: str) -> str:
@@ -461,7 +468,7 @@ def search_page(query: str, root: str, link_for) -> str:
     count = f'<p class="count">{len(found)} résultat{"s" if len(found) > 1 else ""}</p>\n' if found else ""
     home = "" if found else ' class="home"'  # l'accueil : le logo et le champ, au milieu de la page
     return (f'<!DOCTYPE html>\n<html lang="fr"><head><meta charset="utf-8"><title>{e(query or "Recherche")} | Recherche</title>\n'
-            f'<style>{SEARCH_CSS}</style></head>\n<body{home}><main>\n'
+            f'{SEARCH_FONTS}<style>{SEARCH_CSS}</style></head>\n<body{home}><main>\n'
             f'<div class="head"><div class="logo">{SEARCH_LOGO}<h1>Recherche</h1></div>\n'
             f'<form method="get" action="{root}/"><input type="text" name="q" aria-label="Rechercher" placeholder="Un produit, une boutique" value="{e(query)}">'
             f'<button type="submit">Rechercher</button></form></div>\n{count}{results}</main></body></html>')

@@ -16,6 +16,7 @@ import time
 
 from agents import assets
 from agents.assets import FINANCE_AGENT
+from agents.sentinel_gateway import verdict_summary
 from agents.shopping_agent import _text_tool_calls, _tool_result
 
 SYSTEM = """You are Hermès, the user's autonomous personal assistant (a "Jarvis"). You act on their behalf without
@@ -113,7 +114,7 @@ def run_hermes(prompt: str, llm, guard=None, chain=None, instructions: str = "",
                     return out
                 emit({"type": "guard", "status": "checking"})
                 out["verdict"], out["latency_ms"] = guard.verify(request)
-                emit({"type": "verdict", **_verdict_summary(out["verdict"], out["latency_ms"], guard)})
+                emit({"type": "verdict", **verdict_summary(out["verdict"], out["latency_ms"], getattr(guard, "backend", None))})
                 if chain is not None:
                     emit({"type": "submit", "network": "SentinelL1"})
                     site = {"name": assets.ASSETS[aid].name, "domain": assets.ASSETS[aid].domain} if aid in assets.ASSETS else None
@@ -125,11 +126,3 @@ def run_hermes(prompt: str, llm, guard=None, chain=None, instructions: str = "",
                 results.append(_tool_result(use, f"Unknown tool: {name}", error=True))
         messages.append({"role": "user", "content": results})
     return out
-
-
-def _verdict_summary(v: dict, ms, guard) -> dict:
-    from agents.sentinel_chain import short_reason
-    return {"verdict": v["verdict"], "trust_score": v.get("trust_score"), "risk_score": v.get("risk_score"),
-            "severity": v.get("severity"), "reasons": [short_reason([r], 220) for r in (v.get("reasons") or [])[:6]],
-            "owasp": v.get("owasp") or [], "onchain_flagged": bool(v.get("onchain_flagged")),
-            "instruction_id": v.get("instruction_id"), "latency_ms": ms, "backend": getattr(guard, "backend", None)}

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { initials, loadAgents, saveAgents } from './agents';
-import { fetchWorld, streamRun } from './api';
+import { decide, fetchWorld, streamRun } from './api';
 import { AgentEditor } from './components/AgentEditor';
 import { AgentReply } from './components/AgentReply';
 import { BrowserView } from './components/BrowserView';
 import { Composer } from './components/Composer';
-import { ArrowRight, Bag, Chart } from './components/Icons';
+import { Bag, Chart, Shield } from './components/Icons';
 import { Panel } from './components/Panel';
 import { applyEvent, type AgentMessage, type Message } from './run';
 import { durationOf, sleep, spoken } from './timing';
@@ -41,9 +41,10 @@ type ThreadProps = {
   onIdea: (text: string) => void;
   onSelect: (id: string, frame: number) => void;
   onRetry: (prompt: string) => void;
+  onDecide: (id: string, decision: 'allow' | 'decline' | 'block') => void;
 };
 
-function Thread({ messages, mode, shown, onIdea, onSelect, onRetry }: ThreadProps) {
+function Thread({ messages, mode, shown, onIdea, onSelect, onRetry, onDecide }: ThreadProps) {
   const thread = useRef<HTMLDivElement>(null);
   const stick = useRef(true); // on suit le bas du fil, sauf si l'utilisateur est remonté lire
 
@@ -77,17 +78,13 @@ function Thread({ messages, mode, shown, onIdea, onSelect, onRetry }: ThreadProp
           <span className="chat__empty-mark" aria-hidden="true">
             {MODES[mode].icon}
           </span>
-          <p className="chat__empty-title">{EMPTY[mode].title}</p>
-          <p className="chat__empty-text">{EMPTY[mode].text}</p>
-          <p className="chat__ideas-title">Exemples à essayer</p>
+          <p className="chat__text chat__text--strong">{EMPTY[mode].title}</p>
+          <p className="chat__text">{EMPTY[mode].text}</p>
           <ul className="chat__ideas">
             {IDEAS[mode].map((idea) => (
               <li key={idea}>
                 <button type="button" className="chat__idea" onClick={() => onIdea(idea)}>
-                  <span className="chat__idea-text">{idea}</span>
-                  <span className="chat__idea-go">
-                    <ArrowRight />
-                  </span>
+                  {idea}
                 </button>
               </li>
             ))}
@@ -101,7 +98,8 @@ function Thread({ messages, mode, shown, onIdea, onSelect, onRetry }: ThreadProp
             {m.text}
           </div>
         ) : (
-          <AgentReply key={m.id} msg={m} shownFrame={shown?.id === m.id ? shown.frame : null} onSelect={(frame) => onSelect(m.id, frame)} onRetry={onRetry} />
+          <AgentReply key={m.id} msg={m} shownFrame={shown?.id === m.id ? shown.frame : null} onSelect={(frame) => onSelect(m.id, frame)} onRetry={onRetry}
+            onDecide={(decision) => onDecide(m.id, decision)} />
         ),
       )}
     </div>
@@ -118,6 +116,8 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [mode, setMode] = useState<Mode>(() => (new URLSearchParams(window.location.search).get('mode') === 'finance' ? 'finance' : 'shop'));
+  /** Le garde vérifie chaque paiement. Coupé : le paiement part, pour montrer ce qui se passe sans garde. */
+  const [guardOn, setGuardOn] = useState(true);
   /** L'étape passée que l'on revoit dans le navigateur. null : on suit l'agent en direct. */
   const [pin, setPin] = useState<{ id: string; frame: number } | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -163,13 +163,16 @@ export default function App() {
       controller.current = abort;
       let ended = false;
       let said = ''; // la dernière explication écrite dans le fil
+      let before = ''; // le dernier geste joué dans le navigateur : deux saisies de suite s'enchaînent avec Tab
       try {
-        for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model, mode }, abort.signal)) {
+        for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model, mode, guard: guardOn }, abort.signal)) {
           ended ||= ev.type === 'end' || ev.type === 'error';
           patch((m) => applyEvent(m, ev, shopName));
           const narrated = spoken(ev) !== '' && spoken(ev) !== said;
           if (narrated) said = spoken(ev);
-          await sleep(durationOf(ev, narrated), abort.signal); // le geste se joue et son explication s'écrit, avant le suivant
+          const tabbed = ev.type === 'fill' && before === 'fill';
+          if (ev.type === 'nav' || ev.type === 'click' || ev.type === 'fill') before = ev.type;
+          await sleep(durationOf(ev, narrated, tabbed), abort.signal); // le geste se joue et son explication s'écrit, avant le suivant
         }
         if (!ended) patch((m) => ({ ...m, status: 'error', error: 'Le serveur a coupé la réponse avant la fin du run.' }));
       } catch (err) {
@@ -182,8 +185,23 @@ export default function App() {
         controller.current = null;
       }
     },
-    [world, current, mode],
+    [world, current, mode, guardOn],
   );
+
+  /** Un humain tranche un paiement mis en attente par le garde. */
+  async function settle(id: string, decision: 'allow' | 'decline' | 'block') {
+    const target = messages.find((m) => m.id === id);
+    const iid = target?.role === 'agent' ? target.end?.verdict?.instruction_id : null;
+    if (!iid) return;
+    const set = (human: AgentMessage['human']) => setMessages((all) => all.map((m) => (m.id === id && m.role === 'agent' ? { ...m, human } : m)));
+    set({ state: 'sending', decision });
+    try {
+      await decide(iid, decision);
+      set({ state: 'done', decision });
+    } catch (err) {
+      set({ state: 'error', decision, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
 
   useEffect(() => {
     // lien direct : /?ask=... lance la demande à l'ouverture
@@ -264,7 +282,7 @@ export default function App() {
           </span>
           <div className="chat__identity">
             <h1 className="chat__name">{current.name}</h1>
-            <p className="chat__presence">
+            <p className={`chat__presence${running ? ' chat__presence--busy' : ''}`}>
               <span className="chat__presence-dot" aria-hidden="true" />
               {running ? 'Au travail' : 'Disponible'} · {modelLabel(current)}
             </p>
@@ -286,18 +304,30 @@ export default function App() {
 
         {tab === 'chat' ? (
           <>
-            <div className="chat__mode-row">
-              <p className="chat__mode-title" aria-hidden="true">Type de tâche</p>
-              <div className={`chat__mode chat__mode--${mode}`} role="group" aria-label="Type de tâche">
-                {(['shop', 'finance'] as const).map((m) => (
-                  <button key={m} type="button" className="chat__mode-btn" aria-pressed={mode === m} disabled={running} onClick={() => setMode(m)}>
-                    {MODES[m].icon}
-                    {MODES[m].label}
-                  </button>
-                ))}
+            <div className="chat__setup">
+              <div className="chat__mode-row">
+                <p className="chat__mode-title" aria-hidden="true">Type de tâche</p>
+                <div className={`chat__mode chat__mode--${mode}`} role="group" aria-label="Type de tâche">
+                  {(['shop', 'finance'] as const).map((m) => (
+                    <button key={m} type="button" className="chat__mode-btn" aria-pressed={mode === m} disabled={running} onClick={() => setMode(m)}>
+                      {MODES[m].icon}
+                      {MODES[m].label}
+                    </button>
+                  ))}
+                </div>
               </div>
+              <label className={`chat__guard${world.guard ? '' : ' chat__guard--off'}`}>
+                <span className="chat__guard-icon" aria-hidden="true">
+                  <Shield />
+                </span>
+                <input type="checkbox" className="chat__guard-box" checked={!!world.guard && guardOn} disabled={!world.guard || running} onChange={(e) => setGuardOn(e.target.checked)} />
+                <span className="chat__guard-switch" aria-hidden="true" />
+                <span className="chat__guard-text">
+                  {world.guard ? (guardOn ? 'Garde activé : chaque paiement est vérifié' : 'Garde coupé : le paiement part sans vérification') : 'Garde indisponible sur ce serveur'}
+                </span>
+              </label>
             </div>
-            <Thread messages={messages} mode={mode} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} />
+            <Thread messages={messages} mode={mode} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} onDecide={settle} />
             <Composer agentName={current.name} mode={mode} text={draft} running={running} onChange={setDraft} onSend={send} onStop={() => controller.current?.abort()} />
           </>
         ) : (

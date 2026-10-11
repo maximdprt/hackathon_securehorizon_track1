@@ -11,13 +11,15 @@ DEFAULT_THRESHOLDS = {"allow_below": 0.30, "block_at_or_above": 0.70,
                       "high_amount_adjustment": {"ratio": 0.5, "allow_below": 0.20, "block_at_or_above": 0.60}}
 
 FLOOR_NEEDS_APPROVAL = {"calldata_undecodable", "authority_source_unavailable", "order_from_memory_not_current_turn"}
+# mandate rules: the order is beyond what the issuer may do alone. No trust is taken, but it never passes without a human.
+RULE_NEEDS_APPROVAL = {"amount_within_mandate", "amount_over_onchain_cap", "daily_cap_exceeded"}
 # context, not evidence: they raise the score but never justify an escalation by themselves
 INFORMATIONAL = {"order_origin", "hidden_text_ratio", "recipient_prior_incident_info", "invisible_unicode_trace", "payment_details_mention", "amount_just_under_threshold", "tld_risk", "source_is_ad", "tls_missing", "legal_pages_missing", "geo_mismatch"}
 
 
 def load_thresholds(path: str | Path | None) -> dict:
     if path and Path(path).exists():
-        d = json.loads(Path(path).read_text()).get("decision_thresholds") or {}
+        d = json.loads(Path(path).read_text(encoding="utf-8")).get("decision_thresholds") or {}
         out = dict(DEFAULT_THRESHOLDS)
         out.update({k: v for k, v in d.items() if k != "high_amount_adjustment"})
         if d.get("high_amount_adjustment"):
@@ -90,7 +92,7 @@ def combine(signals: list[Signal], llm: dict | None, amount: float, max_amount: 
     else:
         risk = risk_h
 
-    ratio = (amount / max_amount) if max_amount else 0.0
+    ratio = min(amount / max_amount, 1e6) if max_amount else 0.0  # an absurd amount must not overflow the report below
     if ratio >= th["high_amount_adjustment"].get("ratio", 0.5):
         lo, hi = th["high_amount_adjustment"]["allow_below"], th["high_amount_adjustment"]["block_at_or_above"]
         notes.append(f"amount is {round(100 * ratio)}% of the cap: thresholds tightened to {lo}/{hi}")
@@ -114,6 +116,10 @@ def combine(signals: list[Signal], llm: dict | None, amount: float, max_amount: 
     if verdict == "allow" and any(s.id in FLOOR_NEEDS_APPROVAL or s.id.startswith("layer_error_") for s in signals):
         verdict = "needs_approval"
         notes.append("floored to needs_approval (cannot verify)")
+
+    if verdict == "allow" and any(s.id in RULE_NEEDS_APPROVAL and not s.hard for s in signals):
+        verdict = "needs_approval"
+        notes.append("over the mandate cap: a human decides, whatever the score")
 
     severity = {"block": 3, "needs_approval": 2}.get(verdict, 1)
     if repeat_offender and severity < 3:

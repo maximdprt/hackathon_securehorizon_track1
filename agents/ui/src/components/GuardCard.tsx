@@ -1,0 +1,185 @@
+import type { CSSProperties } from 'react';
+import type { Onchain, Verdict } from '../types';
+
+const VERDICT = {
+  allow: { label: 'Paiement validé', tone: 'ok', stamp: 'Visa accordé' },
+  needs_approval: { label: 'Validation humaine requise', tone: 'warn', stamp: 'En attente' },
+  block: { label: 'Paiement refusé', tone: 'bad', stamp: 'Visa refusé' },
+} as const;
+/** Ce que la décision a fait sur la chaîne. */
+const EFFECT = {
+  allow: 'Visa à usage unique délivré on-chain : ce paiement peut passer, et lui seul.',
+  needs_approval: 'SentinelL1 ne tranche pas seul : la transaction est garée, un humain décide.',
+  block: "Arrêtée à l'entrée de la chaîne : l'argent reste dans le wallet. Destinataire signalé, la prochaine fois refus direct.",
+} as const;
+const TX_LABEL = { visa: 'Visa', flag: 'Signalement', decision: 'Décision' } as const;
+const BACKEND: Record<string, string> = { mcp: 'par le serveur MCP', engine: 'moteur en direct', stub: 'garde de remplacement' };
+
+/** Les indices du garde, dits en français. Un indice sans libellé garde son nom technique : sa preuve reste affichée. */
+const LABELS: Record<string, string> = {
+  amount_within_mandate: 'Montant au-dessus du plafond du mandat',
+  amount_over_onchain_cap: "Montant au-dessus du plafond inscrit au registre d'autorité",
+  daily_cap_exceeded: 'Plafond cumulé sur 24 h dépassé',
+  amount_implausible: 'Montant absurde : un transfert illimité déguisé',
+  amount_just_under_threshold: 'Montant juste sous le plafond',
+  action_not_in_mandate: 'Action hors du mandat de cet agent',
+  currency_mismatch: 'Devise différente de celle du mandat',
+  recipient_whitelisted: 'Destinataire hors de la liste autorisée',
+  order_origin: "L'ordre vient de ce que l'agent a lu, pas de l'utilisateur",
+  issuer_in_registry: "Émetteur absent du registre d'autorité",
+  issuer_role_mismatch: "Le rôle de l'émetteur ne lui permet pas de payer",
+  issuer_flagged_onchain: 'Émetteur déjà signalé au registre des menaces',
+  authority_source_unavailable: "Registre d'autorité injoignable",
+  imperative_to_agent: "Instruction adressée à l'agent dans ce qu'il a lu",
+  hidden_text_ratio: 'Texte caché aux lecteurs humains',
+  override_lexicon: "Formules qui cherchent à réécrire les consignes de l'agent",
+  mandate_override_attempt: 'Tentative de lever les limites du mandat',
+  disable_logs_or_confirmation_attempt: 'Tentative de couper la confirmation humaine ou le journal',
+  chat_template_delimiters: 'Balises de conversation injectées dans le contenu',
+  invisible_unicode_count: 'Caractères invisibles dans le contenu',
+  encoded_blob_instruction: 'Instruction dissimulée dans un bloc encodé',
+  urgency_secrecy_markers: "Pression d'urgence ou de secret",
+  bank_detail_change_notice: 'Annonce de changement de coordonnées de paiement',
+  approval_claimed_in_data: 'Le contenu prétend que le paiement est déjà approuvé',
+  agent_targeted_claims: 'Promesses adressées aux agents IA',
+  second_payment_after_first: 'Second paiement réclamé après le premier',
+  checkout_overcollects_pii: 'Le formulaire demande plus de données que nécessaire',
+  recipient_flagged_onchain: 'Destinataire déjà signalé au registre des menaces',
+  recipient_prior_incident_info: 'Destinataire déjà cité dans un incident',
+  address_poisoning_similarity: "Adresse sosie d'une adresse autorisée",
+  recipient_age_tx_count: 'Adresse du destinataire toute récente, sans historique',
+  contract_verified: 'Contrat du destinataire non vérifié',
+  domain_age_days: 'Domaine du marchand très récent',
+  new_merchant_first_payment: 'Premier paiement à un marchand récent',
+  brand_lookalike_score: "Nom de domaine qui imite une marque",
+  free_hosting_subdomain: 'Site sur un hébergement gratuit',
+  price_deviation: 'Prix très en dessous du marché',
+  tld_risk: 'Extension de domaine à risque',
+  legal_pages_missing: 'Pas de mentions légales',
+  payment_methods_offered: 'Moyens de paiement inhabituels',
+  approve_unlimited: 'Autorisation de dépense illimitée',
+  amount_vs_history_zscore: "Montant inhabituel pour cet agent",
+  velocity_1h: 'Rafale de paiements',
+  nonce_replay: 'Paiement rejoué',
+  recipient_missing: 'Ordre de paiement sans destinataire',
+  counterparty_unverified: 'Destinataire inconnu du garde',
+  recipient_not_merchant_wallet: "L'argent ne part pas vers le compte connu de ce marchand",
+  task_order_mismatch: 'Tâche de lecture qui se termine en paiement',
+  authority_chain_broken: "Ordre relayé par un agent qui n'a pas le droit de payer",
+  inter_agent_message_signed: 'Ordre relayé par un autre agent sans signature établie',
+  tool_description_changed: "La description d'un outil a changé",
+  tool_description_has_directives: "Un outil contient des ordres adressés à l'agent",
+};
+/** Les règles du mandat : elles ne retirent pas de points, elles imposent un humain. */
+const RULES = new Set(['amount_within_mandate', 'amount_over_onchain_cap', 'daily_cap_exceeded']);
+const points = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
+
+export type Human = { state: 'sending' | 'done' | 'error'; decision: 'allow' | 'decline' | 'block'; error?: string };
+
+type Props = { verdict: Verdict; onchain?: Onchain | null; human?: Human; onDecide?: (decision: 'allow' | 'decline' | 'block') => void };
+
+/** Le verdict du garde : le score de confiance sur 100, où il se place par rapport aux seuils, et chaque retrait avec sa preuve. */
+export function GuardCard({ verdict, onchain, human, onDecide }: Props) {
+  const v = VERDICT[verdict.verdict];
+  const trust = verdict.trust_score;
+  const th = verdict.thresholds;
+  const waiting = verdict.verdict === 'needs_approval' && human?.state !== 'done';
+  return (
+    <section className={`guard guard--${v.tone}`} aria-label="Verdict du garde">
+      <header className="guard__head">
+        <span className="guard__tag">SentinelL1</span>
+        <span className={`pill pill--${v.tone}`}>{v.label}</span>
+        <span className="guard__via">
+          {BACKEND[verdict.backend ?? ''] ?? verdict.backend}
+          {verdict.latency_ms != null ? ` · ${Math.round(verdict.latency_ms)} ms` : ''}
+        </span>
+      </header>
+
+      {trust != null && (
+        <>
+          <div className="guard__hero">
+            <p className="guard__score">
+              <span className="guard__value">{trust}</span>
+              <span className="guard__unit">/ 100 de confiance</span>
+            </p>
+            <span className="guard__stamp" data-stamp={v.stamp} aria-hidden="true" />
+          </div>
+          {/* les seuils du verdict dessinent les trois zones de la jauge */}
+          <div className={`guard__bar${th ? ' guard__bar--zoned' : ''}`} role="img" aria-label={`Confiance ${trust} sur 100`}
+            style={th ? ({ '--block': th.block_below, '--allow': th.allow_at_or_above } as CSSProperties) : undefined}>
+            <span className="guard__fill" style={{ width: `${trust}%` }} />
+            {th && <span className="guard__tick" style={{ left: `${th.block_below}%` }} />}
+            {th && <span className="guard__tick" style={{ left: `${th.allow_at_or_above}%` }} />}
+          </div>
+          {th && (
+            <p className="guard__scale">
+              Refusé à {th.block_below} ou moins · validé au-dessus de {th.allow_at_or_above} · entre les deux, un humain décide
+            </p>
+          )}
+        </>
+      )}
+
+      {verdict.deductions.length > 0 ? (
+        <ol className="guard__lines" aria-label="Détail du score">
+          <li className="guard__line">
+            <span className="guard__label">Départ</span>
+            <span className="guard__cost">100</span>
+          </li>
+          {verdict.deductions.map((d) => (
+            <li key={d.id} className={`guard__line${d.hard ? ' guard__line--hard' : ''}`}>
+              <span className="guard__label">
+                {LABELS[d.id] ?? d.id.replace(/_/g, ' ')}
+                {d.evidence && <span className="guard__evidence">{d.evidence}</span>}
+              </span>
+              <span className="guard__cost">{d.hard ? 'refus direct' : RULES.has(d.id) ? 'règle' : `−${points(d.cost)}`}</span>
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <p className="plan__text">Aucun indice relevé sur cette transaction.</p>
+      )}
+      {verdict.owasp.length > 0 && <p className="guard__scale">OWASP {verdict.owasp.join(' · ')}</p>}
+
+      {onchain && onchain.ok && (
+        <div className="guard__proof">
+          <p className="guard__effect">{EFFECT[verdict.verdict]}</p>
+          <div className="guard__links">
+            {onchain.txs.map((tx) => (
+              <a key={tx.hash} href={tx.url} target="_blank" rel="noreferrer" className="mono">
+                {TX_LABEL[tx.kind]} {tx.hash.slice(0, 10)}…
+              </a>
+            ))}
+            <a href={onchain.city} target="_blank" rel="noreferrer">
+              Voir la voiture dans la ville 3D
+            </a>
+          </div>
+        </div>
+      )}
+      {onchain && !onchain.ok && <p className="guard__scale">Non inscrit on-chain : {onchain.error}</p>}
+
+      {waiting && onDecide && (
+        <div className="guard__actions">
+          <button type="button" className="button button--primary" disabled={human?.state === 'sending'} onClick={() => onDecide('allow')}>
+            Approuver
+          </button>
+          <button type="button" className="button" disabled={human?.state === 'sending'} onClick={() => onDecide('decline')}>
+            Refuser
+          </button>
+          <button type="button" className="button button--danger" disabled={human?.state === 'sending'} onClick={() => onDecide('block')}>
+            Signaler une fraude
+          </button>
+        </div>
+      )}
+      {human?.state === 'error' && <p className="guard__human guard__human--error">La décision n'a pas pu être enregistrée : {human.error}</p>}
+      {human?.state === 'done' && (
+        <p className="guard__human">
+          {human.decision === 'allow'
+            ? "Approuvé par un humain. Le même ordre, renvoyé au garde, passera une fois ; la sandbox ne rejoue pas le paiement."
+            : human.decision === 'decline'
+              ? "Refusé par un humain. Ce paiement ne part pas ; rien n'est retenu contre le marchand."
+              : 'Fraude signalée par un humain. Le destinataire est inscrit au registre des menaces : la prochaine fois, refus direct.'}
+        </p>
+      )}
+    </section>
+  );
+}

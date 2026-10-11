@@ -13,7 +13,7 @@ from agents import shops, world
 
 SHOP = "0xA11ce00000000000000000000000000000000002"
 SITES = {"runstep": "allow", "solemarket": "needs_approval", "kicksoutlet": "block",
-         "applecorner": "needs_approval", "phonedealz": "block", "stagepass": "allow",
+         "applecorner": "allow", "phonedealz": "block", "stagepass": "allow",
          "ticketnow": "block", "giftvault": "allow", "cryptocashback": "block"}
 PRODUCT_OF = {"airmax-270": ["runstep", "solemarket", "kicksoutlet"], "iphone-16": ["applecorner", "phonedealz"],
               "ticket-aurora": ["stagepass", "ticketnow"], "giftcard-100": ["giftvault", "cryptocashback"]}

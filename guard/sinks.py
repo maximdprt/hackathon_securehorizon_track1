@@ -41,7 +41,7 @@ class ChainSink:
         self.chain = chain
 
     def record(self, verdict: dict) -> None:
-        reason = "; ".join(verdict.get("reasons", []))[:200]
+        reason = (f"trust={verdict.get('trust_score')}/100; " + "; ".join(verdict.get("reasons", [])))[:200]
         tx = self.chain.record_decision(verdict["instruction_id"], verdict["issuer"], ONCHAIN_VERDICT[verdict["verdict"]], reason)
         verdict["onchain_tx"] = tx
 

@@ -2,19 +2,24 @@
 demande d'achat, et on le regarde naviguer : recherche, boutiques, fiche produit, panier, formulaire de carte, paiement.
 
     cd agents/ui && npm install && npm run build     # une fois, puis après chaque modification de l'interface
-    .venv/Scripts/python agents/app.py --open        # http://127.0.0.1:8765
+    .venv/Scripts/python agents/app.py --open        # http://127.0.0.1:8765   (--guard mcp|engine|stub|off)
 
 L'interface est une application React (agents/ui/src). Ce serveur sert sa version construite (agents/ui/dist), l'API
 qu'elle appelle, et les 5 boutiques elles-mêmes sous /shop/<clé>/ : on peut y acheter à la main dans un onglet.
 Les photos des produits déposées dans agents/sites/images sont servies sous /sites/images/<clé>/<produit>.
 Pour modifier l'interface en direct : `npm run dev` dans agents/ui, avec ce serveur lancé à côté.
 
-Aucun garde n'est branché ici : l'agent va jusqu'au bout et la boutique confirme la commande. Le paiement est simulé,
-le profil et la carte de l'acheteur sont fictifs. La requête `verify_payment` que le garde aurait reçue juste avant le
-clic sur "Payer" est montrée dans l'interface et enregistrée dans agents/out/runs.jsonl (voir `run_browser(guard=...)`).
+Le garde est branché juste avant le paiement. Par défaut (`--guard mcp`) le serveur lance mcp_server.py en sous-processus
+et appelle son outil `verify_payment` par le protocole MCP : validé, le clic sur "Payer" part ; refusé ou renvoyé à un humain,
+il ne part pas. L'agent ne connaît pas le garde. L'interface montre le verdict, le score de confiance et chaque retrait ;
+une décision en attente se tranche par /api/decide (outil `approve_pending`). L'interrupteur "Garde" de l'interface, ou
+`--guard off`, laisse partir le paiement sans vérification, pour montrer ce qui se passe sans garde.
+Le paiement est simulé, le profil et la carte de l'acheteur sont fictifs. Chaque run est enregistré dans agents/out/runs.jsonl
+avec la requête `verify_payment` et le verdict complet.
 
 En mode "finance", c'est l'agent Hermès (agents/hermes_agent.py) qui répond : il n'ouvre aucune page, il cherche des
-placements (agents/assets.py), lit leur fiche et prépare un ordre. Sans garde, l'ordre est préparé mais jamais envoyé.
+placements (agents/assets.py), lit leur fiche et prépare un ordre. Avec le garde l'ordre lui est soumis ; sans garde il est
+préparé mais jamais envoyé.
 
 Tout reste sur la machine : le serveur n'écoute que sur 127.0.0.1 et les boutiques n'existent que dans ce processus.
 """
@@ -38,8 +43,8 @@ sys.path.insert(0, str(ROOT))
 
 from agents import assets, shops, world  # noqa: E402
 from agents.browser_agent import PROFILE, masked, run_browser  # noqa: E402
-from agents.hermes_agent import run_hermes  # noqa: E402
 from agents.guard_client import GuardClient  # noqa: E402
+from agents.hermes_agent import run_hermes  # noqa: E402
 from agents.llm import MODEL_ID, BedrockLLM  # noqa: E402
 from agents.sentinel_chain import API as CHAIN_API, SentinelChain  # noqa: E402
 from agents.sentinel_gateway import verdict_summary  # noqa: E402
@@ -66,6 +71,9 @@ SHOP_PATH = re.compile(r"/shop/([a-z0-9]+)(/.*)?")
 IMAGE_PATH = re.compile(re.escape(shops.IMAGE_ROOT) + r"/([a-z0-9]+)/([a-z0-9-]+)")  # la photo d'un produit dans une boutique
 # Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe (les photos viennent d'ici).
 SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
+# Le moteur de recherche est notre page, dessinée comme l'interface : elle charge en plus ses polices (Google Fonts), rien d'autre.
+SEARCH_CSP = {"Content-Security-Policy": SHOP_CSP["Content-Security-Policy"].replace("style-src 'unsafe-inline'", "style-src 'unsafe-inline' https://fonts.googleapis.com")
+              + "; font-src https://fonts.gstatic.com"}
 PACE = 0  # le serveur n'attend pas entre deux gestes : c'est l'interface qui les joue à vitesse humaine
 _llms: dict[str, BedrockLLM] = {}
 _guard: GuardClient | None = None   # le garde à l'entrée de la chaîne, réglé au lancement (--guard)
@@ -143,7 +151,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/search":
             query = parse_qs(url.query).get("q", [""])[0]
             page = shops.search_page(query, "/search", lambda key: f"/shop/{key}/").replace('action="/search/"', 'action="/search"')
-            return self._send(200, page.encode(), "text/html; charset=utf-8", SHOP_CSP)
+            return self._send(200, page.encode(), "text/html; charset=utf-8", SEARCH_CSP)
         shop = SHOP_PATH.fullmatch(path)
         if shop and shop.group(1) in world.ALL_SITES:
             return self._shop("GET", shop.group(1), shop.group(2) or "/", {})
@@ -158,13 +166,30 @@ class Handler(BaseHTTPRequestHandler):
             fields = parse_qs(self.rfile.read(length).decode("utf-8", "replace"), keep_blank_values=True)
             return self._shop("POST", shop.group(1), shop.group(2) or "/", {k: v[0] for k, v in fields.items()})
         # Content-Type JSON exigé : une page web tierce ne peut pas l'envoyer sans préflight CORS, que l'on n'accorde pas
-        if self.path != "/api/run" or not self.headers.get("Content-Type", "").startswith("application/json"):
+        if self.path not in ("/api/run", "/api/decide") or not self.headers.get("Content-Type", "").startswith("application/json"):
             return self._json(404, {"error": "not found"})
+        if self.path == "/api/decide":  # un humain tranche une décision en attente (outil approve_pending du garde)
+            try:
+                body = json.loads(self.rfile.read(length))
+                iid, decision = str(body["instruction_id"]), body["decision"]
+                assert decision in ("allow", "decline", "block") and len(iid) <= 100 and _guard is not None
+            except Exception:
+                return self._json(400, {"error": "bad request"})
+            try:
+                final = _guard.approve(iid, decision, "humain (interface de la sandbox)")
+            except Exception as exc:  # décision déjà tranchée, garde arrêté...
+                return self._json(409, {"error": f"{type(exc).__name__}: {str(exc)[:300]}"})
+            OUT.mkdir(exist_ok=True)
+            with (OUT / "decisions.jsonl").open("a", encoding="utf-8") as f:
+                f.write(json.dumps({"instruction_id": iid, "decision": decision, "at": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
+            return self._json(200, {"instruction_id": iid, "verdict": final["verdict"], "trust_score": final.get("trust_score"),
+                                    "approved_by": final.get("approved_by")})
         try:
             body = json.loads(self.rfile.read(length))
             prompt, model = body["prompt"].strip(), body.get("model") or MODEL_ID
             instructions, agent = str(body.get("instructions", "")).strip(), str(body.get("agent", "")).strip()
             mode = body.get("mode", "shop")
+            guard = _guard if body.get("guard", True) else None  # l'interface peut couper le garde pour un run
             assert prompt and len(prompt) <= 2000 and len(instructions) <= 4000 and len(agent) <= 80 and model in MODELS and mode in ("shop", "finance")
         except Exception:
             return self._json(400, {"error": "bad request"})
@@ -180,8 +205,9 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             llm = _llms.get(model) or _llms.setdefault(model, BedrockLLM(model))
-            if mode == "finance":  # l'agent Hermès généraliste : analyse d'actifs puis pay/approve/swap via le garde
-                run = run_hermes(prompt, llm, guard=_guard, chain=_chain, instructions=instructions, emit=emit)
+            backend = guard.backend if guard else None
+            if mode == "finance":  # l'agent Hermès généraliste : sans garde l'ordre est préparé, jamais envoyé (outcome "ready") ; avec, il lui est soumis
+                run = run_hermes(prompt, llm, guard=guard, chain=_chain if guard else None, instructions=instructions, emit=emit)
                 run.update(agent=agent, model=model, mode=mode, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
                 OUT.mkdir(exist_ok=True)
                 with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
@@ -190,24 +216,24 @@ class Handler(BaseHTTPRequestHandler):
                 emit({"type": "end", "outcome": run["outcome"], "order": run["order"], "chosen": run.get("asset") or "", "why": run["why"],
                       "considered": [], "submitted": None, "confirmation": None, "expected": None, "final_text": run["final_text"],
                       "turns": run["turns"], "site": None, "request": request, "asset": public_asset(run.get("asset")),
-                      **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], _guard.backend if _guard else None),
+                      **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], backend),
                           "onchain": run.get("onchain")} if run["verdict"] else {})})
                 return
-            # l'agent ne connaît pas le garde ; run_browser appelle guard.verify au clic "Payer" et ne paie que si allow
-            run = run_browser(prompt, llm, guard=_guard, instructions=instructions, emit=emit, pace=PACE)
+            # l'agent ne connaît pas le garde : run_browser l'appelle au clic sur "Payer" et ne paie que s'il valide
+            run = run_browser(prompt, llm, guard=guard, instructions=instructions, emit=emit, pace=PACE)
             if run["verdict"] and _chain:  # la transaction entre dans SentinelL1 : le garde a jugé, on inscrit la décision
                 emit({"type": "submit", "network": "SentinelL1"})
                 run["onchain"] = _chain.authorize(run["verdict"], public_site(run["site"]) if run["site"] else None,
                                                    item=", ".join(world.PRODUCTS[p]["name"] for p in run.get("items", {})) or run.get("chosen", ""))
                 emit({"type": "onchain", **run["onchain"]})
-            run.update(agent=agent, model=model, backend=_guard.backend if _guard else None, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
+            run.update(agent=agent, model=model, backend=backend, started=time.strftime("%Y-%m-%dT%H:%M:%S"))
             OUT.mkdir(exist_ok=True)
             with (OUT / "runs.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps(run, ensure_ascii=False) + "\n")
             request = run["request"] and {**run["request"], "source_context": f"<{len(run['request']['source_context'])} caractères de HTML lus par l'agent>"}
             keys = ("outcome", "order", "chosen", "why", "considered", "submitted", "confirmation", "expected", "final_text", "turns")
             emit({"type": "end", **{k: run[k] for k in keys}, "site": public_site(run["site"]) if run["site"] else None, "request": request,
-                  **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], _guard.backend if _guard else None),
+                  **({"verdict": verdict_summary(run["verdict"], run["latency_ms"], backend),
                       "onchain": run.get("onchain")} if run["verdict"] else {})})
         except ConnectionError:
             pass  # l'onglet a été fermé pendant le run
@@ -225,22 +251,29 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--port", type=int, default=8765)
     p.add_argument("--open", action="store_true", help="ouvre l'interface dans le navigateur")
-    p.add_argument("--guard", choices=["engine", "stub", "off"], default="engine", help="le garde à l'entrée de SentinelL1 (défaut engine)")
+    p.add_argument("--guard", choices=["mcp", "engine", "stub", "off"], default="mcp",
+                   help="le garde à l'entrée de SentinelL1 : mcp (serveur MCP, défaut), engine (moteur en direct), stub, off")
     p.add_argument("--chain", default=CHAIN_API, help="API authorize de SentinelL1, ou off")
     a = p.parse_args()
     if a.guard != "off":
         # le garde lit le registre de menaces on-chain (adresse déjà flaguée = refus direct, même entre sessions)
         os.environ.setdefault("GUARD_CONTRACT_ADDRESS", "0x7A7e5F80BE65F588DF975C4Aa563BA442db8bcb6")
         os.environ.setdefault("AVAX_RPC_URL", "https://rpc.petroi.fr/rpc")
-        _guard = GuardClient(a.guard)
-        _chain = SentinelChain(a.chain) if a.chain != "off" else None
+        try:
+            _guard = GuardClient(a.guard)
+        except Exception as exc:  # dépendances du garde absentes, serveur MCP qui ne démarre pas...
+            print(f"  GARDE INDISPONIBLE ({type(exc).__name__}: {exc}) : les paiements partiront sans vérification")
+        _chain = SentinelChain(a.chain) if _guard and a.chain != "off" else None
     url = f"http://127.0.0.1:{a.port}/"
     server = ThreadingHTTPServer(("127.0.0.1", a.port), Handler)
     print(f"Sandbox -> {url}   boutiques : {url}search   (Ctrl+C pour arrêter)")
-    print(f"  garde : {_guard.backend if _guard else 'off'}   chaîne : {_chain.base if _chain else 'off'}   Claude : {os.environ.get('GUARD_LLM','off')}")
+    print(f"  garde : {_guard.backend if _guard else 'aucun'}   chaîne : {_chain.base if _chain else 'off'}   Claude dans le garde : {os.environ.get('GUARD_LLM', 'off')}")
     if a.open:
         webbrowser.open(url)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        if _guard:
+            _guard.close()

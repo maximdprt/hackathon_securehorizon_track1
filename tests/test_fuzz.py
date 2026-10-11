@@ -414,7 +414,7 @@ def order_invalid(req: dict[str, Any]) -> bool:
         f = float(amt)
     except (TypeError, ValueError, OverflowError):
         return True
-    if not (f > 0) or not math.isfinite(f) or f > 1e18:
+    if not (f > 0) or not math.isfinite(f):  # an absurd amount is a block now, not a rejected request
         return True
     issuer = o.get("issuer")
     if not isinstance(issuer, str) or not issuer.strip():

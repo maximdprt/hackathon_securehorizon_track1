@@ -69,8 +69,6 @@ class PaymentOrder:
             raise ValueError("amount must be finite")
         if amount <= 0:
             raise ValueError("amount must be > 0")
-        if amount > 1e18:
-            raise ValueError("amount is implausibly large")
         self.amount = amount
         if not self.issuer:
             raise ValueError("issuer is required")
@@ -97,6 +95,7 @@ class Mandate:
     role: str = "agent"
     allowed_actions: list[str] = field(default_factory=lambda: ["pay"])
     max_amount: float = 0.0  # 0 = no cap
+    max_daily: float = 0.0  # 0 = no cumulative cap over 24 h
     currency: str = "USDC"
     allowed_recipients: list[str] = field(default_factory=list)
     description: str = ""

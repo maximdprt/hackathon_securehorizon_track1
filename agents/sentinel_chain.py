@@ -43,7 +43,8 @@ class SentinelChain:
             "payment": {"issuer": verdict["issuer"], "recipient": verdict["recipient"],
                         "amount": int(round(float(verdict["amount"]) * 10**DECIMALS)), "nonce": time.time_ns() // 1000},
             "verdict": ONCHAIN_VERDICT[verdict["verdict"]],
-            "reason": short_reason(verdict.get("reasons") or []),
+            # the trust score leads the on-chain reason: whoever reads the chain later still gets it
+            "reason": (f"trust={verdict.get('trust_score')}/100; " + short_reason(verdict.get("reasons") or []))[:200],
             "ttl": ttl,
             "full": json.loads(json.dumps(verdict, default=str)),
             "context": {"issuer_label": "shopping-agent", "recipient_label": (site or {}).get("name") or verdict["recipient"],

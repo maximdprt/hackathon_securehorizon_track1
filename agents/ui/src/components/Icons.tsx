@@ -50,6 +50,12 @@ export const Alert = () => (
     <path d="M8 6.5v3.2M8 11.6v.2" />
   </Icon>
 );
+export const Shield = () => (
+  <Icon>
+    <path d="M8 1.8l5 1.9v3.9c0 3.1-2 5.5-5 6.6-3-1.1-5-3.5-5-6.6V3.7z" />
+    <path d="M5.8 8l1.6 1.6 2.9-3.1" />
+  </Icon>
+);
 export const Lock = () => (
   <Icon size={14}>
     <rect x="3.2" y="7.2" width="9.6" height="6.6" rx="1.4" />

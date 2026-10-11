@@ -9,6 +9,10 @@ LAYER = "mandate"
 def extract(req: VerifyRequest, mandate: Mandate | None) -> list[Signal]:
     sig: list[Signal] = []
     o = req.order
+    if o.amount > 1e18:
+        sig.append(Signal("amount_implausible", LAYER, 1.0, f"amount {o.amount:g} is above any plausible value: an unlimited transfer in disguise", hard=True, owasp=["ASI03"]))
+    if o.action in ("pay", "transfer") and not o.recipient:
+        sig.append(Signal("recipient_missing", LAYER, 1.0, f"a {o.action} order names no recipient: nothing can be checked about who gets the money", hard=True, owasp=["ASI03"]))
     if mandate is None:
         sig.append(Signal("issuer_in_registry", LAYER, 1.0, f"no mandate registered for issuer {o.issuer}", hard=True, owasp=["ASI03"]))
         return sig
@@ -17,14 +21,13 @@ def extract(req: VerifyRequest, mandate: Mandate | None) -> list[Signal]:
         sig.append(Signal("action_not_in_mandate", LAYER, 0.50, f"action {o.action!r} not in mandate {mandate.allowed_actions}", owasp=["ASI03"]))
 
     if mandate.max_amount and o.amount > mandate.max_amount:
-        if o.amount > 2 * mandate.max_amount:
-            sig.append(Signal("amount_within_mandate", LAYER, 1.0, f"amount {o.amount} > 2x mandate cap {mandate.max_amount}", hard=True, owasp=["ASI03"]))
-        else:
-            sig.append(Signal("amount_within_mandate", LAYER, 0.50, f"amount {o.amount} exceeds mandate cap {mandate.max_amount}", owasp=["ASI03"]))
+        # over the cap, by any margin, is a mandate rule, not a suspicion: it costs no trust and never blocks by itself,
+        # a human decides (scoring.RULE_NEEDS_APPROVAL)
+        sig.append(Signal("amount_within_mandate", LAYER, 0.0, f"amount {o.amount} exceeds mandate cap {mandate.max_amount}", owasp=["ASI03"]))
     elif mandate.max_amount and o.amount >= 0.95 * mandate.max_amount:
         sig.append(Signal("amount_just_under_threshold", LAYER, 0.15, f"amount {o.amount} sits just under the cap {mandate.max_amount} (structuring pattern)"))
 
-    if mandate.currency and o.currency and o.currency.upper() != mandate.currency.upper():
+    if mandate.currency and o.currency and o.currency.upper() not in {c.strip().upper() for c in mandate.currency.split("|")}:
         sig.append(Signal("currency_mismatch", LAYER, 0.30, f"order currency {o.currency} differs from mandate currency {mandate.currency}"))
 
     if mandate.allowed_recipients and o.recipient and o.recipient not in mandate.allowed_recipients:

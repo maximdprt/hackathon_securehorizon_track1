@@ -91,7 +91,7 @@ test('the browser shows what the agent does, step by step, up to the confirmed o
 
   await ask('Achète une Apple Watch Series 10 46 mm');
   expect(await screen.findByText('Commande passée chez Meridian Watch Co.')).toBeInTheDocument();
-  expect(bodies).toEqual([{ prompt: 'Achète une Apple Watch Series 10 46 mm', agent: 'Chasseur de prix', model: 'm.pixtral', mode: 'shop', instructions: expect.stringContaining('prix le plus bas') }]);
+  expect(bodies).toEqual([{ prompt: 'Achète une Apple Watch Series 10 46 mm', agent: 'Chasseur de prix', model: 'm.pixtral', mode: 'shop', guard: true, instructions: expect.stringContaining('prix le plus bas') }]);
 
   // le navigateur est sur la dernière page : la confirmation de commande
   expect(screen.getByText('meridian-watch.example/confirmation/MER-1001', { selector: '.browser__url' })).toBeInTheDocument();
@@ -343,7 +343,9 @@ test('a reason repeated on consecutive steps is written once, and a step waits f
 
 test('with the guard on, the verdict is a SentinelL1 notification, not the agent speaking', async () => {
   const VERDICT = { verdict: 'block' as const, trust_score: 8, risk_score: 0.92, severity: 3, onchain_flagged: true,
-    instruction_id: '0xab', reasons: ['new_merchant_first_payment: domaine de 9 jours'], owasp: ['ASI07'], latency_ms: 1.2, backend: 'engine' };
+    instruction_id: '0xab', owasp: ['ASI07'], latency_ms: 1.2, backend: 'engine', notes: [],
+    thresholds: { allow_at_or_above: 70, block_below: 30 },
+    deductions: [{ id: 'new_merchant_first_payment', layer: 'counterparty', cost: 50, hard: false, evidence: 'domaine de 9 jours' }] };
   const ONCHAIN = { ok: true as const, verdict: 'block', payment_id: '0x11', nonce: 1, city: 'https://city.test/?live=1', latency_ms: 900,
     txs: [{ kind: 'flag' as const, hash: '0xf1f1f1f1f1', url: 'https://explorer.test/tx/0xf1' }, { kind: 'decision' as const, hash: '0xd1d1d1d1d1', url: 'https://explorer.test/tx/0xd1' }] };
   const events: RunEvent[] = [
@@ -363,9 +365,11 @@ test('with the guard on, the verdict is a SentinelL1 notification, not the agent
   expect(await screen.findByText("J'ai lancé le paiement, mais il n'est pas passé.")).toBeInTheDocument();
   expect(screen.queryByText(/garde a bloqué/)).not.toBeInTheDocument();
   // la décision vient d'un acteur distinct : SentinelL1
-  const sentinel = screen.getByRole('region', { name: 'Vérification SentinelL1' });
-  expect(within(sentinel).getByText('Transaction frauduleuse, refusée')).toBeInTheDocument();
-  expect(within(sentinel).getByText(/confiance 8\/100/)).toBeInTheDocument();
+  const sentinel = screen.getByRole('region', { name: 'Verdict du garde' });
+  expect(within(sentinel).getByText('SentinelL1')).toBeInTheDocument();
+  expect(within(sentinel).getByText('Paiement refusé')).toBeInTheDocument();
+  expect(within(sentinel).getByRole('img', { name: 'Confiance 8 sur 100' })).toBeInTheDocument();
+  expect(within(sentinel).getByText('Premier paiement à un marchand récent')).toBeInTheDocument();
   expect(within(sentinel).getByText(/l'argent reste dans le wallet/)).toBeInTheDocument();
   expect(within(sentinel).getByRole('link', { name: /Signalement 0xf1/ })).toHaveAttribute('href', 'https://explorer.test/tx/0xf1');
   expect(within(sentinel).getByRole('link', { name: 'Voir la voiture dans la ville 3D' })).toHaveAttribute('href', 'https://city.test/?live=1');

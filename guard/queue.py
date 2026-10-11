@@ -29,9 +29,13 @@ class PendingQueue:
     def list(self) -> list[dict]:
         return list(self._load().values())
 
+    def get(self, instruction_id: str) -> dict | None:
+        return self._load().get(instruction_id)
+
     def pop(self, instruction_id: str) -> dict | None:
         with self._lock:
             d = self._load()
             v = d.pop(instruction_id, None)
-            self._save(d)
+            if v is not None:
+                self._save(d)
             return v

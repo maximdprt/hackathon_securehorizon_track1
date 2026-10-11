@@ -50,7 +50,7 @@ def test_block_is_sent_to_authorize_with_the_full_verdict_and_comes_back_with_ex
     assert seen[0]["path"] == "/authorize"
     assert body["verdict"] == "block" and body["payment"]["issuer"] == ISSUER and body["payment"]["recipient"] == SHOP
     assert body["payment"]["amount"] == 229 * 10**18 and isinstance(body["payment"]["nonce"], int)  # SEC wei, matches GuardedVault.pay
-    assert len(body["reason"]) <= 200 and body["reason"].startswith("new_merchant_first_payment")
+    assert len(body["reason"]) <= 200 and body["reason"].startswith("trust=") and "new_merchant_first_payment" in body["reason"]
     assert body["full"]["verdict"] == "block" and body["full"]["instruction_id"] == verdict()["instruction_id"]
     assert body["context"]["recipient_label"] == "Meridian Watch Co." and body["context"]["issuer_label"] == "shopping-agent"
     assert proof["ok"] and proof["payment_id"] == "0x" + "11" * 32

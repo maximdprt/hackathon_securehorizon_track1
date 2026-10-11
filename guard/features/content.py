@@ -137,6 +137,12 @@ def extract(req: VerifyRequest, cleaned: Cleaned) -> list[Signal]:
     if PII_FIELDS.search(raw) and PAYMENT_CONTEXT.search(raw):
         sig.append(Signal("checkout_overcollects_pii", LAYER, 0.20, f"checkout asks for identity data a purchase never needs: {PII_FIELDS.search(raw).group(0)!r}"))
 
+    # the agent was given a reading job and comes back with a payment: the order was born in what it read (Track 01, problem 2).
+    # A paid API call (x402) is the one case where a task without money in it legitimately ends in a payment.
+    if task.strip() and L.READ_ONLY_TASK.search(task) and not L.PAYMENT_INTENT.search(task) and not req.context.get("x402"):
+        sig.append(Signal("task_order_mismatch", LAYER, 0.50, f"the agent's task is a reading job ({task.strip()[:60]!r}), yet it orders a {req.order.action}: the order comes from what it read",
+                          owasp=["ASI03", "ASI07"]))
+
     if req.origin == "memory":
         sig.append(Signal("order_from_memory_not_current_turn", LAYER, 0.30, "order has no source in the current turn (replayed from memory)"))
 
