@@ -108,17 +108,12 @@ export function GuardCar({ geo, theme, share }: { geo: GuardGeo; theme: Theme; s
     r.position.copy(p);
     r.rotation.y = -yaw;
     // the X-ray: driving through the beam, what has passed is a hologram; then the whole car while Sentinel analyses it.
-    // On the way to the C-Chain, the gate's plane cuts what has gone through it. Else solid, whole
+    // Else solid, whole: on the way to the C-Chain it goes through the gate whole, and is gone as it meets the tower
     let v = 1e9;
     if (motion.leg === "scanPass") {
       dir.set(Math.cos(geo.toll.yaw), 0, Math.sin(geo.toll.yaw));
       v = dir.dot(geo.toll.p);
     } else if (motion.xray > 0.5) v = -1e9;
-    else if ((motion.leg === "toCChain" || motion.leg === "parkToCChain") && Math.hypot(p.x - geo.gate.p.x, p.z - geo.gate.p.z) < geo.carL * 1.5) {
-      // only at the gate: the lane winds round the hub, a plane further would cut the car on its way
-      dir.set(Math.cos(geo.gate.yaw), 0, Math.sin(geo.gate.yaw));
-      v = dir.dot(geo.gate.p);
-    }
     clip.solid.normal.copy(dir).negate();
     clip.solid.constant = v;
     clip.holo.normal.copy(dir);

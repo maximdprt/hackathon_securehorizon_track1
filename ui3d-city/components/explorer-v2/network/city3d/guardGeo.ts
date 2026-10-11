@@ -13,6 +13,7 @@ import type { Leg } from "@/sim/store";
 import { BLOCK_H, type Building, type CityModel } from "./model";
 import { LOT, SIZE, WIDTH } from "./Traffic";
 import { CAR_LENGTH } from "./carModel";
+import { hubFootOf } from "./HubTower";
 
 /** the human post: a covered car park on the road's right, its drive-through aisle along the road, an entry gate and an
     exit gate on its front, the warden's booth by the aisle. Its frame: +x away from the road, +z toward the tower */
@@ -60,7 +61,8 @@ export type GuardGeo = {
   /** the X-ray gantry: its beam's point on the road, the road's heading there */
   toll: { p: Vector3; yaw: number; span: number };
   stop: { p: Vector3; yaw: number };
-  /** the C-Chain's gate on the road into the hub: a visa's car goes through it and is gone (GuardCar clips it there) */
+  /** the C-Chain's gate on the road into the hub: a visa's car goes through it on to the C-Chain's tower, and is gone
+      only as its nose meets the tower's foot (the legs to the C-Chain end there) */
   gate: { p: Vector3; yaw: number; w: number };
   /** the yard's metres in the world */
   k: number;
@@ -182,7 +184,34 @@ export function guardGeoOf(model: CityModel, city: City): GuardGeo | null {
   const dStop = dBeam - (carL / 2 + carW * 0.3);
   const dPost = dStop - carW * 2.2 - gateZ;
   const dGate = core - carW * 0.4;
-  const dEnd = dGate - carL * 1.5;
+  // past the gate, on across the plaza to the C-Chain's tower: the leg ends where the car's nose meets the tower's foot
+  // (its outer step or the stair down its front), never inside it
+  const foot = hubFootOf(hubB.n.w);
+  const inPoly = (poly: [number, number][], x: number, z: number) => {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, zi] = poly[i];
+      const [xj, zj] = poly[j];
+      if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  const inTower = (p: Vector3) => {
+    const x = p.x - hubB.x;
+    const z = p.z - hubB.z;
+    return inPoly(foot.step, x, z) || (Math.abs(x) <= foot.stair.x && z >= foot.stair.z0 && z <= foot.stair.z1);
+  };
+  const touches = (d: number) => {
+    const nose = P(d, 0, 0).addScaledVector(F, carL / 2);
+    return [-0.5, -0.25, 0, 0.25, 0.5].some((s) => inTower(nose.clone().addScaledVector(R, s * carW)));
+  };
+  const nudge = carW * 0.02;
+  let dEnd = dGate - carL;
+  for (let d = dGate; d > 0; d -= nudge)
+    if (touches(d)) {
+      dEnd = d + nudge;
+      break;
+    }
   const roadHalf = Math.min(ringHalf * 0.8, 2.6 * k); // no wider than the gantry
 
   const step = carW * 0.25;

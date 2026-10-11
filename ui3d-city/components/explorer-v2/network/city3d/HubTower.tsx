@@ -738,6 +738,13 @@ function steelOf(g: Faces, f: Frame, key: WingKey, z0: number, z1: number, fins:
   }
 }
 
+/** AVAGUARD: the tower's foot in plan round its ground point, as massOf builds it: the forecourt's outer step and the
+    stair down its front (x within ±stair.x, z from stair.z0 out to stair.z1). Our visa's car drives into it (guardGeo) */
+export function hubFootOf(w: number) {
+  const step = chamferOf(w * STEPS[0], STEP_CUT);
+  return { step, stair: { x: w * STAIR_W, z0: chamferOf(w * STEPS[1], STEP_CUT)[2][1], z1: step[2][1] + 3.2 } };
+}
+
 /* the tower's massing, merged, each part in its own color: the forecourt, the stair, the podium, its fins, cornice and canopy; the C and X wings' cores and steel run by run, and every wing's lobbies and their sills; the C wing's lantern, fins, lid and spire; the X wing's roof, the P wing's roof and the beacon's mast; the bridges */
 function massOf(w: number, h: number): BufferGeometry {
   const g = new Faces();

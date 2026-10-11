@@ -192,8 +192,9 @@ function finish(tx: TxEvent, outcome: "ALLOW" | "BLOCK", via: "Sentinel" | "huma
   return n;
 }
 
-/* 4b. green: the barrier lifts, the road to the C-Chain lights in green, the car drives it and goes through the
-   C-Chain's gate, cut at its plane (GuardCar): the payment is executed, its visa spent, its proof on-chain */
+/* 4b. green: the barrier lifts, the road to the C-Chain lights in green, the car drives it, through the C-Chain's
+   gate and on into the C-Chain's tower, gathering speed; it is gone the moment its nose meets the tower (guardGeo): the
+   payment is executed, its visa spent, its proof on-chain */
 async function allow(tx: TxEvent, via: "Sentinel" | "humain", from: "toCChain" | "parkToCChain") {
   motion.tone = "allow";
   sim.set({ phase: "allow", routeLit: true });
@@ -201,7 +202,7 @@ async function allow(tx: TxEvent, via: "Sentinel" | "humain", from: "toCChain" |
     t.call(() => fly("cchain"));
     t.to(motion, { glow: 1, duration: 0.4 });
     const at = t.duration();
-    leg(t, from, from === "toCChain" ? TIMINGS.toCChain : TIMINGS.parkToCChain, "power1.inOut");
+    leg(t, from, from === "toCChain" ? TIMINGS.toCChain : TIMINGS.parkToCChain, "power1.in");
     // the barrier falls back once the car has gone past it
     t.to(motion, { barrier: 0, duration: span(TIMINGS.barrier) }, at + span(1.2));
     if (!still()) t.call(() => fly("gate"), [], at + (from === "toCChain" ? TIMINGS.toCChain : TIMINGS.parkToCChain) * 0.45);
