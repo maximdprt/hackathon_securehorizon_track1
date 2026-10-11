@@ -65,13 +65,13 @@ function Figure({ label, value, sub, title, tone, href, className }: { label: st
   const body = (
     <>
       <span className={cn(MONO_LABEL, "whitespace-nowrap")}>{label}</span>
-      <span className="whitespace-nowrap font-mono text-[17px] font-semibold tabular-nums leading-tight text-zinc-900 dark:text-zinc-50" style={tone ? { color: tone } : undefined}>
+      <span className="whitespace-nowrap font-mono text-[15px] font-semibold tabular-nums leading-tight text-zinc-900 md:text-[17px] dark:text-zinc-50" style={tone ? { color: tone } : undefined}>
         {value}
       </span>
       <span className="whitespace-nowrap font-mono text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400">{sub}</span>
     </>
   );
-  const box = cn("flex min-w-0 flex-col items-start gap-0.5 px-4 py-2.5", className);
+  const box = cn("flex min-w-0 shrink-0 snap-start flex-col items-start gap-0.5 px-3 py-2 md:px-4 md:py-2.5", className);
   return href ? (
     <a href={href} target="_blank" rel="noreferrer" title={title} className={cn(box, "transition-colors first:rounded-l-2xl last:rounded-r-2xl hover:bg-zinc-50/80 dark:hover:bg-zinc-900/60")}>
       {body}
@@ -83,7 +83,10 @@ function Figure({ label, value, sub, title, tone, href, className }: { label: st
   );
 }
 
-/** the strip's six cells: what the agent checked, stopped, saved, banned, asked a human, and proved */
+/** the strip's seven cells: what the agent checked, stopped, saved, caught, banned, asked a human, and proved. AVAGUARD: the
+    cells drop by the strip's room, the least read first, each rule with some 30 px to spare over the cells that stay (all
+    seven hold about 750 px, then 640, 530, 410, and the three that never drop 330, under which the strip fades out:
+    city-frame.tsx STRIP_GONE). A phone's strip stands in no container: no rule matches there, and it scrolls instead */
 export function Figures() {
   const k = useKpis();
   const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
@@ -96,13 +99,13 @@ export function Figures() {
         label="Argent sauvé"
         value={fmtAmount(k.saved.value)}
         sub={k.saved.token}
-        className="@max-[640px]/strip:hidden"
+        className="@max-[570px]/strip:hidden"
         tone={STATE.allow.hex}
         title="Ce que les paiements refusés auraient envoyé aux escrocs (montants publiés par l'agent)"
       />
       <Figure label="Pièges" value={k.injections} sub="ordres cachés" className="@max-[780px]/strip:hidden" title="Des instructions cachées dans un document ou une page, écrites pour manipuler l'agent IA (prompt injection)" />
-      <Figure label="Escrocs" value={k.banned} sub="bannis" title="Adresses inscrites au registre des hackers : leurs tentatives suivantes sont refusées d'office" />
-      <Figure label="Avis humain" value={k.human} sub="cas douteux" className="@max-[700px]/strip:hidden" tone={STATE.human.hex} title="Les cas trop incertains pour décider seul : une personne valide ou refuse" />
+      <Figure label="Escrocs" value={k.banned} sub="bannis" className="@max-[440px]/strip:hidden" title="Adresses inscrites au registre des hackers : leurs tentatives suivantes sont refusées d'office" />
+      <Figure label="Avis humain" value={k.human} sub="cas douteux" className="@max-[680px]/strip:hidden" tone={STATE.human.hex} title="Les cas trop incertains pour décider seul : une personne valide ou refuse" />
       <Figure
         label="Preuves"
         value={`${pct(k.proved, k.total)} %`}
@@ -132,11 +135,16 @@ const dot = (hex: string, label: string) => (
 );
 
 /** the key, in the bottom left corner as city-key.tsx stands: what the city shows, in words; `network` the other L1s that
-    stand round the protocol (the ring), 0 when the city is the protocol alone */
-export function SentinelKey({ network = 0 }: { network?: number }) {
+    stand round the protocol (the ring), 0 when the city is the protocol alone; `onClose` folds it (KeyCorner) */
+export function SentinelKey({ network = 0, onClose }: { network?: number; onClose?: () => void }) {
   return (
-    <div className={cn("rounded-2xl px-4 py-3", GLASS)} style={{ width: KEY_W }}>
-      <p className="text-[12px] leading-snug text-zinc-700 dark:text-zinc-200">
+    <div role="region" aria-label="Légende" className={cn("relative rounded-2xl px-4 py-3", GLASS)} style={{ width: `min(${KEY_W}px, calc(100vw - 2 * var(--frame)))` }}>
+      {onClose && (
+        <button type="button" aria-label="Replier la légende" title="Replier la légende" onClick={onClose} className="absolute right-2 top-2 rounded-full p-1 text-zinc-400 transition-colors hover:text-zinc-900 dark:hover:text-zinc-50">
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+      <p className={cn("text-[12px] leading-snug text-zinc-700 dark:text-zinc-200", onClose && "pr-5")}>
         Un agent IA veut payer : chaque <b className="font-semibold">voiture</b> est un paiement. Sentinel le contrôle <b className="font-semibold">avant</b> que l&apos;argent parte.
       </p>
       <div className="mt-2.5 grid grid-cols-[3.75rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2">
@@ -157,6 +165,28 @@ export function SentinelKey({ network = 0 }: { network?: number }) {
       </div>
       <p className="mt-2.5 border-t border-zinc-100 pt-2 font-mono text-[9px] text-zinc-400 dark:border-zinc-900 dark:text-zinc-500">Ville 3D d&apos;après Avalanche Builder Hub (open source, BSD-3) · Voiture d&apos;après « Ferrari 458 Italia » par vicent091036 (Sketchfab), simplifiée</p>
     </div>
+  );
+}
+
+/** AVAGUARD: the key's corner: the key, or folded, a pill in the corner's place that opens it (the city's layout folds
+    it on a small or short screen, CityShell.tsx) */
+export function KeyCorner({ open, onOpen, network }: { open: boolean; onOpen: (open: boolean) => void; network: number }) {
+  if (open) return <SentinelKey network={network} onClose={() => onOpen(false)} />;
+  return (
+    <button
+      type="button"
+      aria-expanded={false}
+      onClick={() => onOpen(true)}
+      title="Ce que montre la ville"
+      className={cn("flex h-11 items-center gap-2 rounded-2xl px-3.5 text-[13px] font-medium text-zinc-700 transition-colors hover:text-zinc-950 dark:text-zinc-200 dark:hover:text-white", GLASS)}
+    >
+      <span aria-hidden className="flex -space-x-0.5">
+        {[STATE.verify.hex, STATE.allow.hex, STATE.block.hex, STATE.human.hex].map((hex) => (
+          <span key={hex} className="h-2.5 w-2.5 rounded-full ring-2 ring-white dark:ring-zinc-950" style={{ background: hex }} />
+        ))}
+      </span>
+      Légende
+    </button>
   );
 }
 
@@ -253,9 +283,9 @@ export function LatestFeed({ away }: { away: boolean }) {
   if (away) return null;
   const fresh = head !== null && seen !== null && head !== seen;
   return (
-    <div className="absolute bottom-(--frame) right-(--frame) z-30 flex flex-col items-end gap-2">
+    <div data-city-chrome className="absolute bottom-(--frame) right-(--frame) z-30 flex flex-col items-end gap-2 max-md:bottom-[calc(var(--frame)+var(--strip-h)+0.5rem)]">
       {open && (
-        <div className={cn("w-[320px] overflow-hidden rounded-2xl", GLASS)}>
+        <div className={cn("w-[min(320px,calc(100vw-2*var(--frame)))] overflow-hidden rounded-2xl", GLASS)}>
           <div className="flex items-center justify-between border-b border-zinc-100 px-4 py-2.5 dark:border-zinc-900">
             <span className={MONO_LABEL}>Dernières décisions</span>
             <button type="button" aria-label="Fermer" onClick={() => setOpen(false)} className="rounded-full p-1 text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50">

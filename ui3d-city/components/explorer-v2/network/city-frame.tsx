@@ -6,7 +6,7 @@
    and the key and the news button keep the bottom corners on the same line. Every card moves on one curve. */
 
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode, type Ref } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VIEW_SWITCH } from "@/components/explorer-v2/view-switch";
@@ -19,7 +19,7 @@ export const FRAME = "[--frame:1rem]";
 export const PANEL_W = 372;
 export const LIVE_W = 344;
 /** the news button's width (news-feed.tsx): it keeps the bottom right corner while no pane stands there */
-const NEWS_W = 48;
+export const NEWS_W = 48;
 /** the frame's motion: fast attack, long decay */
 export const EASE = "ease-[cubic-bezier(0.16,1,0.3,1)]";
 
@@ -184,24 +184,28 @@ export const STRIP_FIT: Record<PchainNetwork, { avax?: string; marketCap?: strin
 };
 
 /* the figures at the city's foot, centred on the window whatever is open: the strip's box stands as far in from both
-   edges as the wider side needs (the sidebar, or the key from xl, at the left; a pane, or the news button, at the
-   right), so nothing moves it sideways, and its cells drop by the room that leaves (STRIP_FIT). With no room for the
-   cells that stay (STRIP_FIT's gone rule) it fades out: a pane never stands over it */
-export function FigureStrip({ sidebar, legend, right, network, children }: { sidebar: boolean; legend: boolean; right: number; network: PchainNetwork; children: ReactNode }) {
-  // the key (city-key.tsx, KEY_W 320) stands from xl only, so the breakpoint sets its edge
-  const left = sidebar ? `calc(${PANEL_W}px + 2 * var(--frame))` : legend ? "var(--key-edge)" : "var(--frame)";
-  const edge = `max(${left}, calc(${right || NEWS_W}px + 2 * var(--frame)))`;
+   edges as the wider side needs (the sidebar, or the key, at the left; a pane, or the news button, at the right), so
+   nothing moves it sideways, and its cells drop by the room that leaves (STRIP_FIT). With no room for the cells that
+   stay (STRIP_FIT's gone rule) it fades out: a pane never stands over it.
+   AVAGUARD: the app gives the box's edges in pixels (CityShell.tsx, which knows its key, folded or not, and its card),
+   and our cells' own rules (ui/Frame.tsx Figures) with STRIP_GONE; `hidden` fades it under a sheet. The box is the strip's
+   container from md only: on a phone it spans the city's foot, no rule matches, and the cells scroll sideways, each
+   snapping to the strip's edge. `boxRef` reads the strip's height, which the phone's key and news stand above */
+export const STRIP_GONE = "@max-[350px]/strip:invisible @max-[350px]/strip:opacity-0";
+
+export function FigureStrip({ edges, hidden = false, boxRef, children }: { edges: [number, number]; hidden?: boolean; boxRef?: Ref<HTMLDivElement>; children: ReactNode }) {
   return (
     <div
-      className="pointer-events-none absolute bottom-(--frame) z-10 flex justify-center @container/strip [--key-edge:var(--frame)] xl:[--key-edge:calc(320px+2*var(--frame))]"
-      style={{ left: edge, right: edge }}
+      className={cn("pointer-events-none absolute bottom-(--frame) z-10 flex justify-center transition-[left,right,opacity,visibility] duration-300 md:@container/strip", EASE, hidden && "invisible opacity-0")}
+      style={{ left: edges[0], right: edges[1] }}
     >
       <div
+        ref={boxRef}
         role="group"
         aria-label="Network figures"
         className={cn(
-          "pointer-events-auto flex divide-x divide-zinc-200/80 rounded-2xl border border-zinc-200/90 bg-white/[0.92] shadow-[0_12px_32px_-20px_rgba(30,27,58,0.35)] backdrop-blur-xl transition-[opacity,visibility] duration-200 dark:divide-zinc-800 dark:border-zinc-800/90 dark:bg-zinc-950/[0.88]",
-          STRIP_FIT[network].gone,
+          "pointer-events-auto flex snap-x snap-mandatory divide-x divide-zinc-200/80 overflow-x-auto overscroll-x-contain rounded-2xl border border-zinc-200/90 bg-white/[0.92] shadow-[0_12px_32px_-20px_rgba(30,27,58,0.35)] backdrop-blur-xl transition-[opacity,visibility] duration-200 [scrollbar-width:none] max-md:w-full md:overflow-visible dark:divide-zinc-800 dark:border-zinc-800/90 dark:bg-zinc-950/[0.88] [&::-webkit-scrollbar]:hidden",
+          STRIP_GONE,
         )}
       >
         {children}
