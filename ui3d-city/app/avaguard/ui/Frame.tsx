@@ -153,7 +153,7 @@ export function SentinelKey() {
         {keyRow("Parking", "attend l'avis d'un humain")}
         {keyRow("Tours", "Sentinel, et la C-Chain où l'argent arrive")}
       </div>
-      <p className="mt-2.5 border-t border-zinc-100 pt-2 font-mono text-[9px] text-zinc-400 dark:border-zinc-900 dark:text-zinc-500">Ville 3D d&apos;après Avalanche Builder Hub (open source, BSD-3)</p>
+      <p className="mt-2.5 border-t border-zinc-100 pt-2 font-mono text-[9px] text-zinc-400 dark:border-zinc-900 dark:text-zinc-500">Ville 3D d&apos;après Avalanche Builder Hub (open source, BSD-3) · Voiture d&apos;après « Ferrari 458 Italia » par vicent091036 (Sketchfab), simplifiée</p>
     </div>
   );
 }

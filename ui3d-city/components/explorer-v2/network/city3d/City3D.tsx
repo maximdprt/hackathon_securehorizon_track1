@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react"; // AVAGUARD: + Suspense
 import { RouterRef, type Router } from "@/components/explorer-v2/router-ref";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { PerformanceMonitor } from "@react-three/drei";
@@ -958,7 +958,12 @@ export default function City3D({ data: incoming, network, versions = null, targe
         </Stage>
         <Stage at={4}>
         {/* SENTINEL: no ambient fleet in the demo city, its one hero car plays on the main road (AvaGuardRun, Road) */}
-        {!SENTINEL_ONLY && <Traffic routes={routes} streets={streets} city={city} inks={traffic.inks} on={traffic.on} blue={traffic.blue} theme={theme} still={still} liveAt={schedule.liveAt} hovered={hoverRoute?.key ?? null} onHoverRoute={onHoverRoute} frozen={flyingRef} picked={pairWays} onPickRoute={onRoute ? pickRoute : undefined} tint={routeLit ? { key: guardKey(hubId), color: AVAGUARD3.allow[theme] } : null} />}
+        {/* AVAGUARD: the cars' model loads apart, the city stands meanwhile */}
+        {!SENTINEL_ONLY && (
+          <Suspense fallback={null}>
+            <Traffic routes={routes} streets={streets} city={city} inks={traffic.inks} on={traffic.on} blue={traffic.blue} theme={theme} still={still} liveAt={schedule.liveAt} hovered={hoverRoute?.key ?? null} onHoverRoute={onHoverRoute} frozen={flyingRef} picked={pairWays} onPickRoute={onRoute ? pickRoute : undefined} tint={routeLit ? { key: guardKey(hubId), color: AVAGUARD3.allow[theme] } : null} />
+          </Suspense>
+        )}
         <Marks model={model} city={city} hover={state.hover} pick={state.pick} focus={focus} theme={theme} still={still} />
         {/* AVAGUARD: our parcel (toll, human lot, scrapyard, proofs) and the protected payment playing on it */}
         {model.buildings.length > 0 && <AvaGuardRun model={model} city={city} routes={routes} streets={streets} theme={theme} still={still} onShot={setGuardShot} cameraRef={cameraRef} />}
