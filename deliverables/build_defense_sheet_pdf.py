@@ -1,6 +1,6 @@
 """Build deliverables/defense-sheet.html (branded, self-contained, ONE A4 page) then print to defense-sheet.pdf
 with headless Chrome. Design system: DESIGN.md (ink #171717 / canvas #fafafa, hairlines, Geist, mono technical,
-dark hero band). No em dashes.
+dark hero band). No em dashes. Proper French accents (UTF-8).
 
 Structure (as required): threat scenario addressed, NIST CSF functions, ATT&CK / ATLAS techniques & OWASP risks,
 metrics achieved (detection, false positives, time to detect and respond), known limitations.
@@ -25,32 +25,32 @@ def b64(p: pathlib.Path) -> str:
 logo_white = b64(LOGO_WHITE)
 
 NIST = [
-    ("Identify", "Mandats et autorites resolus cote serveur, jamais declares par l'agent."),
-    ("Protect", "Visa on-chain a usage unique, GuardedVault fail-closed (pas de visa = revert)."),
+    ("Identify", "Mandats et autorités résolus côté serveur, jamais déclarés par l'agent."),
+    ("Protect", "Visa on-chain à usage unique, GuardedVault fail-closed (pas de visa = revert)."),
     ("Detect", "7 couches de signaux + fusion Claude sur l'intention et l'injection."),
     ("Respond", "Block + flag de l'adresse + escalade humaine, incident DORA ouvert au refus."),
-    ("Recover", "Trace on-chain rejouable, registre de menaces partage et reutilisable."),
+    ("Recover", "Trace on-chain rejouable, registre de menaces partagé et réutilisable."),
 ]
 
 TECHNIQUES = [
-    ("OWASP ASI03", "Compromission d'autorite : un agent peu privilegie declenche un paiement qu'il ne peut pas ordonner. Pare par la verification de la chaine d'autorite on-chain."),
-    ("OWASP ASI07", "Abus d'agent / d'outil : instruction injectee (document, page, autre agent) qui detourne l'outil de paiement. Pare par la detection d'injection."),
-    ("MITRE ATLAS", "Prompt injection indirecte, evasion par encodage et obfuscation, manipulation d'agent."),
-    ("Vecteurs", "HTML cache, PDF et mail piege, tool poisoning (MCP), confusion d'autorite, address poisoning, tresorerie migree, base64 / hex / url / ROT13, homoglyphes, unicode invisible, depassement de mandat, contrepartie frauduleuse."),
+    ("OWASP ASI03", "Compromission d'autorité : un agent peu privilégié déclenche un paiement qu'il ne peut pas ordonner. Paré par la vérification de la chaîne d'autorité on-chain."),
+    ("OWASP ASI07", "Abus d'agent ou d'outil : instruction injectée (document, page, autre agent) qui détourne l'outil de paiement. Paré par la détection d'injection."),
+    ("MITRE ATLAS", "Prompt injection indirecte, évasion par encodage et obfuscation, manipulation d'agent."),
+    ("Vecteurs", "HTML caché, PDF et mail piégé, tool poisoning (MCP), confusion d'autorité, address poisoning, trésorerie migrée, base64 / hex / url / ROT13, homoglyphes, unicode invisible, dépassement de mandat, contrepartie frauduleuse."),
 ]
 
 METRICS = [
-    ("100 %", "Detection", "23 attaques, redteam/run.py"),
-    ("0 %", "Faux positifs", "52 controles legitimes"),
-    ("&lt; 1 ms", "Temps de detection", "heuristiques ; ~3 s avec Claude"),
-    ("20 / 20", "Bout-en-bout on-chain", "verdicts justes et mines"),
+    ("100 %", "Détection", "23 attaques + batterie 90/90"),
+    ("0 %", "Faux positifs", "52 contrôles + batterie 10/10"),
+    ("~1,4 ms", "Temps de détection", "médian, heuristiques ; ~3 s avec Claude"),
+    ("20 / 20", "Bout-en-bout on-chain", "verdicts justes et minés"),
 ]
 
 LIMITS = [
-    "Le jugement d'intention fin depend de Claude ; sans LLM, on ne devine jamais allow (plancher humain).",
-    "La memoire des menaces est on-chain et durable, mais le jugement reste par transaction (pas encore de correlation multi-tx avancee).",
-    "L'execution reelle du paiement exige un wallet agent autorise et approvisionne.",
-    "Un adversaire peut inventer une strategie inedite : banc adaptatif teste (0 bypass), recalibrage continu, aucune triche.",
+    "Le jugement d'intention fin dépend de Claude ; sans LLM, on ne devine jamais allow (plancher humain).",
+    "Chiffres mesurés sur notre banc (red-team + batterie + évasion) : honnêtes et reproductibles, mais pas une garantie universelle.",
+    "La mémoire des menaces est on-chain et durable, mais le jugement reste par transaction (pas encore de corrélation multi-tx avancée).",
+    "Un adversaire peut inventer une stratégie inédite : banc adaptatif testé (0 bypass), recalibrage continu, aucune triche.",
 ]
 
 nist_rows = "".join(
@@ -117,7 +117,7 @@ HTML = f"""<!doctype html>
 
   .kpis {{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px; }}
   .kpi {{ background:var(--ink); color:#fff; border-radius:9px; padding:12px 13px; }}
-  .kpi__n {{ font-size:23px; font-weight:600; letter-spacing:-1px; line-height:1; }}
+  .kpi__n {{ font-size:22px; font-weight:600; letter-spacing:-1px; line-height:1; }}
   .kpi__l {{ font-size:9.5px; font-weight:500; margin-top:5px; }}
   .kpi__s {{ font-size:8px; color:rgba(255,255,255,.62); margin-top:2px; }}
 
@@ -133,17 +133,17 @@ HTML = f"""<!doctype html>
 <body>
   <div class="hero">
     <div class="mesh"></div>
-    <div class="hero__top"><img src="{logo_white}" alt="Sentinel"><span class="eyebrow">Sentinel &middot; ESSECKATHON Track 01 &middot; Fintech Security &middot; Equipe 2</span></div>
+    <div class="hero__top"><img src="{logo_white}" alt="Sentinel"><span class="eyebrow">Sentinel &middot; ESSECKATHON Track 01 &middot; Fintech Security &middot; Équipe 2</span></div>
     <h1>Defense sheet</h1>
-    <p>Un garde devant tout paiement d'agent IA : il verifie l'autorite et l'intention, delivre un visa on-chain si OK, refuse et flague si c'est une arnaque, escalade a un humain en cas de doute. Chaque decision est une preuve inviolable sur Avalanche.</p>
+    <p>Un garde devant tout paiement d'agent IA : il vérifie l'autorité et l'intention, délivre un visa on-chain si OK, refuse et flague si c'est une arnaque, escalade à un humain en cas de doute. Chaque décision est une preuve inviolable sur Avalanche.</p>
     <div class="badges"><span class="badge badge--live">SentinelL1 Live</span><span class="badge">chainId 99999</span><span class="badge">ERC-8004 + x402</span><span class="badge">2026-10-11</span></div>
   </div>
 
   <div class="sec threat">
-    <h2>Scenario de menace traite</h2>
-    <p class="quote">&laquo; a low-privilege agent, fed a booby-trapped document, tells a financial agent to execute a payment. Without authority-chain checks, it goes through. &raquo; (Track 01, probleme 2)</p>
-    <p>Un agent peu privilegie, nourri d'un document piege, ordonne un paiement a un agent financier. Sans verification de la chaine d'autorite, il passe. Cas reel Scamlexity : un agent de shopping achete sur un faux site et livre les donnees de paiement.</p>
-    <p class="vectors"><b>Vecteurs couverts :</b> injection indirecte (HTML cache, PDF, mail), tool poisoning (MCP), confusion d'autorite, address poisoning, tresorerie migree, encodage (base64 / hex / url / ROT13), homoglyphes, unicode invisible, depassement de mandat, contrepartie frauduleuse (domaine neuf, marque sosie, honeypot).</p>
+    <h2>Scénario de menace traité</h2>
+    <p class="quote">&laquo; a low-privilege agent, fed a booby-trapped document, tells a financial agent to execute a payment. Without authority-chain checks, it goes through. &raquo; (Track 01, problème 2)</p>
+    <p>Un agent peu privilégié, nourri d'un document piégé, ordonne un paiement à un agent financier. Sans vérification de la chaîne d'autorité, il passe. Cas réel Scamlexity : un agent de shopping achète sur un faux site et livre les données de paiement.</p>
+    <p class="vectors"><b>Vecteurs couverts :</b> injection indirecte (HTML caché, PDF, mail), tool poisoning (MCP), confusion d'autorité, address poisoning, trésorerie migrée, encodage (base64 / hex / url / ROT13), homoglyphes, unicode invisible, dépassement de mandat, contrepartie frauduleuse (domaine neuf, marque sosie, honeypot).</p>
   </div>
 
   <div class="two">
@@ -152,11 +152,11 @@ HTML = f"""<!doctype html>
   </div>
 
   <div class="para">
-    <b>La parade : verify_payment.</b> Pipeline pur et explicable, avant la signature : sanitisation (HTML cache, unicode invisible, blobs encodes), puis 7 couches de signaux (contenu, mandat, autorite on-chain, contrepartie, transaction, outils, comportement), blocs durs, fusion Claude sur l'intention, score de confiance degressif, seuils <span class="mono">allow &ge; 70 &middot; humain 30 a 70 &middot; block &lt; 30</span>. Le mandat est resolu cote serveur. Une adresse flaguee est refusee d'office la fois suivante.
+    <b>La parade : verify_payment.</b> Pipeline pur et explicable, avant la signature : sanitisation (HTML caché, unicode invisible, blobs encodés), puis 7 couches de signaux (contenu, mandat, autorité on-chain, contrepartie, transaction, outils, comportement), blocs durs, fusion Claude sur l'intention, score de confiance dégressif, seuils <span class="mono">allow &ge; 70 &middot; humain 30 à 70 &middot; block &lt; 30</span>. Le mandat est résolu côté serveur. Une adresse flaguée est refusée d'office la fois suivante.
   </div>
 
   <div class="sec">
-    <h2>Metriques atteintes (reproductibles)</h2>
+    <h2>Métriques atteintes (reproductibles)</h2>
     <div class="kpis">{kpi_cards}</div>
   </div>
 

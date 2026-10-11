@@ -24,37 +24,37 @@ logo_dark = b64(LOGO_DARK)
 
 FRAMEWORKS = [
     ("DORA", "Digital Operational Resilience Act", [
-        "Journal d'incidents inviolable : chaque block ou flag est un evenement on-chain date, une piste d'audit non repudiable (journalisation et detection des incidents TIC).",
-        "Detection et reponse : le garde detecte (7 couches + IA) et repond (block / flag / escalade) en moins d'1 ms (heuristiques) ou environ 3 s (fusion IA) ; un incident DORA est ouvert automatiquement au refus.",
-        "Resilience : repli local si la chaine est injoignable (le verdict tient), et le paiement ne passe jamais sans visa valide (fail-closed via GuardedVault).",
-        "Reporting : metriques exportables (taux de detection, faux positifs, temps de detection et de reponse, nombre d'incidents) pour le registre d'incidents.",
+        "Journal d'incidents inviolable : chaque block ou flag est un événement on-chain daté, une piste d'audit non répudiable (journalisation et détection des incidents TIC).",
+        "Détection et réponse : le garde détecte (7 couches + IA) et répond (block / flag / escalade) en environ 1,4 ms (heuristiques) ou environ 3 s (fusion IA) ; un incident DORA est ouvert automatiquement au refus.",
+        "Résilience : repli local si la chaîne est injoignable (le verdict tient), et le paiement ne passe jamais sans visa valide (fail-closed via GuardedVault).",
+        "Reporting : métriques exportables (taux de détection, faux positifs, temps de détection et de réponse, nombre d'incidents) pour le registre d'incidents.",
     ]),
     ("MiCA", "Markets in Crypto-Assets", [
-        "Tracabilite des transferts : emetteur, beneficiaire, montant, verdict et motif inscrits on-chain.",
-        "Controle du beneficiaire : registre de menaces on-chain et allowlist des contreparties, refus des adresses signalees (address poisoning, marchand fantome).",
-        "Gouvernance : decision par smart contract (AuthorityRegistry), autorites revocables, flags contestables (clearThreat, le droit de recours).",
+        "Traçabilité des transferts : émetteur, bénéficiaire, montant, verdict et motif inscrits on-chain.",
+        "Contrôle du bénéficiaire : registre de menaces on-chain et allowlist des contreparties, refus des adresses signalées (address poisoning, marchand fantôme).",
+        "Gouvernance : décision par smart contract (AuthorityRegistry), autorités révocables, flags contestables (clearThreat, le droit de recours).",
     ]),
-    ("AI Act", "Reglement IA de l'Union europeenne", [
-        "Transparence et explicabilite : chaque decision est explicable (signaux cites, poids, formule OU bruite, seuils affiches).",
-        "Surveillance humaine : la zone de doute (30 a 70) est escaladee a un humain avant tout paiement ; sa decision est tracee.",
-        "Robustesse : banc de tests honnete (detection 100 %, evasion 814 essais, faux positifs 0 %) et un adversaire adaptatif reel (0 bypass).",
-        "Journalisation : enregistrement automatique des decisions (logs + on-chain) sur toute la duree de vie.",
-        "Gestion du risque : pas d'allow devine sans preuve, plancher humain quand l'IA est indisponible.",
+    ("AI Act", "Règlement IA de l'Union européenne", [
+        "Transparence et explicabilité : chaque décision est explicable (signaux cités, poids, formule OU bruité, seuils affichés).",
+        "Surveillance humaine : la zone de doute (30 à 70) est escaladée à un humain avant tout paiement ; sa décision est tracée.",
+        "Robustesse : banc de tests honnête (détection 100 %, évasion 814 essais, faux positifs 0 %) et un adversaire adaptatif réel (0 bypass).",
+        "Journalisation : enregistrement automatique des décisions (logs + on-chain) sur toute la durée de vie.",
+        "Gestion du risque : pas d'allow deviné sans preuve, plancher humain quand l'IA est indisponible.",
     ]),
 ]
 
 AML_BULLETS = [
-    "Qui paie qui, combien, pourquoi : attache a chaque transaction (elements Travel Rule).",
-    "Detection de schemas : structuring (montant juste sous le plafond), velocite, beneficiaire recemment modifie, honeypot ou contrat non verifie.",
-    "Registre des adresses a risque : partage on-chain, la deuxieme tentative vers une adresse flaguee est refusee d'office.",
+    "Qui paie qui, combien, pourquoi : attaché à chaque transaction (éléments Travel Rule).",
+    "Détection de schémas : structuring (montant juste sous le plafond), vélocité, bénéficiaire récemment modifié, honeypot ou contrat non vérifié.",
+    "Registre des adresses à risque : partagé on-chain, la deuxième tentative vers une adresse flaguée est refusée d'office.",
 ]
 
 KYB = ("KYB souverain", "know your beneficiary",
-       "Couche opt-in (GUARD_KYB=on) qui verifie le beneficiaire contre le registre officiel des entreprises de l'Etat "
+       "Couche opt-in (GUARD_KYB=on) qui vérifie le bénéficiaire contre le registre officiel des entreprises de l'État "
        "(API Recherche d'entreprises, data.gouv.fr / DINUM). Entreprise active et correspondante : preuve officielle "
-       "attachee a la decision (SIREN + etat). Beneficiaire radie, introuvable ou nom non concordant : signal de risque et "
-       "escalade humaine. Verification par une source tierce officielle, loggee et rejouable (exigence DORA sur les tiers), "
-       "jamais declarative. Si le registre est indisponible, aucun paiement n'est debloque pour autant (fail-closed via les "
+       "attachée à la décision (SIREN + état). Bénéficiaire radié, introuvable ou nom non concordant : signal de risque et "
+       "escalade humaine. Vérification par une source tierce officielle, loggée et rejouable (exigence DORA sur les tiers), "
+       "jamais déclarative. Si le registre est indisponible, aucun paiement n'est débloqué pour autant (fail-closed via les "
        "autres couches).")
 
 
@@ -161,8 +161,8 @@ HTML = f"""<!doctype html>
   <div class="hero">
     <div class="brandmesh"></div>
     <div class="hero__top"><img src="{logo_white}" alt="Sentinel"><span class="eyebrow">Sentinel &middot; ESSECKATHON Track 01 &middot; Fintech Security</span></div>
-    <h1>Conformite</h1>
-    <p class="thesis">Chaque decision de paiement d'agent devient une preuve inviolable, horodatee et rejouable sur Avalanche. L'audit n'est plus declaratif, il est verifiable on-chain.</p>
+    <h1>Conformité</h1>
+    <p class="thesis">Chaque décision de paiement d'agent devient une preuve inviolable, horodatée et rejouable sur Avalanche. L'audit n'est plus déclaratif, il est vérifiable on-chain.</p>
     <div class="badges">
       <span class="badge badge--live">SentinelL1 Live</span>
       <span class="badge">chainId 99999</span>
@@ -172,9 +172,9 @@ HTML = f"""<!doctype html>
   </div>
 
   <div class="legend">
-    <span><b>Un controle</b> = <span class="mono">DecisionRecorded</span></span>
+    <span><b>Un contrôle</b> = <span class="mono">DecisionRecorded</span></span>
     <span><b>Un refus</b> = <span class="mono">ThreatFlagged</span></span>
-    <span><b>Une autorisation</b> = <span class="mono">VisaGranted</span> (visa a usage unique)</span>
+    <span><b>Une autorisation</b> = <span class="mono">VisaGranted</span> (visa à usage unique)</span>
   </div>
 
   <div class="grid">
@@ -182,19 +182,19 @@ HTML = f"""<!doctype html>
   </div>
 
   <div class="thresholds">
-    <span class="eyebrow">Seuils de decision &middot; recommandation KPMG</span>
+    <span class="eyebrow">Seuils de décision &middot; recommandation KPMG</span>
     <div class="trow">
-      <div class="tcell"><div class="t"><span class="dot" style="background:#0070f3"></span>Confiance &ge; 70</div><div class="d">Visa delivre, le paiement passe</div></div>
-      <div class="tcell"><div class="t"><span class="dot" style="background:#f5a623"></span>30 a 70</div><div class="d">Escalade a un humain avant tout paiement</div></div>
+      <div class="tcell"><div class="t"><span class="dot" style="background:#0070f3"></span>Confiance &ge; 70</div><div class="d">Visa délivré, le paiement passe</div></div>
+      <div class="tcell"><div class="t"><span class="dot" style="background:#f5a623"></span>30 à 70</div><div class="d">Escalade à un humain avant tout paiement</div></div>
       <div class="tcell"><div class="t"><span class="dot" style="background:#ee0000"></span>Confiance &lt; 30</div><div class="d">Refus et flag de l'adresse au registre</div></div>
     </div>
-    <div class="note">Seuils resserres automatiquement quand le montant approche le plafond du mandat.</div>
+    <div class="note">Seuils resserrés automatiquement quand le montant approche le plafond du mandat.</div>
   </div>
 
   <div class="proofs">
-    <span class="eyebrow">Preuves on-chain &middot; verifiables par le jury</span>
+    <span class="eyebrow">Preuves on-chain &middot; vérifiables par le jury</span>
     <div class="row">
-      <span class="kv"><b>Chaine</b> <span class="mono">SentinelL1 (chainId 99999)</span></span>
+      <span class="kv"><b>Chaîne</b> <span class="mono">SentinelL1 (chainId 99999)</span></span>
       <span class="kv"><b>AuthorityRegistry</b> <span class="mono">0x7A7e&hellip;bcb6</span></span>
       <span class="kv"><b>GuardedVault</b> <span class="mono">0xc7de&hellip;C7c0</span></span>
       <span class="kv"><b>Explorer</b> <span class="mono">https://explorer.petroi.fr</span></span>
@@ -203,7 +203,7 @@ HTML = f"""<!doctype html>
 
   <div class="foot">
     <span>Sentinel &middot; le garde des paiements d'agents IA</span>
-    <span>Chaque voiture de la ville 3D = un DecisionRecorded reel &middot; city.petroi.fr</span>
+    <span>Chaque voiture de la ville 3D = un DecisionRecorded réel &middot; city.petroi.fr</span>
   </div>
 </body></html>"""
 

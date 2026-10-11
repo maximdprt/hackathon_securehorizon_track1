@@ -11,7 +11,7 @@
 2. **Agent sauvé** : garde ON, même attaque → **BLOCK**, visa refusé, flag on-chain. Dans la ville, la voiture fait demi-tour. On ouvre la carte d'analyse : score, signaux, motif — tout est explicable.
 3. **2e agent immunisé** : un autre agent vise la même adresse → **refus direct** (registre on-chain). La protection est collective.
 
-**Preuves (30 s)** — Détection **100 %**, faux positifs **0 %** ; batterie **100/100** (10 stratégies × 10) ; évasion **814 essais, 0 faille** ; latence **< 1 ms**. 20 transactions réelles vérifiables dans l'explorateur. Honnête : chaque test est rejouable, on a trouvé et corrigé nos propres failles (ex. évasion ROT13).
+**Preuves (30 s)** — Détection **100 %**, faux positifs **0 %** ; batterie **100/100** (10 stratégies × 10) ; évasion **814 essais, 0 faille** ; latence **~1,4 ms**. 20 transactions réelles vérifiables dans l'explorateur. Honnête : chaque test est rejouable, on a trouvé et corrigé nos propres failles (ex. évasion ROT13).
 
 **Pourquoi ça gagne (20 s)** — Marche pour le **shopping** ET la **finance/crypto** (même garde, zéro modification). Conforme **DORA / MiCA / AML / AI Act** par conception (trace on-chain + human-in-the-loop). Sur **Avalanche** (requis), avec **ERC-8004** + **x402**.
 

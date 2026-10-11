@@ -25,7 +25,7 @@ Pipeline pur, explicable, avant la signature : **sanitisation** (HTML caché, un
 - **Détection 100 %** (23 attaques) · **Faux positifs 0 %** (52 contrôles) — `redteam/run.py`.
 - **Batterie 100/100** : 10 stratégies × 10, shopping + finance — 90/90 pièges, 0/10 faux positifs — `redteam/battery100.py`.
 - **Évasion** : 814 essais (casse, espaces, homoglyphes, unicode, base64/hex/url/ROT13, langues, split) → **100 % détection, 0 gap** — `redteam/evasion.py`.
-- **Latence** : ~0,8 ms (heuristiques seules) · ~3 s (avec Claude).
+- **Latence** : ~1,4 ms (heuristiques seules) · ~3 s (avec Claude).
 - **Bout-en-bout on-chain** : 20 transactions (shopping + finance) → 20/20 verdicts justes, 20/20 minées, visibles dans l'explorateur et la ville 3D — `redteam/validate_onchain.py`.
 - **156+ tests** (moteur, sanitizer, fuzzing, protocole MCP, e2e chaîne).
 

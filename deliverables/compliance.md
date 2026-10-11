@@ -4,7 +4,7 @@
 
 ## DORA (Digital Operational Resilience Act)
 - **Journal d'incidents inviolable** : chaque block/flag est un événement on-chain daté → piste d'audit non répudiable (art. sur la journalisation et la détection des incidents TIC).
-- **Détection & réponse** : le garde détecte (7 couches + IA) et répond (block/flag/escalade) en < 1 ms (heuristiques) / ~3 s (IA) ; incident DORA ouvert automatiquement au refus (`INC-AAAA-xxxx`).
+- **Détection & réponse** : le garde détecte (7 couches + IA) et répond (block/flag/escalade) en ~1,4 ms (heuristiques) / ~3 s (IA) ; incident DORA ouvert automatiquement au refus (`INC-AAAA-xxxx`).
 - **Résilience** : repli local si la chaîne est injoignable (le verdict tient), le paiement ne passe jamais sans visa valide (fail-closed via `GuardedVault`).
 - **Reporting** : métriques exportables (taux de détection, faux positifs, temps de détection/réponse, nb d'incidents) pour le registre d'incidents.
 

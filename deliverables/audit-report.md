@@ -45,7 +45,7 @@ Chaque décision écrit un événement inviolable et horodaté :
 
 ## 4. Cartographie réglementaire
 Détail complet dans `deliverables/compliance.md`. Synthèse :
-- **DORA** : journal d'incidents inviolable (chaque refus = incident daté on-chain) · détection + réponse (<1 ms heuristiques,
+- **DORA** : journal d'incidents inviolable (chaque refus = incident daté on-chain) · détection + réponse (~1,4 ms heuristiques,
   ~3 s avec IA) · résilience fail-closed (repli local, paiement jamais sans visa) · reporting métriques.
 - **MiCA** : traçabilité émetteur/bénéficiaire/montant/verdict on-chain · contrôle du bénéficiaire (registre de menaces) ·
   gouvernance par smart contract (autorités révocables, flags contestables).
@@ -65,7 +65,7 @@ Seuils resserrés automatiquement quand le montant approche le plafond du mandat
 - 21 scénarios d'attaque (S1-S7, M1-M10, A1, I1 + contrôles) → **détection 100 %, faux positifs 0 %**.
 - Campagne de durcissement : 47 cas bénins (**faux positifs 38 % → 0 %**), évasion **850 mutations**, fuzzing **800 requêtes**,
   tests protocole MCP + persistance, 3 passes Claude live stables.
-- Latence : **< 1 ms** (heuristiques) / **~3 s** (fusion IA).
+- Latence : **~1,4 ms** (heuristiques) / **~3 s** (fusion IA).
 
 **Adversaire réel adaptatif (attaquant LLM en boucle, reproductible `python redteam/adaptive_cap.py`)** :
 attaquant = Claude Sonnet 4.5 qui reçoit à chaque tour le verdict + les raisons du garde et **mute** pour les contourner,

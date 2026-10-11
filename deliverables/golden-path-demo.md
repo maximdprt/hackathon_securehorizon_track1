@@ -29,6 +29,6 @@ Depuis le repo, avec `.env` chargé :
 Chaque décision apparaît dans la ville (`/cars`) et l'explorateur. Pas de test en cours = pas de voiture (rien d'aléatoire).
 
 ## Replis (si un imprévu en live)
-- AWS expiré → rafraîchir `.env` (l'agent Bedrock) ; le garde tourne sans IA (`GUARD_LLM=off`, heuristiques, < 1 ms).
+- AWS expiré → rafraîchir `.env` (l'agent Bedrock) ; le garde tourne sans IA (`GUARD_LLM=off`, heuristiques, ~1,4 ms).
 - Chaîne lente → le verdict s'affiche quand même (repli local) ; relancer `deploy/deploy_city.py` si la ville décroche.
 - Mode hors-ligne du pitch → `https://city.petroi.fr/?live=0` (scénario scripté des 3 actes).
