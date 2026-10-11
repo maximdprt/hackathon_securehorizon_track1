@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "vite build && vite build -c vite.app.config.ts",
-    "copy": "node -e \"require('fs').copyFileSync('dist/sentinel-auth.js','../sentinel-auth.js');require('fs').copyFileSync('dist-app/sentinel-app.js','../sentinel-app.js')\""
+    "build": "vite build && vite build -c vite.app.config.ts && vite build -c vite.ops.config.ts",
+    "copy": "node -e \"const f=require('fs');f.copyFileSync('dist/sentinel-auth.js','../sentinel-auth.js');f.copyFileSync('dist-app/sentinel-app.js','../sentinel-app.js');f.copyFileSync('dist-ops/sentinel-ops.js','../sentinel-ops.js')\""
   },
   "dependencies": {
     "@privy-io/react-auth": "^2",
