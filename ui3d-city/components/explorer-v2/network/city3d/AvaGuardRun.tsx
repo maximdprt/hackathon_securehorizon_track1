@@ -19,7 +19,7 @@ import { HUB3, MASS3, type Theme } from "./palette";
 import type { Shot } from "./Rig";
 import { TIME } from "./shaders";
 import { guardGeoOf, poseAt, type GuardGeo } from "./guardGeo";
-import { Crown, ProofStack, Word } from "./Parcel";
+import { Crown, Departure, ProofStack, Word } from "./Parcel";
 import { CityYard } from "./CityYard";
 import { HumanLot } from "./HumanLot";
 import { GuardCar, type CarMats } from "./GuardCar";
@@ -112,7 +112,7 @@ function CChainGate({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
     u.value += (want - u.value) * Math.min(1, dt * 6);
   });
   return (
-    <group position={p} rotation={[0, -yaw, 0]}>
+    <group name="guard:gate" position={p} rotation={[0, -yaw, 0]}>
       {[-1, 1].map((side) => (
         <group key={side} position={[0, 0, (side * (w + t)) / 2]}>
           <mesh position={[0, h / 2, 0]} material={mats.pylon} castShadow>
@@ -282,6 +282,7 @@ export function AvaGuardRun({ model, city, routes, streets, theme, still, onShot
   return (
     <group>
       <Road geo={geo} theme={theme} />
+      <Departure geo={geo} theme={theme} />
       <Crown geo={geo} theme={theme} />
       {/* each piece of the parcel is a door to its screen (Door.tsx, sim/nav.ts) */}
       <Door name="guard:parking" at={[geo.parking.c.x, geo.S * 0.5, geo.parking.c.z]} tip={<ParkingTip />} onOpen={OPEN.parking}>

@@ -110,6 +110,49 @@ export function ProofStack({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* the departure                                                       */
+/* ------------------------------------------------------------------ */
+
+/* where a payment leaves the control tower: a low canopy over the road at the tower's corner, its roof on two side walls,
+   open toward the gantry, the protocol's green in a fine strip along its mouth and a faint pool of it on the road there.
+   The car starts under it, its tail still in the tower, and rolls out: it never shows through a wall */
+export function Departure({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
+  const { p, yaw, depth, w } = geo.departure;
+  const dark = theme === "dark";
+  const h = geo.carW * 1.55;
+  const t = Math.max(0.35, geo.carW * 0.14);
+  const mats = useMemo(
+    () => ({
+      shell: lambert(MASS3.frame[theme]),
+      soffit: lambert(MASS3.wall[theme]),
+      strip: basic(AVAGUARD3.crown[theme]),
+      pool: new MeshBasicMaterial({ color: AVAGUARD3.crown[theme], transparent: true, opacity: dark ? 0.16 : 0.1, depthWrite: false, toneMapped: false }),
+    }),
+    [theme, dark],
+  );
+  useEffect(() => () => Object.values(mats).forEach((m) => m.dispose()), [mats]);
+  // its frame: +x down the road (toward the gantry), z across it; it reaches back into the tower's corner as far as its
+  // walls meet the tower's two faces (the corner is a right angle on the road's axis), so it stands against the tower
+  const back = w / 2 + t;
+  const len = depth + back;
+  const mid = depth / 2 - back / 2;
+  return (
+    <group name="guard:departure" position={p} rotation={[0, -yaw, 0]}>
+      {[-1, 1].map((side) => (
+        <Block key={side} w={len} h={h} d={t} x={mid} z={(side * (w - t)) / 2} mat={mats.shell} />
+      ))}
+      <Block w={len} h={t * 0.8} d={w} x={mid} y0={h} mat={mats.shell} />
+      <Block w={len - t} h={0.05} d={w - 2 * t} x={mid} y0={h - 0.05} mat={mats.soffit} />
+      {/* the green strip along its mouth, under the roof's edge */}
+      <Block w={t * 0.6} h={t * 0.35} d={w - 2 * t} x={depth - t * 0.3} y0={h - t * 0.35} mat={mats.strip} />
+      <mesh position={[depth + geo.carW * 0.2, 0.09, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.pool} renderOrder={1}>
+        <planeGeometry args={[geo.carW * 2.2, w * 0.9]} />
+      </mesh>
+    </group>
+  );
+}
+
 /** the HQ's one addition: a fine green crown at its top (a discreet emissive ring) */
 export function Crown({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const hq = geo.hq;

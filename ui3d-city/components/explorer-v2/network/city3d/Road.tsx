@@ -46,10 +46,8 @@ function Strip({ geo, material }: { geo: { position: Float32Array; index: Uint32
 
 export function Road({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   const { road, dashes, center, edges } = useMemo(() => {
-    // the road's axis, from the ring road's outer edge to the tower's door, on the ground the car drives
-    const along = [...geo.legs.approach.pts, ...geo.legs.scanPass.pts.slice(1), ...geo.legs.toCChain.pts.slice(1)];
-    const dOf = (p: Vector3) => -p.dot(geo.F);
-    const pts = along.filter((p) => dOf(p) >= geo.road.d0 && dOf(p) <= geo.road.d1 + geo.carW);
+    // the road's axis, from the tower's foot (under the departure canopy) down to the ring road's outer edge
+    const pts = geo.road.axis;
     // the dashes, as the ring road's: a dash, a gap
     const dash = geo.carW * 0.9;
     const dashes: Vector3[][] = [];

@@ -112,7 +112,8 @@ Sans `NEXT_PUBLIC_SENTINEL_API`, tout tourne sur la simulation locale.
 
 ```bash
 npm test                  # vitest : city-wards (+ cas Security), city-ring (l'anneau du réseau), Director (4 scènes), source des écrans
-npm run test:visual       # Playwright (Chrome installé) : captures home / péage / déchetterie, et chaque porte, dans docs/captures
+npm run test:visual       # Playwright (Chrome installé) : captures home / péage / déchetterie, et chaque porte, dans docs/captures ;
+                          # paths.spec.ts vérifie chaque trajet de la voiture sur la scène (raccords, virages, aucun mur ni poteau)
 npm run extract           # ré-extraire la City depuis un clone de builders-hub
 npm run snapshot          # ré-enregistrer l'instantané Fuji (une fois)
 node tools/capture.mjs <plan.json>   # captures et images pour GIF via Chrome headless

@@ -97,12 +97,13 @@ export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime;
     const inLot = motion.visible && (motion.leg === "toParking" || motion.leg === "parkToCChain" || motion.leg === "parkToScrapyard");
-    // each gate's barrier lifts while our car is near it, then falls back behind it
+    // each gate's barrier lifts as our car comes through it, then falls back behind it: the entry's on the way in, the
+    // exit's on the way out; while the car waits for a person, both stay down
     const near = [false, false];
     if (inLot) {
       poseAt(geo.legs[motion.leg as "toParking" | "parkToCChain" | "parkToScrapyard"], motion.u, car);
-      near[0] = car.distanceTo(P.gate) < geo.carL * 1.1;
-      near[1] = car.distanceTo(P.exit) < geo.carL * 1.1;
+      near[0] = motion.leg === "toParking" && motion.u < 0.999 && car.distanceTo(P.gate) < geo.carL * 1.1;
+      near[1] = motion.leg !== "toParking" && car.distanceTo(P.exit) < geo.carL * 1.1;
     }
     const k = Math.min(1, dt * 5);
     for (let i = 0; i < 2; i++) {
@@ -136,9 +137,10 @@ export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
   // the aisle, between the front railing and the bays; the booth between the aisle and the bays, where the car waits
   const aisleX = -depth / 2 - aisle / 2;
   const booth = { x: -depth / 2 + w * 0.42, z: 0, w: w * 0.6, d: w * 1.25, h: w * 1.05 };
+  // AVAGUARD: the lamps at the back corners, and at the front along the side railings, clear of the gates and the car's turns
   const corners: [number, number][] = [
-    [x0 + post * 2, z0 + post * 2],
-    [x0 + post * 2, z1 - post * 2],
+    [x0 + (x1 - x0) * 0.42, z0 + post * 2],
+    [x0 + (x1 - x0) * 0.42, z1 - post * 2],
     [x1 - post * 2, z0 + post * 2],
     [x1 - post * 2, z1 - post * 2],
   ];
@@ -173,6 +175,7 @@ export function HumanLot({ geo, theme }: { geo: GuardGeo; theme: Theme }) {
               ref={(g) => {
                 arms.current[gi] = g;
               }}
+              name="barrier"
               position={[-post * 1.6, w * 0.55, gz0 + post * 1.3]}
             >
               {Array.from({ length: 6 }, (_, k) => (

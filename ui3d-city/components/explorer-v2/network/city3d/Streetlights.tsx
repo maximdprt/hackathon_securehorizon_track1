@@ -26,6 +26,7 @@ export function Streetlights({
   glow = false,
   model,
   rise = [],
+  keep,
 }: {
   city: City;
   theme: Theme;
@@ -33,6 +34,8 @@ export function Streetlights({
   /** the towers, and when each rises on the city's clock: a post rises with the tower nearest it */
   model?: CityModel;
   rise?: ArrayLike<number>;
+  /** AVAGUARD: where no post may stand (a plan point), as the protocol's road and the C-Chain's gate across it */
+  keep?: (x: number, z: number) => boolean;
 }) {
   const dark = theme === "dark";
   // each post's place in the plan: down both sides of every ring road, a lot's pitch apart, clear of the boulevards; and the tower nearest it
@@ -54,6 +57,7 @@ export function Streetlights({
           if (seams.length > 1 && seams.some((s) => Math.abs(Math.atan2(Math.sin(a - s), Math.cos(a - s))) < clear)) continue;
           const x = rr * Math.cos(a);
           const z = rr * Math.sin(a);
+          if (keep?.(x, z)) continue;
           let b = -1;
           let d = Infinity;
           model?.buildings.forEach((bd, i) => {
@@ -68,7 +72,7 @@ export function Streetlights({
       }
     });
     return out;
-  }, [city, model]);
+  }, [city, model, keep]);
 
   // when a post rises: with its tower, or at the clock's start when it has none
   const riseOf = (i: number) => {

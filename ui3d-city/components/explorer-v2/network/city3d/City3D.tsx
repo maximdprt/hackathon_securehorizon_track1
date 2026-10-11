@@ -563,6 +563,19 @@ export default function City3D({ data: incoming, network, versions = null, targe
     [onSelect, selected, still, holdHover],
   );
 
+  /* AVAGUARD: the protocol's road, from the C-Chain's plaza to our control tower, and the C-Chain's gate across it: no
+     street light stands on it (one stood in the gate's opening, a hand's breadth from the visa's car) */
+  const protocolRoad = useMemo(() => {
+    const hq = model.buildings[model.byId.get(AVAGUARD_ID) ?? -1];
+    if (!SENTINEL_ONLY || !hq) return undefined;
+    const len = Math.hypot(hq.x, hq.z) || 1;
+    const [ux, uz] = [hq.x / len, hq.z / len];
+    return (x: number, z: number) => {
+      const along = x * ux + z * uz;
+      return along > city.core * 0.5 && along < len && Math.abs(x * uz - z * ux) < city.lot * 0.24;
+    };
+  }, [model, city]);
+
   // AVAGUARD: the Director's shots over our parcel take the camera first; null hands it back to the city's own
   const [guardShot, setGuardShot] = useState<Shot | null>(null);
   const routeLit = useSim((s) => s.routeLit);
@@ -967,7 +980,7 @@ export default function City3D({ data: incoming, network, versions = null, targe
         </Stage>
         <Stage at={5}>{model.buildings.length > 0 && <Helicopters model={model} pulse={pulse} theme={theme} still={still} liveAt={schedule.liveAt} network={network} />}</Stage>
         <Stage at={3}>
-        <Streetlights city={city} theme={theme} glow={rich} model={model} rise={schedule.rise} />
+        <Streetlights city={city} theme={theme} glow={rich} model={model} rise={schedule.rise} keep={protocolRoad} />
         <Sites
           model={model}
           outskirts={outskirts}
