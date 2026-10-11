@@ -1,9 +1,10 @@
+import type { CSSProperties } from 'react';
 import type { Verdict } from '../types';
 
 const VERDICT = {
-  allow: { label: 'Paiement validé', tone: 'ok' },
-  needs_approval: { label: 'Validation humaine requise', tone: 'warn' },
-  block: { label: 'Paiement refusé', tone: 'bad' },
+  allow: { label: 'Paiement validé', tone: 'ok', stamp: 'Visa accordé' },
+  needs_approval: { label: 'Validation humaine requise', tone: 'warn', stamp: 'En attente' },
+  block: { label: 'Paiement refusé', tone: 'bad', stamp: 'Visa refusé' },
 } as const;
 const BACKEND: Record<string, string> = { mcp: 'par le serveur MCP', engine: 'moteur en direct', stub: 'garde de remplacement' };
 
@@ -89,11 +90,16 @@ export function GuardCard({ verdict, human, onDecide }: Props) {
 
       {trust != null && (
         <>
-          <p className="guard__score">
-            <span className="guard__value">{trust}</span>
-            <span className="guard__unit">/ 100 de confiance</span>
-          </p>
-          <div className="guard__bar" role="img" aria-label={`Confiance ${trust} sur 100`}>
+          <div className="guard__hero">
+            <p className="guard__score">
+              <span className="guard__value">{trust}</span>
+              <span className="guard__unit">/ 100 de confiance</span>
+            </p>
+            <span className="guard__stamp" data-stamp={v.stamp} aria-hidden="true" />
+          </div>
+          {/* les seuils du verdict dessinent les trois zones de la jauge */}
+          <div className={`guard__bar${th ? ' guard__bar--zoned' : ''}`} role="img" aria-label={`Confiance ${trust} sur 100`}
+            style={th ? ({ '--block': th.block_below, '--allow': th.allow_at_or_above } as CSSProperties) : undefined}>
             <span className="guard__fill" style={{ width: `${trust}%` }} />
             {th && <span className="guard__tick" style={{ left: `${th.block_below}%` }} />}
             {th && <span className="guard__tick" style={{ left: `${th.allow_at_or_above}%` }} />}

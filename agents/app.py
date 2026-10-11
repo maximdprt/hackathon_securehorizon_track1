@@ -68,6 +68,9 @@ SHOP_PATH = re.compile(r"/shop/([a-z0-9]+)(/.*)?")
 IMAGE_PATH = re.compile(re.escape(shops.IMAGE_ROOT) + r"/([a-z0-9]+)/([a-z0-9-]+)")  # la photo d'un produit dans une boutique
 # Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe (les photos viennent d'ici).
 SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
+# Le moteur de recherche est notre page, dessinée comme l'interface : elle charge en plus ses polices (Google Fonts), rien d'autre.
+SEARCH_CSP = {"Content-Security-Policy": SHOP_CSP["Content-Security-Policy"].replace("style-src 'unsafe-inline'", "style-src 'unsafe-inline' https://fonts.googleapis.com")
+              + "; font-src https://fonts.gstatic.com"}
 PACE = 0  # le serveur n'attend pas entre deux gestes : c'est l'interface qui les joue à vitesse humaine
 _llms: dict[str, BedrockLLM] = {}
 _guard: GuardClient | None = None  # le garde devant chaque paiement, réglé au lancement (--guard)
@@ -156,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/search":
             query = parse_qs(url.query).get("q", [""])[0]
             page = shops.search_page(query, "/search", lambda key: f"/shop/{key}/").replace('action="/search/"', 'action="/search"')
-            return self._send(200, page.encode(), "text/html; charset=utf-8", SHOP_CSP)
+            return self._send(200, page.encode(), "text/html; charset=utf-8", SEARCH_CSP)
         shop = SHOP_PATH.fullmatch(path)
         if shop and shop.group(1) in world.SITES:
             return self._shop("GET", shop.group(1), shop.group(2) or "/", {})

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Frame, Step } from '../run';
-import { easeMove, fillTime, ms, paced, sleep, T, travelTime, typingTime } from '../timing';
+import { easeMove, fillTime, ms, paced, sleep, T, tabTime, travelTime, typingTime } from '../timing';
 import type { Site } from '../types';
 import { Card, Globe, Lock, Pen, Pointer } from './Icons';
 
@@ -82,6 +82,7 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
   const trail = useRef<SVGSVGElement>(null);
   const at = useRef({ x: 0, y: 0 }); // où est la pointe du curseur, dans le repère de la page
   const shown = useRef(''); // adresse de la page chargée dans le cadre
+  const filled = useRef(''); // adresse de la page si le dernier geste y était une saisie : la suivante s'enchaîne avec Tab
   const turn = useRef(0); // un geste en cours est abandonné dès qu'un autre commence
   const arriving = useRef<{ frame: Frame; turn: number; play: boolean } | null>(null); // la page en cours de chargement
   const live = useRef(animate);
@@ -210,6 +211,10 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
       const doc = iframe.current?.contentDocument;
       const target = doc && frame.kind !== 'nav' && shown.current === frame.url ? byRef(doc, frame.ref) : null;
 
+      // une saisie qui suit une saisie sur la même page : comme au clavier, Tab passe au champ suivant, le curseur ne bouge pas
+      const tabbed = play && !!target && frame.kind === 'fill' && filled.current === frame.url;
+      filled.current = target && frame.kind === 'fill' ? frame.url : '';
+
       if (!doc || !target) {
         // une autre page : l'adresse se tape dans la barre, l'ancienne page s'efface, la nouvelle monte en place
         if (play && frame.kind === 'nav' && (frame.how === 'goto' || frame.how === 'search')) {
@@ -248,21 +253,31 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
         const field = byRef<HTMLInputElement>(doc, input.dataset.ref);
         if (field && input.dataset.ref !== frame.ref) field.value = input.value; // ce qui a déjà été saisi est en place
       });
-      if (play) await sleep(ms(T.hesitate));
-      if (!current()) return;
-      await reach(target, frame.kind === 'fill' ? 0.7 : 1);
-      if (!current()) return;
-      if (play && frame.kind === 'click') await sleep(ms(T.aim)); // le curseur se pose avant de cliquer
-      if (!current()) return;
-      target.setAttribute('data-hl', '1');
-      await press(frame.kind === 'fill' ? 'type' : 'click');
-      if (!current()) return;
+      if (tabbed) {
+        const view = iframe.current?.contentWindow;
+        const box = target.getBoundingClientRect();
+        if (view && (box.top < 24 || box.bottom > view.innerHeight - 24)) await scrollTo(view, target);
+        if (!current()) return;
+        await sleep(ms(T.tab));
+        if (!current()) return;
+        target.setAttribute('data-hl', '1'); // le champ suivant prend le focus
+      } else {
+        if (play) await sleep(ms(T.hesitate));
+        if (!current()) return;
+        await reach(target, frame.kind === 'fill' ? T.fillMove : 1);
+        if (!current()) return;
+        if (play && frame.kind === 'click') await sleep(ms(T.aim)); // le curseur se pose avant de cliquer
+        if (!current()) return;
+        target.setAttribute('data-hl', '1');
+        await press(frame.kind === 'fill' ? 'type' : 'click');
+        if (!current()) return;
+      }
 
       if (frame.kind === 'fill') {
         const field = target as HTMLInputElement;
         const value = byRef<HTMLInputElement>(next, frame.ref)?.value ?? '';
         // la saisie finit à l'heure prévue (fillTime) : si la page a défilé longtemps, la frappe accélère
-        const typing = play ? Math.min(ms(typingTime(value.length)), began + ms(fillTime(value.length)) - performance.now()) : 0;
+        const typing = play ? Math.min(ms(typingTime(value.length)), began + ms(tabbed ? tabTime(value.length) : fillTime(value.length)) - performance.now()) : 0;
         if (typing >= value.length * 6) {
           field.value = '';
           const start = performance.now();
