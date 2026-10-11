@@ -197,22 +197,10 @@ export function BrowserView({ frame, frameKey, animate, agentName, sites, captio
         </>
       ) : (
         <div className="browser__start">
-          <h2 className="browser__start-title">Le navigateur de l'agent</h2>
+          <h2 className="browser__start-title">Commencez une conversation avec un agent</h2>
           <p className="browser__start-text">
-            Donnez une consigne à l'agent : il cherche, ouvre les boutiques, choisit un article, remplit le formulaire et paie. Chaque page qu'il voit
-            s'affiche ici, avec son curseur qui se déplace, clique et tape.
+            Confiez-lui un achat dans le chat, à droite. Vous le verrez agir ici en direct, geste après geste, pendant qu'il explique ce qu'il fait.
           </p>
-          <p className="browser__start-text">Les cinq boutiques du bac à sable, que vous pouvez aussi visiter vous-même :</p>
-          <ul className="browser__tiles">
-            {sites.map((s) => (
-              <li key={s.key}>
-                <a className="browser__tile" href={s.preview} target="_blank" rel="noopener">
-                  <span className="browser__tile-name">{s.name}</span>
-                  <span className="browser__tile-domain">{s.domain}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
         </div>
       )}
     </section>

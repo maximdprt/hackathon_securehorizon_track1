@@ -42,12 +42,6 @@
   border-radius: 0 0 14px 14px; }
 .browser__start-title { margin: 0 0 10px; font-size: 22px; font-weight: 700; }
 .browser__start-text { max-width: 62ch; margin: 0 0 12px; font-size: 15px; line-height: 1.55; color: #44505E; }
-.browser__tiles { margin: 18px 0 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
-.browser__tile { display: flex; flex-direction: column; gap: 4px; min-height: 44px; padding: 16px; border: 1px solid #E3E7ED; border-radius: 12px;
-  background: #F7F8FA; color: inherit; text-decoration: none; }
-.browser__tile:hover { border-color: var(--accent); }
-.browser__tile-name { font-size: 15px; font-weight: 600; }
-.browser__tile-domain { font: 400 12px 'JetBrains Mono', Consolas, monospace; color: #5E6B7A; }
 
 @media (max-width: 1000px) {
   .agentic { flex-direction: column; height: auto; min-height: 100%; }
