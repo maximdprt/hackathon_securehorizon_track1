@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 type W = { __doorAt?: (k: string) => [number, number] | null; __ag?: { sim: { get: () => { view: string | null; viewFilter: string } } } };
 
 async function open(page: Page) {
-  await page.goto("/");
+  await page.goto("/?live=0");
   await page.locator("canvas").first().waitFor();
   await page.waitForFunction(() => !!(window as unknown as W).__doorAt?.("hub"));
   await page.waitForTimeout(9_000);
