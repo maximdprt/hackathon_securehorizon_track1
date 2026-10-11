@@ -119,7 +119,7 @@ def _decide(body: dict):
     """Un humain tranche un paiement en attente (outil approve_pending), puis la décision entre dans SentinelL1."""
     try:
         iid, decision = str(body["instruction_id"]), body["decision"]
-        assert decision in ("allow", "block") and len(iid) <= 100
+        assert decision in ("allow", "decline", "block") and len(iid) <= 100
     except Exception:
         return _resp(400, json.dumps({"error": "bad request"}))
     guard, chain = _guard_chain()
@@ -127,7 +127,8 @@ def _decide(body: dict):
         final = guard.approve(iid, decision, "humain (interface de la sandbox)")
     except Exception as exc:  # décision déjà tranchée, ou attente gardée par un autre conteneur
         return _resp(409, json.dumps({"error": f"{type(exc).__name__}: {str(exc)[:300]}"}))
-    onchain = chain.authorize(final, None, item="validation humaine") if chain else None
+    # « refusé, sans fraude » (decline) ne retient rien contre le marchand : rien n'est écrit (un block le signalerait)
+    onchain = chain.authorize(final, None, item="validation humaine") if chain and decision != "decline" else None
     return _resp(200, json.dumps({"instruction_id": iid, "verdict": final["verdict"], "trust_score": final.get("trust_score"),
                                   "approved_by": final.get("approved_by"), "onchain": onchain}, default=str))
 

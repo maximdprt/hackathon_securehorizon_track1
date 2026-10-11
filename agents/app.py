@@ -71,6 +71,9 @@ SHOP_PATH = re.compile(r"/shop/([a-z0-9]+)(/.*)?")
 IMAGE_PATH = re.compile(re.escape(shops.IMAGE_ROOT) + r"/([a-z0-9]+)/([a-z0-9-]+)")  # la photo d'un produit dans une boutique
 # Les boutiques servies à un humain : formulaires vers ce serveur seulement, aucun script, aucune ressource externe (les photos viennent d'ici).
 SHOP_CSP = {"Content-Security-Policy": "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'"}
+# Le moteur de recherche est notre page, dessinée comme l'interface : elle charge en plus ses polices (Google Fonts), rien d'autre.
+SEARCH_CSP = {"Content-Security-Policy": SHOP_CSP["Content-Security-Policy"].replace("style-src 'unsafe-inline'", "style-src 'unsafe-inline' https://fonts.googleapis.com")
+              + "; font-src https://fonts.gstatic.com"}
 PACE = 0  # le serveur n'attend pas entre deux gestes : c'est l'interface qui les joue à vitesse humaine
 # la ville 3D, en ligne et en développement : son bouton Valider / Refuser tranche une attente par /api/decide
 CITY_ORIGINS = {"https://city.petroi.fr", "http://localhost:3000", "http://127.0.0.1:3000"}
@@ -166,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/search":
             query = parse_qs(url.query).get("q", [""])[0]
             page = shops.search_page(query, "/search", lambda key: f"/shop/{key}/").replace('action="/search/"', 'action="/search"')
-            return self._send(200, page.encode(), "text/html; charset=utf-8", SHOP_CSP)
+            return self._send(200, page.encode(), "text/html; charset=utf-8", SEARCH_CSP)
         shop = SHOP_PATH.fullmatch(path)
         if shop and shop.group(1) in world.ALL_SITES:
             return self._shop("GET", shop.group(1), shop.group(2) or "/", {})
@@ -188,7 +191,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 body = json.loads(self.rfile.read(length))
                 iid, decision = str(body["instruction_id"]), body["decision"]
-                assert decision in ("allow", "block") and len(iid) <= 100 and _guard is not None
+                assert decision in ("allow", "decline", "block") and len(iid) <= 100 and _guard is not None
             except Exception:
                 return self._json(400, {"error": "bad request"})
             try:
@@ -199,7 +202,8 @@ class Handler(BaseHTTPRequestHandler):
             with (OUT / "decisions.jsonl").open("a", encoding="utf-8") as f:
                 f.write(json.dumps({"instruction_id": iid, "decision": decision, "at": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
             # la décision humaine entre dans SentinelL1 comme les autres : visa ou signalement, et la voiture garée repart
-            onchain = _chain.authorize(final, None, item="validation humaine") if _chain else None
+            # « refusé, sans fraude » (decline) ne retient rien contre le marchand : rien n'est écrit (un block le signalerait)
+            onchain = _chain.authorize(final, None, item="validation humaine") if _chain and decision != "decline" else None
             return self._json(200, {"instruction_id": iid, "verdict": final["verdict"], "trust_score": final.get("trust_score"),
                                     "approved_by": final.get("approved_by"), "onchain": onchain})
         try:

@@ -97,7 +97,7 @@ function StepLine({ step, selected, live, onSelect }: StepProps) {
   );
 }
 
-type OutcomeProps = { end: EndEvent; human?: AgentMessage['human']; onDecide: (decision: 'allow' | 'block') => void };
+type OutcomeProps = { end: EndEvent; human?: AgentMessage['human']; onDecide: (decision: 'allow' | 'decline' | 'block') => void };
 
 /** Ce que le bac à sable sait du destinataire et que ni l'agent ni le garde ne savent : pour juger si le verdict est juste. */
 function Truth({ end }: { end: EndEvent }) {
@@ -194,7 +194,7 @@ const VERDICT = {
 } as const;
 const TX_LABEL = { visa: 'Visa', flag: 'Signalement', decision: 'Décision' } as const;
 
-type SentinelProps = { verdict: Verdict; onchain?: Onchain | null; human?: AgentMessage['human']; onDecide: (decision: 'allow' | 'block') => void };
+type SentinelProps = { verdict: Verdict; onchain?: Onchain | null; human?: AgentMessage['human']; onDecide: (decision: 'allow' | 'decline' | 'block') => void };
 
 /** La notification SentinelL1 : un acteur à part, que l'agent ne connaît pas. Révélée APRÈS la voiture : le verdict, le
     détail du score du garde (GuardCard), la décision humaine quand elle est attendue, et la preuve on-chain. */
@@ -266,7 +266,7 @@ type Props = {
   onSelect: (frame: number) => void;
   onRetry: (prompt: string) => void;
   /** Un humain tranche le paiement que le garde a mis en attente. */
-  onDecide: (decision: 'allow' | 'block') => void;
+  onDecide: (decision: 'allow' | 'decline' | 'block') => void;
 };
 
 export function AgentReply({ msg, shownFrame, onSelect, onRetry, onDecide }: Props) {

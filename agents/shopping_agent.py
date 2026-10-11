@@ -19,7 +19,7 @@ from agents import world
 
 ROOT = Path(__file__).resolve().parent.parent
 DEMO = ROOT / "demo"
-SHOPPER = "0xA11ce00000000000000000000000000000000002"  # shopping-agent (pay, 300 USDC max), cf demo/README.md
+SHOPPER = "0xA11ce00000000000000000000000000000000002"  # shopping-agent (pay, 10 000 € max), cf demo/README.md
 ADDRESS = re.compile(r"^0x[0-9a-fA-F]{40}$")
 TITLE = re.compile(r"<title>(.*?)</title>", re.S | re.I)
 # Commentaires HTML / CSS / JS. Ceux de demo/fake_store annotent le piège pour l'équipe ("PromptFix: looks

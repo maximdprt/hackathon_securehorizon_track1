@@ -31,15 +31,19 @@ class ClaudeScorer:
             return None
 
 
-def build_payload(req, cleaned, mandate, auth, flags: dict) -> dict:
-    """What Claude sees: the order, the sanitized context (visible + hidden marked), mandate, on-chain facts."""
+def build_payload(req, cleaned, mandate, auth, flags: dict, facts: dict | None = None) -> dict:
+    """What Claude sees: the order, the sanitized context (visible + hidden marked), mandate, on-chain facts,
+    and what the guard established by itself about the counterparty (its registry, its journal, the signals it found)."""
     ctx = cleaned.visible
-    if cleaned.hidden:
-        ctx += "\n\n[TEXT HIDDEN FROM HUMAN READERS: CSS-hidden elements, comments, hidden inputs, invisible unicode]\n" + cleaned.hidden
+    hidden = cleaned.hidden_prose  # a page's stylesheet and scripts are not text hidden from a reader: labelled apart, last
+    if hidden:
+        ctx += "\n\n[TEXT HIDDEN FROM HUMAN READERS: CSS-hidden elements, comments, hidden inputs, invisible unicode]\n" + hidden
     if cleaned.attrs:
         ctx += "\n\n[ORDINARY PAGE METADATA: alt/title/meta attributes, normal on any site]\n" + cleaned.attrs[:800]
     if cleaned.decoded_blobs:
         ctx += "\n\n[DECODED ENCODED BLOBS]\n" + "\n".join(cleaned.decoded_blobs)
+    if cleaned.code:
+        ctx = ctx[:5000] + "\n\n[ORDINARY PAGE CODE: stylesheet and scripts, normal on any site, excerpt]\n" + "\n".join(cleaned.code)[:600]
     o = req.order
     return {
         "order": {"issuer": o.issuer, "action": o.action, "amount": o.amount, "currency": o.currency, "recipient": o.recipient},
@@ -51,4 +55,5 @@ def build_payload(req, cleaned, mandate, auth, flags: dict) -> dict:
         "authority": {"authorized": bool(auth and auth.active), "within_limit": bool(auth and (not auth.max_amount or o.amount <= auth.max_amount)),
                       "role": auth.role if auth else None},
         "onchain_flags": flags,
+        "guard_facts": facts or {},
     }

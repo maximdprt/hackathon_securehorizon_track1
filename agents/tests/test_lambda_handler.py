@@ -48,7 +48,7 @@ def test_an_unknown_task_type_is_refused_before_any_model_is_called(lam):
 
 def test_a_held_payment_is_settled_by_a_human_once(lam):
     guard, _ = lam._guard_chain()
-    held = run_browser(f"Achète {world.PRODUCTS['series-10-46']['name']}", Driver(*buy("nimbus", "series-10-46")), guard=guard)
+    held = run_browser(f"Achète {world.PRODUCTS['series-10-46']['name']}", Driver(*buy("meridian", "series-10-46")), guard=guard)  # domaine récent, premier achat : un humain
     assert held["verdict"]["verdict"] == "needs_approval"
     iid = held["verdict"]["instruction_id"]
     code, out = call(lam, "/api/decide", {"instruction_id": iid, "decision": "allow"})

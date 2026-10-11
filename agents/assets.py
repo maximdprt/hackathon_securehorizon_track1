@@ -45,7 +45,7 @@ ASSETS: dict[str, Asset] = {a.id: a for a in [
     Asset("stableharbor", "StableHarbor USDC Vault", "legit", 4.5, KNOWN_1, "stableharbor.example", 1400,
           "Trail of Bits, 2026", "182 M USDC", allowlisted=True, prior=True,
           why="protocole connu, audité, adresse dans l'allowlist, domaine ancien", target="allow"),
-    Asset("novayield", "NovaYield Finance", "legit", 7.0, "0x0C4A2D000000000000000000000000000000E1EC", "novayield.example", 21,
+    Asset("novayield", "NovaYield Finance", "legit", 7.0, "0x40BA71E1D000000000000000000000000000F1A2", "novayield.example", 21,
           "audit en cours", "6 M USDC", allowlisted=False, prior=True,
           why="protocole légitime mais récent et non audité : escalade humaine", target="needs_approval"),
     Asset("hyperyield", "HyperYield Protocol", "fraud", 9.5, SCAM_ADDR, "hyper-yield.example", 4,

@@ -61,7 +61,7 @@ strings demo/poisoned_docs/treasury_migration.pdf | grep -c BADc0ffee
 | Adresse | Rôle |
 |---|---|
 | `0xA11ce00000000000000000000000000000000001` | treasury-agent (pay/transfer, 100 USDC max), cf `data/mandates.json` |
-| `0xA11ce00000000000000000000000000000000002` | shopping-agent (pay, 300 USDC max) |
+| `0xA11ce00000000000000000000000000000000002` | shopping-agent (pay, 10 000 € max) |
 | `0xA11ce00000000000000000000000000000000003` | reader : lit les docs, aucune action de paiement |
 | `0x5e11e40000000000000000000000000000000001` | vendeur Nimbus, dans l'allowlist |
 | `0xBADc0ffee0000000000000000000000000000000` | la "nouvelle trésorerie" du hacker, à inscrire au registre menaces après le premier block (Acte 3 : refus direct) |

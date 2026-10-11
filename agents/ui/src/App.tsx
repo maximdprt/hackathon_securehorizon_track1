@@ -5,6 +5,7 @@ import { AgentEditor } from './components/AgentEditor';
 import { AgentReply } from './components/AgentReply';
 import { BrowserView } from './components/BrowserView';
 import { Composer } from './components/Composer';
+import { Shield } from './components/Icons';
 import { Panel } from './components/Panel';
 import { applyEvent, type AgentMessage, type Message } from './run';
 import { durationOf, sleep, spoken } from './timing';
@@ -35,7 +36,7 @@ type ThreadProps = {
   onIdea: (text: string) => void;
   onSelect: (id: string, frame: number) => void;
   onRetry: (prompt: string) => void;
-  onDecide: (id: string, decision: 'allow' | 'block') => void;
+  onDecide: (id: string, decision: 'allow' | 'decline' | 'block') => void;
 };
 
 function Thread({ messages, mode, shown, onIdea, onSelect, onRetry, onDecide }: ThreadProps) {
@@ -153,13 +154,16 @@ export default function App() {
       controller.current = abort;
       let ended = false;
       let said = ''; // la dernière explication écrite dans le fil
+      let before = ''; // le dernier geste joué dans le navigateur : deux saisies de suite s'enchaînent avec Tab
       try {
         for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model, mode, guard: guardOn }, abort.signal)) {
           ended ||= ev.type === 'end' || ev.type === 'error';
           patch((m) => applyEvent(m, ev, shopName));
           const narrated = spoken(ev) !== '' && spoken(ev) !== said;
           if (narrated) said = spoken(ev);
-          await sleep(durationOf(ev, narrated), abort.signal); // le geste se joue et son explication s'écrit, avant le suivant
+          const tabbed = ev.type === 'fill' && before === 'fill';
+          if (ev.type === 'nav' || ev.type === 'click' || ev.type === 'fill') before = ev.type;
+          await sleep(durationOf(ev, narrated, tabbed), abort.signal); // le geste se joue et son explication s'écrit, avant le suivant
         }
         if (!ended) patch((m) => ({ ...m, status: 'error', error: 'Le serveur a coupé la réponse avant la fin du run.' }));
       } catch (err) {
@@ -176,7 +180,7 @@ export default function App() {
   );
 
   /** Un humain tranche un paiement mis en attente par le garde. */
-  async function settle(id: string, decision: 'allow' | 'block') {
+  async function settle(id: string, decision: 'allow' | 'decline' | 'block') {
     const target = messages.find((m) => m.id === id);
     const iid = target?.role === 'agent' ? target.end?.verdict?.instruction_id : null;
     if (!iid) return;
@@ -269,7 +273,7 @@ export default function App() {
           </span>
           <div className="chat__identity">
             <h1 className="chat__name">{current.name}</h1>
-            <p className="chat__presence">
+            <p className={`chat__presence${running ? ' chat__presence--busy' : ''}`}>
               <span className="chat__presence-dot" aria-hidden="true" />
               {running ? 'Au travail' : 'Disponible'} · {modelLabel(current)}
             </p>
@@ -291,20 +295,25 @@ export default function App() {
 
         {tab === 'chat' ? (
           <>
-            <div className="chat__mode" role="group" aria-label="Type de tâche">
-              {(['shop', 'finance'] as const).map((m) => (
-                <button key={m} type="button" className="chat__mode-btn" aria-pressed={mode === m} disabled={running} onClick={() => setMode(m)}>
-                  {m === 'shop' ? 'Boutiques' : 'Finance'}
-                </button>
-              ))}
+            <div className="chat__setup">
+              <div className="chat__mode" role="group" aria-label="Type de tâche">
+                {(['shop', 'finance'] as const).map((m) => (
+                  <button key={m} type="button" className="chat__mode-btn" aria-pressed={mode === m} disabled={running} onClick={() => setMode(m)}>
+                    {m === 'shop' ? 'Boutiques' : 'Finance'}
+                  </button>
+                ))}
+              </div>
+              <label className={`chat__guard${world.guard ? '' : ' chat__guard--off'}`}>
+                <span className="chat__guard-icon" aria-hidden="true">
+                  <Shield />
+                </span>
+                <input type="checkbox" className="chat__guard-box" checked={!!world.guard && guardOn} disabled={!world.guard || running} onChange={(e) => setGuardOn(e.target.checked)} />
+                <span className="chat__guard-switch" aria-hidden="true" />
+                <span className="chat__guard-text">
+                  {world.guard ? (guardOn ? 'Garde activé : chaque paiement est vérifié' : 'Garde coupé : le paiement part sans vérification') : 'Garde indisponible sur ce serveur'}
+                </span>
+              </label>
             </div>
-            <label className={`chat__guard${world.guard ? '' : ' chat__guard--off'}`}>
-              <input type="checkbox" className="chat__guard-box" checked={!!world.guard && guardOn} disabled={!world.guard || running} onChange={(e) => setGuardOn(e.target.checked)} />
-              <span className="chat__guard-switch" aria-hidden="true" />
-              <span className="chat__guard-text">
-                {world.guard ? (guardOn ? 'Garde activé : chaque paiement est vérifié' : 'Garde coupé : le paiement part sans vérification') : 'Garde indisponible sur ce serveur'}
-              </span>
-            </label>
             <Thread messages={messages} mode={mode} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} onDecide={settle} />
             <Composer agentName={current.name} text={draft} running={running} onChange={setDraft} onSend={send} onStop={() => controller.current?.abort()} />
           </>

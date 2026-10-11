@@ -84,7 +84,27 @@ def address_similarity(recipient: str, known: list[str]) -> str | None:
     return None
 
 
-def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource, data: dict) -> list[Signal]:
+def _wallets(known: dict) -> list[str]:
+    w = known.get("wallet")
+    return [str(x).strip().lower() for x in (w if isinstance(w, (list, tuple)) else [w]) if x]
+
+
+def established(recipient: str, data: dict) -> bool:
+    """A counterparty the guard itself knows as long-standing: in the global allowlist, an old active address of its registry,
+    or the registered wallet of a domain older than a month. Nothing a caller declares enters here."""
+    r = (recipient or "").strip().lower()
+    if not r:
+        return False
+    if r in data.get("allowlist", []):
+        return True
+    a = _dict((data.get("addresses") or {}).get(r))
+    if (_num(a.get("age_days")) or 0) >= 30 and (_num(a.get("tx_count")) or 0) > 0:
+        return True
+    return any(r in _wallets(d) and (_num(d.get("age_days")) or 0) >= 30 for d in (data.get("domains") or {}).values() if isinstance(d, dict))
+
+
+def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource, data: dict, prior: bool | None = None) -> list[Signal]:
+    """`prior`: has the guard itself already let this issuer pay this recipient (its own journal)? None = not asked (direct callers)."""
     sig: list[Signal] = []
     o = req.order
 
@@ -115,9 +135,28 @@ def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource
 
     merchant = _dict(req.context.get("merchant"))
     domain = _str(merchant.get("domain")).lower().strip()
+    known = _dict((data.get("domains") or {}).get(domain)) if domain else {}
+    wallets = _wallets(known)
+
+    if o.recipient and prior is not None:
+        # who vouches for this recipient, among what the guard knows by itself? What the caller declares does not count.
+        listed = o.recipient in (mandate.allowed_recipients if mandate else []) or o.recipient in data.get("allowlist", []) \
+            or bool(mandate and domain and domain in mandate.allowed_recipients)
+        in_registry = o.recipient in (data.get("addresses") or {}) or bool(known and (not wallets or o.recipient in wallets))
+        if not (listed or in_registry or prior):
+            sig.append(Signal("counterparty_unverified", LAYER, 0.30,
+                              "the guard knows nothing about this recipient: not in a list, no entry for its address or its merchant domain, never paid before"
+                              + (f" (declared domain {domain!r} is unknown to the guard)" if domain else " (no merchant declared)"), owasp=["ASI03"]))
+    if o.recipient and wallets and o.recipient not in wallets:
+        sig.append(Signal("recipient_not_merchant_wallet", LAYER, 0.50,
+                          f"{domain} is paid at {wallets[0][:8]}…{wallets[0][-4:]}, not at this recipient: the money leaves for someone else", owasp=["ASI03"]))
+
     if domain:
-        info = dict(_dict((data.get("domains") or {}).get(domain)))
-        info.update({k: v for k, v in merchant.items() if v is not None})
+        info = {k: v for k, v in merchant.items() if v is not None}
+        declared_age = _num(info.get("age_days", info.get("domain_age_days")))
+        info.update(known)  # what the guard knows by itself wins over what the caller declares
+        if declared_age is not None and (_num(known.get("age_days")) is None or declared_age < _num(known.get("age_days"))):
+            info["age_days"] = declared_age  # a caller may bring bad news (a younger domain), never good news
         host, label, tld = _registrable(domain)
 
         flagged, sev, reason = source.is_flagged(domain)
@@ -133,9 +172,11 @@ def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource
             elif age < 30:
                 sig.append(Signal("domain_age_days", LAYER, 0.30, f"domain registered {age} days ago"))
             # a shop that did not exist last month, and the user is known never to have bought there: the Scamlexity pattern
-            if 0 <= age < 30 and _dict(req.context.get("history")).get("prior_purchase") is False:
+            declared = _dict(req.context.get("history")).get("prior_purchase")
+            if 0 <= age < 30 and (declared is False or (declared is True and prior is False)):
                 sig.append(Signal("new_merchant_first_payment", LAYER, 0.50,
-                                  f"first payment to a merchant whose domain is {age:g} days old", owasp=["ASI07"]))
+                                  f"first payment to a merchant whose domain is {age:g} days old"
+                                  + ("" if declared is False else " (an earlier purchase is claimed, the guard has no record of one)"), owasp=["ASI07"]))
         if tld in RISKY_TLDS:
             sig.append(Signal("tld_risk", LAYER, 0.15, f"high-abuse TLD {tld}"))
         if any(host.endswith(f) for f in FREE_HOSTS):

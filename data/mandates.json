@@ -19,11 +19,11 @@
   "allowed_actions": [
    "pay"
   ],
-  "max_amount": 300,
+  "max_amount": 10000,
   "currency": "USDC|EUR",
   "allowed_recipients": [],
-  "description": "buy consumer goods requested by the user on reputable merchants, max 300 USDC per order",
-  "max_daily": 3000
+  "description": "buy consumer goods requested by the user on reputable merchants, max 10000 EUR per order",
+  "max_daily": 30000
  },
  "0xA11ce00000000000000000000000000000000003": {
   "role": "reader",
@@ -45,7 +45,8 @@
   "allowed_recipients": [
    "0x5e12e40000000000000000000000000000000001"
   ],
-  "description": "pays x402 API calls to whitelisted services, max 5 USDC per call"
+  "description": "pays x402 API calls to whitelisted services, max 5 USDC per call",
+  "max_daily": 50
  },
  "0xA11ce00000000000000000000000000000000005": {
   "role": "finance-agent",

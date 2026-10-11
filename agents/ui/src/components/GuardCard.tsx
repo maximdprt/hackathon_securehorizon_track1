@@ -1,9 +1,10 @@
+import type { CSSProperties } from 'react';
 import type { Verdict } from '../types';
 
 const VERDICT = {
-  allow: { label: 'Paiement validé', tone: 'ok' },
-  needs_approval: { label: 'Validation humaine requise', tone: 'warn' },
-  block: { label: 'Paiement refusé', tone: 'bad' },
+  allow: { label: 'Paiement validé', tone: 'ok', stamp: 'Visa accordé' },
+  needs_approval: { label: 'Validation humaine requise', tone: 'warn', stamp: 'En attente' },
+  block: { label: 'Paiement refusé', tone: 'bad', stamp: 'Visa refusé' },
 } as const;
 const BACKEND: Record<string, string> = { mcp: 'par le serveur MCP', engine: 'moteur en direct', stub: 'garde de remplacement' };
 
@@ -53,6 +54,12 @@ const LABELS: Record<string, string> = {
   amount_vs_history_zscore: "Montant inhabituel pour cet agent",
   velocity_1h: 'Rafale de paiements',
   nonce_replay: 'Paiement rejoué',
+  recipient_missing: 'Ordre de paiement sans destinataire',
+  counterparty_unverified: 'Destinataire inconnu du garde',
+  recipient_not_merchant_wallet: "L'argent ne part pas vers le compte connu de ce marchand",
+  task_order_mismatch: 'Tâche de lecture qui se termine en paiement',
+  authority_chain_broken: "Ordre relayé par un agent qui n'a pas le droit de payer",
+  inter_agent_message_signed: 'Ordre relayé par un autre agent sans signature établie',
   tool_description_changed: "La description d'un outil a changé",
   tool_description_has_directives: "Un outil contient des ordres adressés à l'agent",
 };
@@ -60,10 +67,10 @@ const LABELS: Record<string, string> = {
 const RULES = new Set(['amount_within_mandate', 'amount_over_onchain_cap', 'daily_cap_exceeded']);
 const points = (n: number) => String(Math.round(n * 10) / 10).replace('.', ',');
 
-export type Human = { state: 'sending' | 'done' | 'error'; decision: 'allow' | 'block'; error?: string };
+export type Human = { state: 'sending' | 'done' | 'error'; decision: 'allow' | 'decline' | 'block'; error?: string };
 
 /** embedded : dans la notification SentinelL1, qui porte déjà le verdict ; la carte n'en montre que le score et son détail. */
-type Props = { verdict: Verdict; human?: Human; onDecide?: (decision: 'allow' | 'block') => void; embedded?: boolean };
+type Props = { verdict: Verdict; human?: Human; onDecide?: (decision: 'allow' | 'decline' | 'block') => void; embedded?: boolean };
 
 /** Le verdict du garde : le score de confiance sur 100, où il se place par rapport aux seuils, et chaque retrait avec sa preuve. */
 export function GuardCard({ verdict, human, onDecide, embedded = false }: Props) {
@@ -84,11 +91,16 @@ export function GuardCard({ verdict, human, onDecide, embedded = false }: Props)
 
       {trust != null && (
         <>
-          <p className="guard__score">
-            <span className="guard__value">{trust}</span>
-            <span className="guard__unit">/ 100 de confiance</span>
-          </p>
-          <div className="guard__bar" role="img" aria-label={`Confiance ${trust} sur 100`}>
+          <div className="guard__hero">
+            <p className="guard__score">
+              <span className="guard__value">{trust}</span>
+              <span className="guard__unit">/ 100 de confiance</span>
+            </p>
+            <span className="guard__stamp" data-stamp={v.stamp} aria-hidden="true" />
+          </div>
+          {/* les seuils du verdict dessinent les trois zones de la jauge */}
+          <div className={`guard__bar${th ? ' guard__bar--zoned' : ''}`} role="img" aria-label={`Confiance ${trust} sur 100`}
+            style={th ? ({ '--block': th.block_below, '--allow': th.allow_at_or_above } as CSSProperties) : undefined}>
             <span className="guard__fill" style={{ width: `${trust}%` }} />
             {th && <span className="guard__tick" style={{ left: `${th.block_below}%` }} />}
             {th && <span className="guard__tick" style={{ left: `${th.allow_at_or_above}%` }} />}
@@ -127,8 +139,11 @@ export function GuardCard({ verdict, human, onDecide, embedded = false }: Props)
           <button type="button" className="button button--primary" disabled={human?.state === 'sending'} onClick={() => onDecide('allow')}>
             Approuver
           </button>
-          <button type="button" className="button" disabled={human?.state === 'sending'} onClick={() => onDecide('block')}>
+          <button type="button" className="button" disabled={human?.state === 'sending'} onClick={() => onDecide('decline')}>
             Refuser
+          </button>
+          <button type="button" className="button button--danger" disabled={human?.state === 'sending'} onClick={() => onDecide('block')}>
+            Signaler une fraude
           </button>
         </div>
       )}
@@ -136,8 +151,10 @@ export function GuardCard({ verdict, human, onDecide, embedded = false }: Props)
       {human?.state === 'done' && (
         <p className="guard__human">
           {human.decision === 'allow'
-            ? "Approuvé par un humain. La décision est inscrite au journal d'audit et sur SentinelL1 (visa) ; la sandbox ne rejoue pas le paiement."
-            : 'Refusé par un humain. Le destinataire est signalé sur SentinelL1 et au registre des menaces : la prochaine fois, refus direct.'}
+            ? "Approuvé par un humain, inscrit sur SentinelL1. Le même ordre, renvoyé au garde, passera une fois ; la sandbox ne rejoue pas le paiement."
+            : human.decision === 'decline'
+              ? "Refusé par un humain. Ce paiement ne part pas ; rien n'est retenu contre le marchand."
+              : 'Fraude signalée par un humain. Le destinataire est signalé sur SentinelL1 et au registre des menaces : la prochaine fois, refus direct.'}
         </p>
       )}
     </section>

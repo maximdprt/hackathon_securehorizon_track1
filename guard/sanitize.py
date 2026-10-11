@@ -40,6 +40,15 @@ class Cleaned:
     unicode_findings: dict[str, int] = field(default_factory=dict)
     homoglyph_words: list[str] = field(default_factory=list)
     hidden_sources: list[str] = field(default_factory=list)
+    code: list[str] = field(default_factory=list)  # page code inside `hidden` (CSS rules, scripts): scanned like the rest, but not prose hidden from a reader
+
+    @property
+    def hidden_prose(self) -> str:
+        """`hidden` without the page code: what a judge should read as text hidden from humans."""
+        out = self.hidden
+        for chunk in self.code:
+            out = out.replace(chunk, "")
+        return out.strip()
 
     @property
     def hidden_ratio(self) -> float:
@@ -135,9 +144,9 @@ def _is_hidden_element(el) -> bool:
     return False
 
 
-def _split_html(html: str) -> tuple[str, str, str, list[str]]:
+def _split_html(html: str) -> tuple[str, str, str, list[str], list[str]]:
     soup = BeautifulSoup(html, "html.parser")
-    hidden_parts, attr_parts, sources = [], [], []
+    hidden_parts, attr_parts, sources, code_parts = [], [], [], []
 
     for c in soup.find_all(string=lambda t: isinstance(t, Comment)):
         if c.strip():
@@ -177,19 +186,21 @@ def _split_html(html: str) -> tuple[str, str, str, list[str]]:
             if t:
                 hidden_parts.append(t)
                 sources.append(f"hidden:{el.name}")
+                if el.name in ("style", "script"):
+                    code_parts.append(t)
             el.decompose()
 
     visible = soup.get_text(" ", strip=True)
-    return visible, "\n".join(hidden_parts), "\n".join(attr_parts), sources
+    return visible, "\n".join(hidden_parts), "\n".join(attr_parts), sources, code_parts
 
 
 def clean(source: str, context_type: str = "text") -> Cleaned:
     source = source or ""
     looks_html = context_type == "html" or bool(re.search(r"<\s*(html|body|div|p|span|script|meta|img)\b", source, re.I))
     if looks_html:
-        visible, hidden, attrs, sources = _split_html(source)
+        visible, hidden, attrs, sources, code = _split_html(source)
     else:
-        visible, hidden, attrs, sources = source, "", "", []
+        visible, hidden, attrs, sources, code = source, "", "", [], []
 
     smuggled = _decode_tag_chars(visible + hidden)
     visible, f1 = _strip_invisible(visible)
@@ -205,4 +216,5 @@ def clean(source: str, context_type: str = "text") -> Cleaned:
     homoglyphs = _homoglyph_words(visible + " " + hidden + " " + attrs)
     blobs = _decode_blobs(visible + "\n" + hidden + "\n" + attrs)
     return Cleaned(visible=visible.strip(), hidden=hidden.strip(), attrs=attrs.strip(), decoded_blobs=blobs,
-                   unicode_findings=findings, homoglyph_words=homoglyphs, hidden_sources=sources)
+                   unicode_findings=findings, homoglyph_words=homoglyphs, hidden_sources=sources,
+                   code=[c for c in (unicodedata.normalize("NFKC", _strip_invisible(c)[0]).strip() for c in code) if c])

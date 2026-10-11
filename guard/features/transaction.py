@@ -37,6 +37,11 @@ SELECTORS = {
 }
 
 
+def nonce_key(issuer: str, nonce: str) -> str:
+    """Nonces are counted per issuer: one agent cannot burn another agent's nonce."""
+    return f"{(issuer or '').strip().lower()}:{nonce}"
+
+
 def decode_calldata(calldata: str) -> dict | None:
     cd = (calldata or "").lower().removeprefix("0x")
     if len(cd) < 8 or any(c not in "0123456789abcdef" for c in cd):
@@ -74,7 +79,8 @@ def extract(req: VerifyRequest, mandate: Mandate | None, source: AuthoritySource
                 sig.append(Signal("signature_contains_arbitrary_call", LAYER, 1.0, f"a {o.action} order carries an allowance call {dec['fn']}", hard=True, owasp=["ASI07"]))
 
     if o.nonce:
-        if source.nonce_seen(o.nonce):
+        # read only: a nonce is spent when its payment goes through (engine), not when an order is merely examined
+        if source.nonce_used(nonce_key(o.issuer, o.nonce)):
             sig.append(Signal("nonce_replay", LAYER, 1.0, f"nonce {o.nonce} already used (replay)", hard=True))
 
     x = _dict(req.context.get("x402"))
