@@ -5,18 +5,25 @@ s'arrête au verdict (allow / needs_approval / block). `request` suit `verify_pa
 {order, source_context, context_type, task, context}. Le mandat n'est pas fourni par l'agent.
 
 Backends (variable d'env GUARD_BACKEND, défaut "auto") :
-  engine : le moteur guard, sur une copie jetable de data/ (même montage que demo/golden_path.py)
-  stub   : règles minimales, pour faire tourner les agents tant que guard/ n'est pas dans le repo
+  mcp    : le serveur MCP du garde (mcp_server.py), lancé en sous-processus et appelé par ses outils : le vrai chemin
+  engine : le même moteur guard, appelé en direct dans ce programme (plus rapide à lancer, sans le protocole)
+  stub   : règles minimales, pour faire tourner les agents sans les dépendances du garde
   auto   : engine si le paquet guard est importable, sinon stub
+
+Dans les deux premiers cas le garde travaille sur une copie jetable de data/ (agents/out/guard_data) : le registre des
+menaces est vierge au lancement et se remplit au fil des refus (acte 3 : la deuxième fois, refus direct).
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import importlib.util
 import json
 import os
 import re
+import shutil
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -96,27 +103,147 @@ class StubGuard:
         }
 
 
-class EngineGuard:
-    """Le moteur guard, état jetable dans demo/out/data, registre menaces vierge au départ."""
+STATE = ("decisions.jsonl", "pending.json", "nonces.json", "threats.mock.json", "spend.json")  # ce que le garde écrit
 
-    def __init__(self):
-        from demo.golden_path import make_engine
-        self.engine = make_engine(None, os.environ.get("GUARD_LLM", "off") == "on")
+
+def fresh_data(target: Path | None = None) -> Path:
+    """Une copie de data/ sans l'état d'un lancement précédent : le garde y lit ses mandats et y écrit ses décisions."""
+    target = target or ROOT / "agents" / "out" / "guard_data"
+    if target.exists():
+        shutil.rmtree(target)
+    shutil.copytree(ROOT / "data", target, ignore=shutil.ignore_patterns(*STATE))
+    (target / "threats.mock.json").write_text("{}", encoding="utf-8")
+    return target
+
+
+class GuardError(RuntimeError):
+    """Le garde a refusé la requête elle-même (ordre mal formé) ou ne répond pas."""
+
+
+class EngineGuard:
+    """Le moteur guard appelé en direct, sur une copie jetable de data/."""
+
+    def __init__(self, data_dir: Path | None = None):
+        from guard.engine import Engine
+        from guard.llm import ClaudeScorer
+        self.engine = Engine.from_env(fresh_data(data_dir), llm=ClaudeScorer(enabled=os.environ.get("GUARD_LLM", "off") == "on"))
 
     def verify(self, request: dict) -> dict:
         return self.engine.verify(request)
 
+    def pending(self) -> list[dict]:
+        return self.engine.pending()
+
+    def approve(self, instruction_id: str, decision: str, approver: str, note: str = "") -> dict:
+        return self.engine.approve(instruction_id, decision, approver, note)
+
+    def decision(self, instruction_id: str) -> dict | None:
+        return self.engine.decision(instruction_id)
+
+    def close(self) -> None:
+        pass
+
+
+class McpGuard:
+    """Le garde par le protocole MCP : mcp_server.py tourne dans son propre processus, on appelle ses outils.
+
+    La session vit dans un fil à part (sa boucle asyncio) tant que le client existe ; les appels y sont postés un par un.
+    """
+
+    def __init__(self, data_dir: Path | None = None, start_timeout: float = 60):
+        self.data_dir = fresh_data(data_dir)
+        self.tools: list[str] = []
+        self._loop = asyncio.new_event_loop()
+        self._ready, self._lock, self._error = threading.Event(), threading.Lock(), None
+        self._session = self._stop = None
+        threading.Thread(target=self._run, name="guard-mcp", daemon=True).start()
+        if not self._ready.wait(start_timeout):
+            raise GuardError("mcp_server.py n'a pas démarré à temps (voir mcp_server.log)")
+        if self._error:
+            raise GuardError(f"mcp_server.py n'a pas démarré : {type(self._error).__name__}: {self._error}")
+
+    def _run(self) -> None:
+        asyncio.set_event_loop(self._loop)
+        self._loop.run_until_complete(self._serve())
+
+    async def _serve(self) -> None:
+        try:
+            from mcp import ClientSession, StdioServerParameters
+            from mcp.client.stdio import stdio_client
+            env = dict(os.environ, GUARD_DATA_DIR=str(self.data_dir), GUARD_LLM=os.environ.get("GUARD_LLM", "off"), PYTHONUNBUFFERED="1", PYTHONUTF8="1")
+            params = StdioServerParameters(command=sys.executable, args=[str(ROOT / "mcp_server.py")], cwd=str(ROOT), env=env)
+            async with stdio_client(params) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    self.tools = sorted(t.name for t in (await session.list_tools()).tools)
+                    self._session, self._stop = session, asyncio.Event()
+                    self._ready.set()
+                    await self._stop.wait()
+        except Exception as exc:  # dépendance absente, serveur qui plante au lancement...
+            self._error = exc
+            self._ready.set()
+
+    def _call(self, tool: str, args: dict, timeout: float = 120):
+        if self._session is None:
+            raise GuardError("la session MCP du garde est fermée")
+        with self._lock:  # le garde écrit son état (file humaine, registre) : un appel à la fois
+            res = asyncio.run_coroutine_threadsafe(self._session.call_tool(tool, args), self._loop).result(timeout)
+        texts = [c.text for c in res.content if getattr(c, "text", None)]
+        if res.is_error:
+            raise GuardError(texts[0] if texts else f"l'outil {tool} a échoué")
+        data = getattr(res, "structured_content", None)
+        if isinstance(data, dict):
+            return data["result"] if set(data) == {"result"} else data
+        return json.loads(texts[0]) if texts else None
+
+    def verify(self, request: dict) -> dict:
+        return self._call("verify_payment", {k: request[k] for k in ("order", "source_context", "context_type", "task", "context") if k in request})
+
+    def pending(self) -> list[dict]:
+        return self._call("list_pending", {}) or []
+
+    def approve(self, instruction_id: str, decision: str, approver: str, note: str = "") -> dict:
+        return self._call("approve_pending", {"instruction_id": instruction_id, "decision": decision, "approver": approver, "note": note})
+
+    def decision(self, instruction_id: str) -> dict | None:
+        try:
+            return self._call("get_decision", {"instruction_id": instruction_id})
+        except GuardError:
+            return None
+
+    def close(self) -> None:
+        if self._stop is not None:
+            self._loop.call_soon_threadsafe(self._stop.set)
+            self._session = None
+
 
 class GuardClient:
-    def __init__(self, backend: str | None = None):
+    def __init__(self, backend: str | None = None, data_dir: Path | None = None):
+        """`data_dir` : où le garde garde son état (défaut agents/out/guard_data, vidé à chaque lancement)."""
         backend = backend or os.environ.get("GUARD_BACKEND", "auto")
         if backend == "auto":
             backend = "engine" if importlib.util.find_spec("guard") else "stub"
         self.backend = backend
-        self._impl = {"engine": EngineGuard, "stub": StubGuard}[backend]()
+        self._impl = StubGuard() if backend == "stub" else {"mcp": McpGuard, "engine": EngineGuard}[backend](data_dir)
 
     def verify(self, request: dict) -> tuple[dict, float]:
         """Renvoie (verdict, latence en ms)."""
         t = time.perf_counter()
         verdict = self._impl.verify(request)
         return verdict, round((time.perf_counter() - t) * 1000, 2)
+
+    def pending(self) -> list[dict]:
+        """Les décisions en attente d'un humain."""
+        return self._impl.pending()
+
+    def approve(self, instruction_id: str, decision: str, approver: str, note: str = "") -> dict:
+        """Un humain tranche une décision en attente : "allow" ou "block"."""
+        return self._impl.approve(instruction_id, decision, approver, note)
+
+    def decision(self, instruction_id: str) -> dict | None:
+        """La décision enregistrée pour un ordre, avec son score et chaque retrait."""
+        return self._impl.decision(instruction_id)
+
+    def close(self) -> None:
+        if hasattr(self._impl, "close"):
+            self._impl.close()

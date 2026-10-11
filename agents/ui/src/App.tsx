@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { initials, loadAgents, saveAgents } from './agents';
-import { fetchWorld, streamRun } from './api';
+import { decide, fetchWorld, streamRun } from './api';
 import { AgentEditor } from './components/AgentEditor';
 import { AgentReply } from './components/AgentReply';
 import { BrowserView } from './components/BrowserView';
@@ -35,9 +35,10 @@ type ThreadProps = {
   onIdea: (text: string) => void;
   onSelect: (id: string, frame: number) => void;
   onRetry: (prompt: string) => void;
+  onDecide: (id: string, decision: 'allow' | 'block') => void;
 };
 
-function Thread({ messages, mode, shown, onIdea, onSelect, onRetry }: ThreadProps) {
+function Thread({ messages, mode, shown, onIdea, onSelect, onRetry, onDecide }: ThreadProps) {
   const thread = useRef<HTMLDivElement>(null);
   const stick = useRef(true); // on suit le bas du fil, sauf si l'utilisateur est remonté lire
 
@@ -87,7 +88,8 @@ function Thread({ messages, mode, shown, onIdea, onSelect, onRetry }: ThreadProp
             {m.text}
           </div>
         ) : (
-          <AgentReply key={m.id} msg={m} shownFrame={shown?.id === m.id ? shown.frame : null} onSelect={(frame) => onSelect(m.id, frame)} onRetry={onRetry} />
+          <AgentReply key={m.id} msg={m} shownFrame={shown?.id === m.id ? shown.frame : null} onSelect={(frame) => onSelect(m.id, frame)} onRetry={onRetry}
+            onDecide={(decision) => onDecide(m.id, decision)} />
         ),
       )}
     </div>
@@ -104,6 +106,8 @@ export default function App() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [draft, setDraft] = useState('');
   const [mode, setMode] = useState<Mode>(() => (new URLSearchParams(window.location.search).get('mode') === 'finance' ? 'finance' : 'shop'));
+  /** Le garde vérifie chaque paiement. Coupé : le paiement part, pour montrer ce qui se passe sans garde. */
+  const [guardOn, setGuardOn] = useState(true);
   /** L'étape passée que l'on revoit dans le navigateur. null : on suit l'agent en direct. */
   const [pin, setPin] = useState<{ id: string; frame: number } | null>(null);
   const controller = useRef<AbortController | null>(null);
@@ -150,7 +154,7 @@ export default function App() {
       let ended = false;
       let said = ''; // la dernière explication écrite dans le fil
       try {
-        for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model, mode }, abort.signal)) {
+        for await (const ev of streamRun({ prompt, agent: current.name, instructions: current.instructions, model, mode, guard: guardOn }, abort.signal)) {
           ended ||= ev.type === 'end' || ev.type === 'error';
           patch((m) => applyEvent(m, ev, shopName));
           const narrated = spoken(ev) !== '' && spoken(ev) !== said;
@@ -168,8 +172,23 @@ export default function App() {
         controller.current = null;
       }
     },
-    [world, current, mode],
+    [world, current, mode, guardOn],
   );
+
+  /** Un humain tranche un paiement mis en attente par le garde. */
+  async function settle(id: string, decision: 'allow' | 'block') {
+    const target = messages.find((m) => m.id === id);
+    const iid = target?.role === 'agent' ? target.end?.verdict?.instruction_id : null;
+    if (!iid) return;
+    const set = (human: AgentMessage['human']) => setMessages((all) => all.map((m) => (m.id === id && m.role === 'agent' ? { ...m, human } : m)));
+    set({ state: 'sending', decision });
+    try {
+      await decide(iid, decision);
+      set({ state: 'done', decision });
+    } catch (err) {
+      set({ state: 'error', decision, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
 
   useEffect(() => {
     // lien direct : /?ask=... lance la demande à l'ouverture
@@ -279,7 +298,14 @@ export default function App() {
                 </button>
               ))}
             </div>
-            <Thread messages={messages} mode={mode} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} />
+            <label className={`chat__guard${world.guard ? '' : ' chat__guard--off'}`}>
+              <input type="checkbox" className="chat__guard-box" checked={!!world.guard && guardOn} disabled={!world.guard || running} onChange={(e) => setGuardOn(e.target.checked)} />
+              <span className="chat__guard-switch" aria-hidden="true" />
+              <span className="chat__guard-text">
+                {world.guard ? (guardOn ? 'Garde activé : chaque paiement est vérifié' : 'Garde coupé : le paiement part sans vérification') : 'Garde indisponible sur ce serveur'}
+              </span>
+            </label>
+            <Thread messages={messages} mode={mode} shown={shown} onIdea={setDraft} onSelect={(id, f) => setPin({ id, frame: f })} onRetry={send} onDecide={settle} />
             <Composer agentName={current.name} text={draft} running={running} onChange={setDraft} onSend={send} onStop={() => controller.current?.abort()} />
           </>
         ) : (

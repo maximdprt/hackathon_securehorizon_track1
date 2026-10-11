@@ -493,7 +493,7 @@ def load_cases() -> dict[str, dict]:
     files = sorted((ROOT / "redteam" / "cases").glob("*.json")) + sorted((ROOT / "demo" / "fixtures").glob("*.json"))
     cases: dict[str, dict] = {}
     for p in files:
-        c = json.loads(p.read_text())
+        c = json.loads(p.read_text(encoding="utf-8"))
         if "request" not in c or "expected" not in c:
             continue
         if isinstance(c["expected"], dict):

@@ -61,7 +61,7 @@ def test_amount_exactly_at_cap_is_not_over_mandate(engine):
 def test_amount_just_over_cap_is_a_soft_signal(engine):
     v = engine.verify(req(amount=100.000001))
     s = sig(v, "amount_within_mandate")
-    assert s and not s["hard"] and s["weight"] == 0.5
+    assert s and not s["hard"] and s["weight"] == 0.0  # a rule now: no trust taken, a human decides
     assert v["authority_check"]["within_limit"] is False
     assert v["verdict"] != "allow"
 

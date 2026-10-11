@@ -91,7 +91,7 @@ test('the browser shows what the agent does, step by step, up to the confirmed o
 
   await ask('Achète une Apple Watch Series 10 46 mm');
   expect(await screen.findByText('Commande passée chez Meridian Watch Co.')).toBeInTheDocument();
-  expect(bodies).toEqual([{ prompt: 'Achète une Apple Watch Series 10 46 mm', agent: 'Chasseur de prix', model: 'm.pixtral', mode: 'shop', instructions: expect.stringContaining('prix le plus bas') }]);
+  expect(bodies).toEqual([{ prompt: 'Achète une Apple Watch Series 10 46 mm', agent: 'Chasseur de prix', model: 'm.pixtral', mode: 'shop', guard: true, instructions: expect.stringContaining('prix le plus bas') }]);
 
   // le navigateur est sur la dernière page : la confirmation de commande
   expect(screen.getByText('meridian-watch.example/confirmation/MER-1001', { selector: '.browser__url' })).toBeInTheDocument();
@@ -343,7 +343,7 @@ test('a reason repeated on consecutive steps is written once, and a step waits f
 
 test('with the guard on, the verdict is a SentinelL1 notification, not the agent speaking', async () => {
   const VERDICT = { verdict: 'block' as const, trust_score: 8, risk_score: 0.92, severity: 3, onchain_flagged: true,
-    instruction_id: '0xab', reasons: ['new_merchant_first_payment: domaine de 9 jours'], owasp: ['ASI07'], latency_ms: 1.2, backend: 'engine' };
+    instruction_id: '0xab', reasons: ['new_merchant_first_payment: domaine de 9 jours'], deductions: [], notes: [], thresholds: null, owasp: ['ASI07'], latency_ms: 1.2, backend: 'engine' };
   const ONCHAIN = { ok: true as const, verdict: 'block', payment_id: '0x11', nonce: 1, city: 'https://city.test/?live=1', latency_ms: 900,
     txs: [{ kind: 'flag' as const, hash: '0xf1f1f1f1f1', url: 'https://explorer.test/tx/0xf1' }, { kind: 'decision' as const, hash: '0xd1d1d1d1d1', url: 'https://explorer.test/tx/0xd1' }] };
   const events: RunEvent[] = [

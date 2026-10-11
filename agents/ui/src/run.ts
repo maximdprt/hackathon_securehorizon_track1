@@ -14,7 +14,7 @@ export type Frame = View & {
 /** Un geste de l'agent dans le fil : on peut cliquer dessus pour revoir la page à ce moment-là. */
 export type Step = {
   id: number;
-  kind: 'search' | 'research' | 'open' | 'click' | 'page' | 'fill' | 'choose' | 'pay' | 'submit' | 'invalid' | 'thought';
+  kind: 'search' | 'research' | 'open' | 'click' | 'page' | 'fill' | 'choose' | 'pay' | 'guard' | 'submit' | 'invalid' | 'thought';
   label: string;
   meta?: string;
   why?: string;
@@ -41,6 +41,8 @@ export type AgentMessage = {
   frames: Frame[];
   end?: EndEvent;
   error?: string;
+  /** La décision d'un humain sur un paiement que le garde a mis en attente. */
+  human?: { state: 'sending' | 'done' | 'error'; decision: 'allow' | 'block'; error?: string };
 };
 export type Message = UserMessage | AgentMessage;
 
@@ -99,10 +101,13 @@ export function applyEvent(msg: AgentMessage, ev: RunEvent, shopName: (key: stri
     }
     case 'invalid':
       return add({ kind: 'invalid', label: 'Geste impossible', meta: ev.message ?? 'Ordre refusé : adresse ou montant invalide.' });
+    case 'guard':
+      return add({ kind: 'guard', label: 'La transaction est vérifiée avant de partir' });
     case 'submit':
       return add({ kind: 'submit', label: `Transaction envoyée à ${ev.network}`, meta: 'une voiture entre dans la ville' });
+    case 'verdict':
     case 'onchain':
-      return msg; // la preuve on-chain est portée par l'événement final, révélée après la voiture
+      return msg; // le verdict et la preuve on-chain sont portés par l'événement final, révélés après la voiture
     case 'end':
       return { ...msg, status: 'done', end: ev };
     case 'error':

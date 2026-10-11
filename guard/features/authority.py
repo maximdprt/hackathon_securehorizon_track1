@@ -22,7 +22,7 @@ def extract(req: VerifyRequest, auth: Authority | None, source_ok: bool) -> list
         if auth.role.lower() in LOW_PRIV_ROLES and o.action in PAY_ACTIONS:
             sig.append(Signal("issuer_role_mismatch", LAYER, 0.60, f"role {auth.role!r} is not allowed to order {o.action!r}", owasp=["ASI03"]))
         if auth.max_amount and o.amount > auth.max_amount:
-            sig.append(Signal("amount_over_onchain_cap", LAYER, 0.50, f"amount {o.amount} > on-chain cap {auth.max_amount}", owasp=["ASI03"]))
+            sig.append(Signal("amount_over_onchain_cap", LAYER, 0.0, f"amount {o.amount} > on-chain cap {auth.max_amount}", owasp=["ASI03"]))
 
     if auth is not None and auth.flagged:
         sig.append(Signal("issuer_flagged_onchain", LAYER, 1.0, f"issuer flagged in incident registry (severity {auth.flag_severity}): {auth.flag_reason}", hard=True))

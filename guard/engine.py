@@ -24,7 +24,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def load_data(data_dir: Path) -> dict:
     def j(name, default):
         p = data_dir / name
-        return json.loads(p.read_text()) if p.exists() else default
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else default
     return {
         "mandates": {norm_addr(k): v for k, v in j("mandates.json", {}).items()},
         "allowlist": [norm_addr(x) for x in j("allowlist.json", [])],
@@ -38,9 +38,30 @@ def load_data(data_dir: Path) -> dict:
 
 class Engine:
     def __init__(self, source: AuthoritySource, sink: DecisionSink, queue: PendingQueue, llm: ClaudeScorer,
-                 data: dict, thresholds: dict | None = None):
+                 data: dict, thresholds: dict | None = None, spend_path: Path | None = None):
         self.source, self.sink, self.queue, self.llm, self.data = source, sink, queue, llm, data
         self.thresholds = thresholds or scoring.DEFAULT_THRESHOLDS
+        self.spend_path = spend_path  # what each issuer was allowed to pay, kept by the guard itself
+        self._spend: list[dict] = json.loads(spend_path.read_text(encoding="utf-8")) if spend_path and spend_path.exists() else []
+
+    # ----- cumulative cap: the guard counts what it let through, the caller cannot under-declare it -----
+    def _spent_24h(self, issuer: str) -> float:
+        since = time.time() - 86400
+        return sum(e["amount"] for e in self._spend if e["issuer"] == norm_addr(issuer) and e["ts"] >= since)
+
+    def _record_spend(self, out: dict) -> None:
+        self._spend.append({"issuer": norm_addr(out["issuer"]), "amount": float(out["amount"]), "ts": time.time()})
+        if self.spend_path:
+            self.spend_path.write_text(json.dumps(self._spend), encoding="utf-8")
+
+    def decision(self, instruction_id: str) -> dict | None:
+        """The recorded decision for one order (latest), with its trust score and every deduction. For audit."""
+        for sink in getattr(self.sink, "sinks", [self.sink]):
+            if hasattr(sink, "read_all"):
+                found = [d for d in sink.read_all() if d.get("instruction_id") == instruction_id]
+                if found:
+                    return found[-1]
+        return None
 
     @classmethod
     def from_env(cls, data_dir: str | Path | None = None, llm: ClaudeScorer | None = None) -> "Engine":
@@ -61,7 +82,8 @@ class Engine:
             except Exception as e:
                 log.error("chain source disabled (%s), using mock", e)
         thresholds = scoring.load_thresholds(ROOT / "detection" / "research" / "features_scoring.json")
-        return cls(source, CompositeSink(*sinks), PendingQueue(data_dir / "pending.json"), llm or ClaudeScorer(), load_data(data_dir), thresholds)
+        return cls(source, CompositeSink(*sinks), PendingQueue(data_dir / "pending.json"), llm or ClaudeScorer(), load_data(data_dir), thresholds,
+                   spend_path=data_dir / "spend.json")
 
     # ----- mandate resolution: never trusted from the agent -----
     def resolve_mandate(self, issuer: str, auth) -> Mandate | None:
@@ -109,6 +131,11 @@ class Engine:
             except Exception as e:  # malformed context facts: fail closed, never crash
                 log.warning("layer %s failed: %s", name, e)
                 signals.append(Signal(f"layer_error_{name}", name, 0.30, f"could not evaluate this layer ({type(e).__name__}: {str(e)[:80]}): treated as unverifiable"))
+        if mandate and mandate.max_daily:
+            spent = self._spent_24h(o.issuer)
+            if spent + o.amount > mandate.max_daily:
+                signals.append(Signal("daily_cap_exceeded", "mandate", 0.0,
+                                      f"{spent:g} already allowed in the last 24 h + {o.amount:g} exceeds the daily cap {mandate.max_daily:g}", owasp=["ASI03"]))
         # dedupe by id, keep the strongest
         best: dict[str, Signal] = {}
         for s in signals:
@@ -171,18 +198,30 @@ class Engine:
     # hard blocks that say nothing against the recipient itself: protocol or issuer-side failures
     PROTOCOL_BLOCKS = {"nonce_replay", "amount_matches_402_quote", "facilitator_endorsed", "issuer_in_registry",
                        "inter_agent_message_signed", "issuer_signature_invalid", "canary_in_outbound", "amount_within_mandate",
-                       "disable_logs_or_confirmation_attempt"}
+                       "disable_logs_or_confirmation_attempt", "amount_implausible"}
 
-    def _effects(self, out: dict) -> None:
+    def _flag(self, key: str, severity: int, reason: str) -> None:
+        """Flag a subject, never lowering what the registry already holds."""
+        try:
+            _, current, _ = self.source.is_flagged(key)
+        except Exception:
+            current = 0
+        if severity > current:
+            self.source.mark_threat(key, severity, reason)
+
+    def _effects(self, out: dict, confirmed: bool = False) -> None:
         if out["verdict"] == "block":
             reason = out["reasons"][0][:120] if out["reasons"] else "blocked by guard"
             hard_ids = {s["id"] for s in out.get("signals", []) if s.get("hard")}
-            recipient_to_blame = bool(hard_ids - self.PROTOCOL_BLOCKS) or not hard_ids  # soft-score block: the whole picture pointed at this counterparty
+            # severity 3 = direct refusal next time, kept for proof (a hard signal against this counterparty) or a human's confirmation;
+            # severity 2 = clues only (soft-score block): weighs on the next order without closing the door for good;
+            # severity 1 = a protocol or issuer-side failure that says nothing against the recipient.
+            proven = bool(hard_ids - self.PROTOCOL_BLOCKS) or confirmed
+            severity = 3 if proven else 2 if not hard_ids else 1
             try:
                 self.source.mark_threat(out["instruction_id"], 3, reason)
                 if out["recipient"]:
-                    # severity 3 = direct refusal next time; severity 1 = a trace in the registry, informational next time
-                    self.source.mark_threat(out["recipient"], 3 if recipient_to_blame else 1, reason)
+                    self._flag(out["recipient"], severity, reason)
                 fac = (out.get("x402") or {}).get("facilitator")
                 if "facilitator_endorsed" in hard_ids and fac:
                     self.source.mark_threat(fac, 3, "non-endorsed facilitator: " + reason)
@@ -192,6 +231,8 @@ class Engine:
                 out.setdefault("sink_errors", []).append(f"mark_threat: {e}")
         if out["verdict"] == "needs_approval":
             self.queue.add(out)
+        if out["verdict"] == "allow":
+            self._record_spend(out)
         self.sink.record(out)
 
     def approve(self, instruction_id: str, decision: str, approver: str, note: str = "") -> dict:
@@ -207,8 +248,9 @@ class Engine:
         pending["timestamp"] = datetime.now(timezone.utc).isoformat()
         pending["severity"] = 3 if decision == "block" else pending.get("severity", 2)
         if decision == "block":
-            self._effects(pending)
+            self._effects(pending, confirmed=True)
         else:
+            self._record_spend(pending)
             self.sink.record(pending)
         return pending
 

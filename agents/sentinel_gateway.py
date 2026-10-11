@@ -21,10 +21,15 @@ STATUS = {"allow": "approved", "needs_approval": "pending_human", "block": "refu
 
 
 def verdict_summary(v: dict, latency_ms: float | None, backend: str | None) -> dict:
-    """Ce que l'interface montre de l'analyse."""
+    """Ce que l'interface montre de l'analyse du garde : le verdict, le score de confiance, chaque retrait avec sa preuve,
+    les seuils, et les raisons lisibles."""
+    evidence = {s["id"]: s.get("evidence", "") for s in v.get("signals") or []}
     return {"verdict": v["verdict"], "trust_score": v.get("trust_score"), "risk_score": v.get("risk_score"),
             "severity": v.get("severity"), "reasons": [short_reason([r], 220) for r in (v.get("reasons") or [])[:6]],
-            "owasp": v.get("owasp") or [], "onchain_flagged": bool(v.get("onchain_flagged")),
+            "deductions": [{"id": d["id"], "layer": d["layer"], "cost": d["cost"], "hard": d["hard"], "evidence": evidence.get(d["id"], "")[:240]}
+                           for d in v.get("deductions") or []],
+            "notes": [r[9:] for r in v.get("reasons") or [] if r.startswith("[engine] ")],
+            "thresholds": v.get("trust_thresholds"), "owasp": v.get("owasp") or [], "onchain_flagged": bool(v.get("onchain_flagged")),
             "instruction_id": v.get("instruction_id"), "latency_ms": latency_ms, "backend": backend}
 
 

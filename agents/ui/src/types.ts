@@ -2,7 +2,7 @@
 
 export type Site = { key: string; name: string; domain: string; kind: 'legit' | 'fraud'; why: string; preview: string; /** Couleur d'identité de la boutique. */ color?: string };
 export type Profile = { name: string; city: string; card: string };
-export type World = { sites: Site[]; models: Record<string, string>; default_model: string; profile: Profile };
+export type World = { sites: Site[]; models: Record<string, string>; default_model: string; profile: Profile; /** Le garde branché devant les paiements : mcp, engine, stub, ou null s'il n'y en a pas. */ guard?: string | null };
 
 export type Order = { issuer: string; action: string; amount: number; currency: string; recipient: string };
 export type Considered = { merchant: string; price: number | null; assessment: string; site: string | null };
@@ -15,6 +15,8 @@ export type Confirmation = {
   card: { holder: string; last4: string; exp: string };
 };
 
+/** Un retrait de points par le garde : l'indice, ce qu'il coûte et la preuve citée. `hard` : un refus direct, sans calcul. */
+export type Deduction = { id: string; layer: string; cost: number; hard: boolean; evidence: string };
 /** L'analyse de la transaction à l'entrée de SentinelL1 (outil MCP verify_payment). L'agent ne la voit pas. */
 export type Verdict = {
   verdict: 'allow' | 'needs_approval' | 'block';
@@ -22,6 +24,9 @@ export type Verdict = {
   risk_score: number | null;
   severity: number | null;
   reasons: string[];
+  deductions: Deduction[];
+  notes: string[];
+  thresholds: { allow_at_or_above: number; block_below: number } | null;
   owasp: string[];
   onchain_flagged: boolean;
   instruction_id: string | null;
@@ -73,6 +78,8 @@ export type RunEvent =
   | { type: 'invalid'; tool?: string; message?: string }
   | { type: 'submit'; network: string }
   | ({ type: 'onchain' } & Onchain)
+  | { type: 'guard'; status: string }
+  | ({ type: 'verdict' } & Partial<Verdict>)
   | EndEvent
   | { type: 'error'; message: string };
 

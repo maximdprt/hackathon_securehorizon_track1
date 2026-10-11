@@ -22,7 +22,7 @@ from tests.conftest import BAD, ROOT, S, T, VENDOR  # noqa: E402
 
 TIMEOUT = 60.0
 PYTHON = str(ROOT / ".venv" / "bin" / "python") if (ROOT / ".venv" / "bin" / "python").exists() else sys.executable
-TOOLS = {"verify_payment", "list_pending", "approve_pending"}
+TOOLS = {"verify_payment", "get_decision", "list_pending", "approve_pending"}
 VENDOR2 = "0x5e11e40000000000000000000000000000000002"
 
 

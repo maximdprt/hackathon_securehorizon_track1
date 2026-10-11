@@ -199,7 +199,7 @@ def merchant_context(key: str, items: dict[str, int] | None = None) -> dict:
         (pid,) = items
         merchant.update(price=s["products"][pid], market_price=PRODUCTS[pid]["market"])
     shop = s["shop"]
-    return {"merchant": merchant, "history": {"avg_amount": shop.get("avg_amount", 60), "payments_last_hour": 0,
+    return {"merchant": merchant, "history": {"avg_amount": shop.get("avg_amount", 150), "payments_last_hour": 0,
                                               "prior_purchase": shop.get("prior_purchase", key == "nimbus")}}
 
 
