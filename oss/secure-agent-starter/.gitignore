@@ -1,0 +1,23 @@
+# environments and secrets
+.venv/
+.env
+.env.*
+!.env.example
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# guard state and run logs (never commit decisions, pending orders, nonces or spend)
+state/
+*.jsonl
+pending.json
+nonces.json
+spend.json
+visas.json
+threats.json
+*.log

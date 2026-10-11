@@ -1,0 +1,29 @@
+{
+  "0xA11ce00000000000000000000000000000000002": {
+    "role": "shopping-agent",
+    "allowed_actions": ["pay"],
+    "max_amount": 10000,
+    "max_daily": 30000,
+    "currency": "USDC|EUR",
+    "allowed_recipients": [],
+    "description": "buy consumer goods requested by the user on reputable merchants, max 10000 per order"
+  },
+  "0xA11ce00000000000000000000000000000000004": {
+    "role": "service-agent",
+    "allowed_actions": ["pay", "approve", "swap"],
+    "max_amount": 5,
+    "max_daily": 50,
+    "currency": "USDC",
+    "allowed_recipients": ["0x5e12e40000000000000000000000000000000001"],
+    "description": "pays x402 API calls to whitelisted services, max 5 USDC per call"
+  },
+  "0xA11ce00000000000000000000000000000000005": {
+    "role": "finance-agent",
+    "allowed_actions": ["pay", "approve", "swap", "transfer"],
+    "max_amount": 300,
+    "max_daily": 600,
+    "currency": "USDC",
+    "allowed_recipients": ["0x5e11e40000000000000000000000000000000001", "0x5e11e40000000000000000000000000000000002"],
+    "description": "invest or move USDC on known protocols, max 300 USDC per action"
+  }
+}

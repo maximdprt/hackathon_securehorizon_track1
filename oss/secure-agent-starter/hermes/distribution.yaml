@@ -1,0 +1,14 @@
+# Hermes Agent profile distribution: `hermes profile install ./oss/secure-agent-starter/hermes --alias`
+# installs it as the isolated profile `sentinel-demo`. Your default Hermes profile is not touched.
+name: sentinel-demo
+version: 0.1.0
+description: "Jarvis, a payment agent whose money moves are screened by the Sentinel guard (MCP), with a sandbox wallet to try it on"
+hermes_requires: ">=0.16.0"
+author: "Sentinel contributors"
+license: MIT
+
+env_requires:
+  - name: SENTINEL_API_KEY
+    description: "Sentinel hosted API key. Optional: without it screen_payment runs locally; with it the guard also reads the shared threat registry and records decisions on SentinelL1"
+    required: false
+    default: ""

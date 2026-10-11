@@ -1,0 +1,53 @@
+# Hermes Agent config for the sentinel-demo profile (installed as ~/.hermes/profiles/sentinel-demo/config.yaml).
+#
+# No model is set here on purpose: pick yours with `sentinel-demo model` (any provider with tool calling works).
+# Hermes keeps this file on `hermes profile update` unless you pass --force-config, so your model choice survives.
+#
+# Two MCP servers:
+#   sentinel  the Sentinel guard. screen_payment is ADVISORY: the model calls it because the safe-payments skill says so.
+#   wallet    a sandbox wallet (simulated USDC) and a small world to act in. The guard runs INSIDE its pay and
+#             pay_x402 tools, so the verdict is ENFORCED even when the model skips screen_payment.
+#
+# Hermes starts stdio servers with a filtered environment (PATH, HOME, USER, LANG, LC_ALL, TERM, SHELL, TMPDIR, XDG_*)
+# plus each server's `env:` block, so every SENTINEL_* variable a server needs is listed there. `${SENTINEL_API_KEY}`
+# is resolved from your shell or the profile's .env when the server starts; left unresolved, both servers treat it
+# as unset.
+#
+# Before sentinel-guard and secure-agent-starter are on PyPI, use the local-path args shown in README.md.
+
+mcp_servers:
+  sentinel:
+    command: uvx
+    args: ["sentinel-guard"]
+    env:
+      SENTINEL_API: "https://rpc.petroi.fr"
+      SENTINEL_API_KEY: "${SENTINEL_API_KEY}"   # unset: local-only screening, nothing leaves the machine
+    timeout: 60             # seconds per tool call; authorize_payment waits for the on-chain write
+    connect_timeout: 120    # the first uvx run downloads the package
+    sampling:
+      enabled: false
+    tools:
+      include: [screen_payment, authorize_payment, explain_decision]
+      resources: false
+      prompts: false
+
+  wallet:
+    command: uvx
+    args: ["--from", "secure-agent-starter", "secure-agent", "wallet-mcp"]   # add "--offline" to keep its guard local
+    env:
+      SENTINEL_API: "https://rpc.petroi.fr"
+      SENTINEL_API_KEY: "${SENTINEL_API_KEY}"
+    timeout: 120
+    connect_timeout: 180
+    sampling:
+      enabled: false
+    tools:
+      include: [search, research, open_page, call_api, pay, pay_x402, wallet_status]
+      resources: false
+      prompts: false
+
+agent:
+  # A payment agent needs neither a shell nor code execution, and each one is a way around the guarded wallet.
+  # file: no editing of this profile's own SOUL.md or skills. web/browser: the sandbox world comes from the wallet
+  # server only. memory: text injected by a page should not persist into later sessions.
+  disabled_toolsets: [terminal, code_execution, file, browser, web, computer_use, delegation, cronjob, messaging, memory]
